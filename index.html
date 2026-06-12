@@ -849,7 +849,7 @@
               <option value="aurora" selected>Aurora</option>
               <option value="wan26t2v">Wan 2.6</option>
               <option value="wan22spicy">Wan 2.2 Spicy</option>
-              <option value="wan26spicy">Wan 2.6 Spicy</option>
+              <option value="wan26spicy">Wan 2.7 Spicy</option>
             </select>
           </div>
           <div class="img-control-group">
@@ -1477,7 +1477,7 @@ async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progres
     modelPath = 'x-ai/grok-imagine-video/video-extend';
     body = { prompt, video: extendVideoUrl, duration: Math.min(duration, 10) };
   } else if (imageDataUrl) {
-    modelPath = 'x-ai/grok-imagine-video/image-to-video';
+    modelPath = 'x-ai/grok-imagine-video-v1.5/image-to-video';
     body = { prompt, image: imageDataUrl, duration };
   } else {
     // Text-to-video
@@ -1554,7 +1554,7 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   } else if (imageDataUrl) {
     // I2V
     modelPath = engine === 'wan26spicy'
-      ? 'alibaba/wan-2.6/image-to-video-spicy'
+      ? 'alibaba/wan-2.7/image-to-video-spicy'
       : 'wavespeed-ai/wan-2.2-spicy/image-to-video';
     const wanDuration = engine === 'wan26spicy' ? Math.min(duration, 15) : Math.min(duration, 5);
     body = { prompt, image: imageDataUrl, resolution: res, duration: wanDuration, aspect_ratio: ratio, seed: -1 };
@@ -1762,7 +1762,7 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
       <option value="aurora" selected>Aurora</option>
       <option value="wan26t2v">Wan 2.6</option>
       <option value="wan22spicy">Wan 2.2 Spicy</option>
-      <option value="wan26spicy">Wan 2.6 Spicy</option>
+      <option value="wan26spicy">Wan 2.7 Spicy</option>
     `;
   }
 
