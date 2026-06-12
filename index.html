@@ -846,6 +846,7 @@
             <span class="mode-label">Engine</span>
             <select id="vid-engine-select" class="img-control-select">
               <option value="aurora" selected>Aurora</option>
+              <option value="wan26t2v">Wan 2.6</option>
               <option value="wan22spicy">Wan 2.2 Spicy</option>
               <option value="wan26spicy">Wan 2.6 Spicy</option>
             </select>
@@ -1443,11 +1444,11 @@ async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUr
 
   // Determine engine — from override (animate/extend buttons) or UI selector
   const engine = engineOverride || document.getElementById('vid-engine-select')?.value || 'aurora';
-  const useWaveSpeed = engine === 'wan22spicy' || engine === 'wan26spicy';
+  const useWaveSpeed = true; // All video routes through WaveSpeed
 
   try {
     if (useWaveSpeed) {
-      if (!wavespeedKey) throw new Error('WaveSpeed API key required. Tap "Set API Key" to add it.');
+      if (!wavespeedKey) throw new Error('WaveSpeed API key required for video. Tap "Set API Key" to add it.');
       await generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engine, progressId, () => cancelled);
     } else {
       await generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progressId, () => cancelled);
@@ -1462,52 +1463,50 @@ async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUr
 }
 
 // ═══════════════════════════════════════════════════════
-// AURORA VIDEO (xAI)
+// AURORA VIDEO (via WaveSpeed — cheaper + T2V support)
 // ═══════════════════════════════════════════════════════
 async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progressId, isCancelled) {
   const duration = parseInt(document.getElementById('vid-duration-select').value);
   const ratio    = document.getElementById('vid-ratio-select').value;
   const res      = document.getElementById('vid-res-select').value;
 
-  let endpoint = 'https://api.x.ai/v1/videos/generations';
-  let body;
+  let modelPath, body;
 
   if (extendVideoUrl) {
-    // Video extension — aspect_ratio/resolution not supported per xAI docs
-    body = {
-      model: 'grok-imagine-video-1.5-2026-05-30',
-      prompt,
-      video: { url: extendVideoUrl },
-      duration: Math.min(duration, 10) // max 10s for extension
-    };
+    modelPath = 'x-ai/grok-imagine-video/video-extend';
+    body = { prompt, video: extendVideoUrl, duration: Math.min(duration, 10), seed: -1 };
+  } else if (imageDataUrl) {
+    modelPath = 'x-ai/grok-imagine-video/image-to-video';
+    body = { prompt, image: imageDataUrl, duration, aspect_ratio: ratio, resolution: res, seed: -1 };
   } else {
-    body = {
-      model: 'grok-imagine-video-1.5-2026-05-30',
-      prompt,
-      duration,
-      aspect_ratio: ratio,
-      resolution: res
-    };
-    if (imageDataUrl) body.image = { url: imageDataUrl };
+    // Text-to-video — uses older grok-imagine-video which supports T2V
+    modelPath = 'x-ai/grok-imagine-video/text-to-video';
+    body = { prompt, duration, aspect_ratio: ratio, resolution: res, seed: -1 };
   }
 
-  const submitRes = await fetch(endpoint, {
+  const submitRes = await fetch(`https://api.wavespeed.ai/api/v3/${modelPath}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wavespeedKey}` },
     body: JSON.stringify(body)
   });
 
   if (!submitRes.ok) {
     const e = await submitRes.json().catch(()=>({}));
-    throw new Error(`Aurora video error ${submitRes.status}: ${e.error?.message || JSON.stringify(e)}`);
+    throw new Error(`Aurora video error ${submitRes.status}: ${e.message || JSON.stringify(e)}`);
   }
 
-  const { request_id } = await submitRes.json();
-  if (!request_id) throw new Error('No request ID returned');
+  const submitData = await submitRes.json();
+  const taskId = submitData.data?.id || submitData.id;
+  if (!taskId) throw new Error('No task ID returned');
 
   const videoUrl = await pollForVideo(
-    () => fetch(`https://api.x.ai/v1/videos/${request_id}`, { headers: { 'Authorization': `Bearer ${apiKey}` } }),
-    data => data.status === 'done' ? (data.video?.url || null) : data.status === 'failed' ? 'FAILED' : null,
+    () => fetch(`https://api.wavespeed.ai/api/v3/predictions/${taskId}/result`, { headers: { 'Authorization': `Bearer ${wavespeedKey}` } }),
+    data => {
+      const status = data.data?.status || data.status;
+      if (status === 'completed') return data.data?.outputs?.[0] || data.outputs?.[0] || null;
+      if (status === 'failed') return 'FAILED';
+      return null;
+    },
     progressId, isCancelled
   );
 
@@ -1527,7 +1526,7 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   let modelPath, body;
 
   if (extendVideoUrl) {
-    // Wan 2.2 Spicy Video Extend
+    // Extend — always use Wan 2.2 Spicy extend
     modelPath = 'wavespeed-ai/wan-2.2-spicy/video-extend';
     body = { prompt, video: extendVideoUrl, resolution: res, duration: Math.min(duration, 8), seed: -1 };
   } else if (imageDataUrl) {
@@ -1537,8 +1536,13 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
       : 'wavespeed-ai/wan-2.2-spicy/image-to-video';
     const wanDuration = engine === 'wan26spicy' ? Math.min(duration, 15) : Math.min(duration, 5);
     body = { prompt, image: imageDataUrl, resolution: res, duration: wanDuration, seed: -1 };
+  } else if (engine === 'wan26t2v') {
+    // Text-to-video
+    modelPath = 'alibaba/wan-2.6/text-to-video';
+    body = { prompt, resolution: res, duration: Math.min(duration, 15), seed: -1, enable_prompt_expansion: false };
   } else {
-    throw new Error('WaveSpeed video requires an image. Use Animate on a generated image.');
+    // Spicy models are I2V only — prompt user to use Animate instead
+    throw new Error('Wan Spicy models require an image. Use the Animate button on a generated image, or switch to Wan 2.6 for text-to-video.');
   }
 
   const submitRes = await fetch(`https://api.wavespeed.ai/api/v3/${modelPath}`, {
@@ -1734,6 +1738,7 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   } else {
     engineSel.innerHTML = `
       <option value="aurora" selected>Aurora</option>
+      <option value="wan26t2v">Wan 2.6</option>
       <option value="wan22spicy">Wan 2.2 Spicy</option>
       <option value="wan26spicy">Wan 2.6 Spicy</option>
     `;
