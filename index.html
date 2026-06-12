@@ -1346,13 +1346,24 @@ async function handleSend() {
 async function generateText(userText) {
   const typingId = appendTyping();
   try {
+    // Build messages array from history
+    const messages = getHistory();
+
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: modelSelect.value, messages: getHistory(), max_tokens: 1024 })
+      body: JSON.stringify({
+        model: modelSelect.value,
+        messages,
+        max_tokens: 2048
+      })
     });
     removeTyping(typingId);
-    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || `API error ${res.status}`); }
+    if (!res.ok) {
+      const errData = await res.json().catch(()=>({}));
+      const errMsg = errData.error?.message || errData.error || errData.message || JSON.stringify(errData);
+      throw new Error(`Chat error ${res.status}: ${errMsg}`);
+    }
     const data = await res.json();
     const reply = data.choices?.[0]?.message?.content || '(no response)';
     addToHistory('assistant', reply);
