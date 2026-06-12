@@ -356,6 +356,24 @@
       display: block;
     }
 
+    /* Edit image button */
+    .edit-img-btn {
+      display: none; /* hidden until image exists */
+      background: rgba(201,184,232,0.15);
+      border: 1px solid rgba(201,184,232,0.3);
+      color: var(--lavender);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .edit-img-btn:hover { background: rgba(201,184,232,0.25); }
+    .edit-img-btn.visible { display: inline-flex; align-items: center; gap: 5px; }
+
     .save-btn {
       position: absolute;
       bottom: 10px; right: 10px;
@@ -795,6 +813,7 @@
         <textarea id="prompt" rows="1" placeholder="Say something…"></textarea>
         <button id="img-toggle" title="Toggle image generation">🎨</button>
         <button id="vid-toggle" title="Toggle video generation">🎬</button>
+        <button id="edit-img-btn" class="edit-img-btn" title="Edit last image">✏️ Edit</button>
         <button id="send-btn" title="Send">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M2 8L14 2L8 14L7 9L2 8Z" fill="currentColor"/>
@@ -996,6 +1015,7 @@ let apiKey = localStorage.getItem('xai_key') || '';
 let wavespeedKey = localStorage.getItem('ws_key') || '';
 let imageMode = false;
 let videoMode = false;
+let lastImageUrl = null; // tracks most recently generated image for editing
 let contentMode = 'normal';
 let isLoading = false;
 let currentThreadId = null;
@@ -1276,22 +1296,47 @@ promptEl.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
 });
 
-imgToggle.addEventListener('click', () => {
-  imageMode = !imageMode;
-  if (imageMode) videoMode = false;
-  imgToggle.classList.toggle('active', imageMode);
+let editMode = false;
+
+function setImageMode(on) {
+  imageMode = on;
+  editMode = false;
+  videoMode = false;
+  imgToggle.classList.toggle('active', on);
   document.getElementById('vid-toggle').classList.remove('active');
-  inputArea.classList.toggle('image-mode', imageMode);
+  document.getElementById('edit-img-btn').classList.remove('active');
+  inputArea.classList.toggle('image-mode', on);
   inputArea.classList.remove('video-mode');
-  modeIndicator.textContent = imageMode ? 'Image mode' : 'Chat mode';
-  promptEl.placeholder = imageMode ? 'Describe an image…' : 'Say something…';
+  modeIndicator.textContent = on ? 'Image mode' : 'Chat mode';
+  promptEl.placeholder = on ? 'Describe an image…' : 'Say something…';
+}
+
+function setEditMode(on) {
+  editMode = on;
+  imageMode = false;
+  videoMode = false;
+  imgToggle.classList.remove('active');
+  document.getElementById('vid-toggle').classList.remove('active');
+  document.getElementById('edit-img-btn').classList.toggle('active', on);
+  inputArea.classList.toggle('image-mode', on); // reuse image-mode styling
+  inputArea.classList.remove('video-mode');
+  modeIndicator.textContent = on ? 'Edit image mode' : 'Chat mode';
+  promptEl.placeholder = on ? 'Describe your edit…' : 'Say something…';
+}
+
+imgToggle.addEventListener('click', () => setImageMode(!imageMode));
+
+document.getElementById('edit-img-btn').addEventListener('click', () => {
+  if (!lastImageUrl) return;
+  setEditMode(!editMode);
 });
 
 document.getElementById('vid-toggle').addEventListener('click', () => {
   videoMode = !videoMode;
-  if (videoMode) imageMode = false;
+  if (videoMode) { imageMode = false; editMode = false; }
   document.getElementById('vid-toggle').classList.toggle('active', videoMode);
   imgToggle.classList.remove('active');
+  document.getElementById('edit-img-btn').classList.remove('active');
   inputArea.classList.toggle('video-mode', videoMode);
   inputArea.classList.remove('image-mode');
   modeIndicator.textContent = videoMode ? 'Video mode' : 'Chat mode';
@@ -1330,7 +1375,9 @@ async function handleSend() {
   promptEl.style.height = 'auto';
   setLoading(true);
 
-  if (imageMode) {
+  if (editMode && lastImageUrl) {
+    await editImage(text, lastImageUrl);
+  } else if (imageMode) {
     await generateImage(text);
   } else if (videoMode) {
     await generateVideo(text, null);
@@ -1340,6 +1387,66 @@ async function handleSend() {
   }
 
   setLoading(false);
+}
+
+// ═══════════════════════════════════════════════════════
+// IMAGE EDITING
+// ═══════════════════════════════════════════════════════
+async function editImage(prompt, imageUrl) {
+  const typingId = appendTyping();
+  const imgModel = document.getElementById('img-model-select').value;
+  const aspectRatio = document.getElementById('img-ratio-select').value;
+  const resolution = document.getElementById('img-res-select').value;
+
+  // Use the edit variant of whatever model is selected
+  const editModel = imgModel === 'grok-imagine-image'
+    ? 'grok-imagine-image/edit'
+    : 'grok-imagine-image-quality/edit';
+
+  // Apply content mode via prompt prefix
+  const styleMap = { fun: 'Playful, fun style. ', normal: '', spicy: 'Sensual, provocative, mature style. ' };
+  const fullPrompt = (styleMap[contentMode] || '') + prompt;
+
+  try {
+    const body = {
+      prompt: fullPrompt,
+      image: imageUrl,
+      aspect_ratio: aspectRatio,
+      resolution: resolution.toLowerCase(),
+      response_format: 'url',
+      n: 1
+    };
+
+    const res = await fetch('https://api.x.ai/v1/images/edits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify(body)
+    });
+
+    removeTyping(typingId);
+
+    if (!res.ok) {
+      const errData = await res.json().catch(()=>({}));
+      const errMsg = errData.error?.message || errData.error || errData.message || JSON.stringify(errData);
+      throw new Error(`Edit error ${res.status}: ${errMsg}`);
+    }
+
+    const data = await res.json();
+    const newUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json;
+    if (!newUrl) throw new Error('No image returned from edit');
+
+    const src = newUrl.startsWith('data:') ? newUrl : newUrl;
+    const hostedUrl = newUrl.startsWith('http') ? newUrl : null;
+
+    lastImageUrl = hostedUrl || src;
+    addMessageToThread({ role: 'assistant', type: 'image', src, hostedUrl, alt: prompt });
+    renderImage(src, prompt, true, hostedUrl);
+
+  } catch(e) {
+    removeTyping(typingId);
+    addMessageToThread({ role: 'assistant', type: 'error', content: e.message });
+    appendError(e.message);
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1426,6 +1533,8 @@ async function generateImage(prompt) {
     } else {
       throw new Error('No image returned');
     }
+    lastImageUrl = hostedUrl || src;
+    showEditButton();
     addMessageToThread({ role: 'assistant', type: 'image', src, hostedUrl, alt: prompt });
     renderImage(src, prompt, true, hostedUrl);
   } catch(e) {
@@ -1971,6 +2080,11 @@ document.getElementById('modal-save').addEventListener('click', () => {
 });
 modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) modalOverlay.classList.remove('open'); });
 keyInput.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('modal-save').click(); });
+
+function showEditButton() {
+  const btn = document.getElementById('edit-img-btn');
+  if (btn) btn.classList.add('visible');
+}
 
 function updateKeyBtn() {
   apiKeyBtn.textContent = apiKey ? 'Key ✓' : 'Set API Key';
