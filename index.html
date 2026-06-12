@@ -1479,9 +1479,9 @@ async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progres
     modelPath = 'x-ai/grok-imagine-video/image-to-video';
     body = { prompt, image: imageDataUrl, duration, aspect_ratio: ratio, resolution: res, seed: -1 };
   } else {
-    // Text-to-video — uses older grok-imagine-video which supports T2V
+    // Text-to-video
     modelPath = 'x-ai/grok-imagine-video/text-to-video';
-    body = { prompt, duration, aspect_ratio: ratio, resolution: res, seed: -1 };
+    body = { prompt, duration, aspect_ratio: ratio, resolution: res };
   }
 
   const submitRes = await fetch(`https://api.wavespeed.ai/api/v3/${modelPath}`, {
