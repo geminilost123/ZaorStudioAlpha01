@@ -853,9 +853,13 @@
 
     <div id="input-area">
       <div id="mode-indicator"><span id="mode-label-text">Chat mode</span><span id="cost-estimate"></span></div>
-      <div id="edit-btn-row" style="display:none;margin-bottom:6px;padding:0 4px;">
-        <button id="edit-img-btn" class="edit-img-btn visible" title="Edit last image">✏️ Edit Last Image</button>
+      <div id="upload-edit-row" style="display:flex;gap:6px;margin-bottom:6px;padding:0 4px;">
+        <button id="upload-img-btn" class="edit-img-btn visible" title="Upload an image to edit or animate">🖼 Upload Image</button>
+        <div id="edit-btn-row" style="display:none;">
+          <button id="edit-img-btn" class="edit-img-btn visible" title="Edit last image">✏️ Edit Last Image</button>
+        </div>
       </div>
+      <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/webp" style="display:none;" />
       <div class="input-row">
         <textarea id="prompt" rows="1" placeholder="Say something…"></textarea>
         <button id="img-toggle" title="Toggle image generation">🎨</button>
@@ -1232,7 +1236,7 @@ function loadThread(id) {
       if (m.type === 'text') {
         renderMessage(m.role, m.content, false);
       } else if (m.type === 'image') {
-        renderImage(m.src, m.alt, false, m.hostedUrl || null);
+        renderImage(m.src, m.alt, false, m.hostedUrl || null, m.modelLabel || 'Aurora');
       } else if (m.type === 'video') {
         renderVideo(m.src, m.alt, false);
       } else if (m.type === 'error') {
@@ -1377,6 +1381,57 @@ document.getElementById('edit-img-btn').addEventListener('click', () => {
   setEditMode(!editMode);
 });
 
+// ── Upload image for editing/animating ──
+document.getElementById('upload-img-btn').addEventListener('click', () => {
+  document.getElementById('img-file-input').click();
+});
+
+document.getElementById('img-file-input').addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  // Size guard — large images bloat localStorage and API payloads
+  if (file.size > 8 * 1024 * 1024) {
+    appendError('Image too large — keep under 8MB.');
+    e.target.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result;
+
+    // Ensure a game exists
+    if (!currentThreadId) createThread('New Game');
+    document.getElementById('empty-state')?.remove();
+
+    // Render as a user-uploaded image in chat
+    const div = document.createElement('div');
+    div.className = 'msg user';
+    const label = document.createElement('div');
+    label.className = 'msg-label';
+    label.textContent = 'You (uploaded)';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'img-wrapper';
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.className = 'gen-image';
+    wrapper.appendChild(img);
+    div.appendChild(label);
+    div.appendChild(wrapper);
+    messagesEl.appendChild(div);
+    scrollToBottom();
+
+    // Save to thread + make it the editable image
+    addMessageToThread({ role: 'user', type: 'image', src: dataUrl, hostedUrl: null, alt: 'Uploaded image' });
+    lastImageUrl = dataUrl;
+    showEditButton();
+    setEditMode(true);
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+});
+
 document.getElementById('vid-toggle').addEventListener('click', () => {
   videoMode = !videoMode;
   if (videoMode) { imageMode = false; editMode = false; }
@@ -1397,16 +1452,9 @@ pills.forEach(pill => {
   });
 });
 
-// Apply cheapest defaults for initial video mode state (Aurora)
-(function initVideoDefaults() {
-  const durEl = document.getElementById('vid-duration-select');
-  const resEl = document.getElementById('vid-res-select');
-  const ratioEl = document.getElementById('vid-ratio-select');
-  applyModelConstraints('aurora', durEl, resEl, ratioEl, false, true);
-})();
-
-// Update cost estimate when video/image selectors change
-['vid-engine-select','vid-duration-select','img-model-select'].forEach(id => {
+// Update cost estimate when any selector changes
+['vid-engine-select','vid-duration-select','vid-res-select',
+ 'img-model-select','img-res-select','img-ratio-select'].forEach(id => {
   document.getElementById(id)?.addEventListener('change', updateCostEstimate);
 });
 
@@ -1556,55 +1604,97 @@ async function generateText(userText) {
 // ═══════════════════════════════════════════════════════
 // IMAGE GENERATION
 // ═══════════════════════════════════════════════════════
+// Map ratio + resolution to WaveSpeed size string (width*height)
+function ratioToSize(ratio, resolution) {
+  const base = resolution === '2K' ? 2048 : 1024;
+  const [w, h] = ratio.split(':').map(Number);
+  if (w >= h) {
+    return `${base}*${Math.round(base * h / w / 8) * 8}`;
+  } else {
+    return `${Math.round(base * w / h / 8) * 8}*${base}`;
+  }
+}
+
 async function generateImage(prompt) {
   const typingId = appendTyping();
-  const styleMap = { fun: 'fun', normal: 'default', spicy: 'spicy' };
   try {
+    if (!wavespeedKey) throw new Error('WaveSpeed API key required for images. Tap "Set API Key" to add it.');
+
     const imgModel = document.getElementById('img-model-select').value;
     const aspectRatio = document.getElementById('img-ratio-select').value;
     const resolution = document.getElementById('img-res-select').value;
-    const body = {
-      model: imgModel,
-      prompt,
-      n: 1,
-      response_format: 'url',
-      aspect_ratio: aspectRatio,
-      resolution: resolution.toLowerCase()
-    };
-    // Note: style/content mode not supported by current xAI image models
-    // Easy/Normal/Hard mode is applied via prompt prefix instead
-    const modePrefix = { fun: 'Playful, fun style. ', normal: '', spicy: 'Sensual, provocative, mature style. ' };
-    if (contentMode !== 'normal') body.prompt = modePrefix[contentMode] + body.prompt;
 
-    const res = await fetch('https://api.x.ai/v1/images/generations', {
+    // Easy/Normal/Hard mode applied via prompt prefix
+    const modePrefix = { fun: 'Playful, fun style. ', normal: '', spicy: 'Sensual, provocative, mature style. ' };
+    const fullPrompt = (contentMode !== 'normal' ? modePrefix[contentMode] : '') + prompt;
+
+    // Confirmed path: x-ai/grok-imagine-image-quality/text-to-image
+    // Simple variant path is unconfirmed on WaveSpeed; fallback handles 404
+    const modelPath = imgModel === 'grok-imagine-image'
+      ? 'x-ai/grok-imagine-image/text-to-image'
+      : 'x-ai/grok-imagine-image-quality/text-to-image';
+
+    const body = {
+      prompt: fullPrompt,
+      size: ratioToSize(aspectRatio, resolution),
+      enable_safety_checker: false
+    };
+
+    let submitRes = await fetch(`https://api.wavespeed.ai/api/v3/${modelPath}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wavespeedKey}` },
       body: JSON.stringify(body)
     });
+
+    // Fallback: if Simple path 404s, retry with confirmed quality path
+    if (submitRes.status === 404 && modelPath.includes('grok-imagine-image/')) {
+      submitRes = await fetch('https://api.wavespeed.ai/api/v3/x-ai/grok-imagine-image-quality/text-to-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wavespeedKey}` },
+        body: JSON.stringify(body)
+      });
+    }
+
+    if (!submitRes.ok) {
+      const errData = await submitRes.json().catch(()=>({}));
+      throw new Error(`Image error ${submitRes.status}: ${errData.message || JSON.stringify(errData)}`);
+    }
+
+    const submitData = await submitRes.json();
+    const taskId = submitData.data?.id || submitData.id;
+    if (!taskId) throw new Error('No task ID returned');
+
+    // Poll every 2s, up to 2 minutes
+    let imageUrl = null;
+    let elapsed = 0;
+    while (elapsed < 120000) {
+      await new Promise(r => setTimeout(r, 2000));
+      elapsed += 2000;
+      const pollRes = await fetch(`https://api.wavespeed.ai/api/v3/predictions/${taskId}/result`, {
+        headers: { 'Authorization': `Bearer ${wavespeedKey}` }
+      });
+      if (!pollRes.ok) continue;
+      const pollData = await pollRes.json();
+      const status = pollData.data?.status || pollData.status;
+      if (status === 'completed') {
+        imageUrl = pollData.data?.outputs?.[0] || pollData.outputs?.[0];
+        break;
+      } else if (status === 'failed') {
+        throw new Error(pollData.data?.error || 'Image generation failed');
+      }
+    }
+
     removeTyping(typingId);
-    if (!res.ok) {
-      const errData = await res.json().catch(()=>({}));
-      const errMsg = errData.error?.message || errData.error || errData.message || JSON.stringify(errData);
-      throw new Error(`Image error ${res.status}: ${errMsg}`);
-    }
-    const data = await res.json();
-    // API may return URL or b64 depending on model
-    let src;
-    let hostedUrl = null;
-    const b64 = data.data?.[0]?.b64_json;
-    const url = data.data?.[0]?.url;
-    if (b64) {
-      src = `data:image/png;base64,${b64}`;
-    } else if (url) {
-      src = url;
-      hostedUrl = url;
-    } else {
-      throw new Error('No image returned');
-    }
-    lastImageUrl = hostedUrl || src;
+    if (!imageUrl) throw new Error('Image generation timed out');
+
+    const src = imageUrl;
+    const hostedUrl = imageUrl;
+    lastImageUrl = hostedUrl;
     showEditButton();
-    addMessageToThread({ role: 'assistant', type: 'image', src, hostedUrl, alt: prompt });
-    renderImage(src, prompt, true, hostedUrl);
+    // Track which model actually generated (for display)
+    const usedModel = imgModel === 'grok-imagine-image' ? 'Aurora Simple' : 'Aurora Mega';
+    addMessageToThread({ role: 'assistant', type: 'image', src, hostedUrl, alt: prompt, modelLabel: usedModel });
+    renderImage(src, prompt, true, hostedUrl, usedModel);
   } catch(e) {
     removeTyping(typingId);
     addMessageToThread({ role: 'assistant', type: 'error', content: e.message });
@@ -1655,7 +1745,7 @@ async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progres
     body = { prompt, video: extendVideoUrl, duration: Math.min(duration, 10) };
   } else if (imageDataUrl) {
     modelPath = 'x-ai/grok-imagine-video-v1.5/image-to-video';
-    body = { prompt, image: imageDataUrl, duration };
+    body = { prompt, image: imageDataUrl, duration: Math.min(duration, 10) }; // I2V max 10s
   } else {
     // Text-to-video
     // T2V not supported via WaveSpeed — route directly through xAI
@@ -1976,11 +2066,11 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   resSel.className = 'img-control-select';
 
   // Apply initial constraints with cheapest defaults
-  applyModelConstraints('aurora', durSel, resSel, null, isExtend, true);
+  applyModelConstraints('aurora', durSel, resSel, null, isExtend, true, !isExtend);
 
   // Update when engine changes — apply cheapest defaults
   engineSel.addEventListener('change', () => {
-    applyModelConstraints(engineSel.value, durSel, resSel, null, isExtend, true);
+    applyModelConstraints(engineSel.value, durSel, resSel, null, isExtend, true, !isExtend);
   });
 
   const generateBtn = document.createElement('button');
@@ -2084,13 +2174,13 @@ function renderMessage(role, text, animate = true) {
   return div;
 }
 
-function renderImage(src, altText, animate = true, hostedUrl = null) {
+function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel = 'Aurora') {
   const div = document.createElement('div');
   div.className = 'msg assistant' + (animate ? '' : ' no-anim');
 
   const label = document.createElement('div');
   label.className = 'msg-label';
-  label.textContent = 'Aurora';
+  label.textContent = modelLabel;
 
   // Image
   const wrapper = document.createElement('div');
@@ -2265,6 +2355,7 @@ function showEditButton() {
 const MODEL_CONSTRAINTS = {
   // defaultDur and defaultRes = cheapest option
   aurora:     { durations: [4,6,8,10,15], resolutions: ['480p','720p'], hasRatio: true,  maxDur: 15, defaultDur: 4,  defaultRes: '480p' },
+  aurora_i2v: { durations: [4,6,8,10],    resolutions: ['480p','720p'], hasRatio: false, maxDur: 10, defaultDur: 4,  defaultRes: '480p' },
   wan26t2v:   { durations: [5,8,10,15],   resolutions: ['720p','1080p'], hasRatio: true,  maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
   wan22spicy: { durations: [5,8],          resolutions: ['480p','720p'], hasRatio: false, maxDur: 8,  defaultDur: 5,  defaultRes: '480p' },
   wan26spicy: { durations: [5,10,15],      resolutions: ['720p','1080p'], hasRatio: false, maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
@@ -2273,10 +2364,10 @@ const MODEL_CONSTRAINTS = {
   wan22spicy_extend: { durations: [5],     resolutions: ['480p','720p'], hasRatio: false, maxDur: 5,  defaultDur: 5,  defaultRes: '480p' },
 };
 
-function applyModelConstraints(engine, durEl, resEl, ratioEl, isExtend, useDefaults = false) {
+function applyModelConstraints(engine, durEl, resEl, ratioEl, isExtend, useDefaults = false, isI2V = false) {
   const key = isExtend
     ? (engine === 'wan22spicy' ? 'wan22spicy_extend' : 'aurora_extend')
-    : engine;
+    : (isI2V && engine === 'aurora' ? 'aurora_i2v' : engine);
   const c = MODEL_CONSTRAINTS[key] || MODEL_CONSTRAINTS['aurora'];
 
   if (durEl) {
@@ -2300,6 +2391,14 @@ function applyModelConstraints(engine, durEl, resEl, ratioEl, isExtend, useDefau
     if (ratioLabel) ratioLabel.style.display = c.hasRatio ? '' : 'none';
   }
 }
+
+// Apply cheapest defaults for initial video mode state — must run after MODEL_CONSTRAINTS is defined
+(function initVideoDefaults() {
+  const durEl = document.getElementById('vid-duration-select');
+  const resEl = document.getElementById('vid-res-select');
+  const ratioEl = document.getElementById('vid-ratio-select');
+  applyModelConstraints('aurora', durEl, resEl, ratioEl, false, true);
+})();
 
 function updateCostEstimate() {
   const el = document.getElementById('cost-estimate');
@@ -2326,12 +2425,19 @@ function updateCostEstimate() {
     modeText.textContent = 'Video mode';
 
   } else if (editMode) {
-    el.textContent = '~$0.06';
+    // Edit = input image + output image at xAI pricing
+    el.textContent = '~$0.04+';
     modeText.textContent = 'Edit image mode';
 
   } else if (imageMode) {
     const model = document.getElementById('img-model-select')?.value || 'grok-imagine-image-quality';
-    const cost = model === 'grok-imagine-image' ? '$0.005' : '$0.022';
+    const res = document.getElementById('img-res-select')?.value || '1K';
+    let cost;
+    if (model === 'grok-imagine-image') {
+      cost = res === '2K' ? '$0.008' : '$0.005';
+    } else {
+      cost = res === '2K' ? '$0.035' : '$0.022';
+    }
     el.textContent = cost;
     modeText.textContent = 'Image mode';
 
