@@ -2036,7 +2036,7 @@ async function generateImage(prompt) {
 // ═══════════════════════════════════════════════════════
 // VIDEO GENERATION
 // ═══════════════════════════════════════════════════════
-async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUrl) {
+async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUrl, durationOverride = null, resOverride = null) {
   let cancelled = false;
   const progressId = appendVideoProgress('Generating video…', () => { cancelled = true; });
 
@@ -2048,7 +2048,7 @@ async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUr
   try {
     if (useWaveSpeed) {
       if (!wavespeedKey) throw new Error('WaveSpeed API key required for Wan models. Tap "Set API Key" to add it.');
-      await generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engine, progressId, () => cancelled);
+      await generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engine, progressId, () => cancelled, durationOverride, resOverride);
     } else {
       await generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progressId, () => cancelled);
     }
@@ -2138,9 +2138,10 @@ async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progres
 // ═══════════════════════════════════════════════════════
 // WAVESPEED VIDEO (Wan)
 // ═══════════════════════════════════════════════════════
-async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engine, progressId, isCancelled) {
-  const duration = parseInt(document.getElementById('vid-duration-select').value);
-  const res      = document.getElementById('vid-res-select').value;
+async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engine, progressId, isCancelled, durationOverride = null, resOverride = null) {
+  const _dur = durationOverride != null ? parseInt(durationOverride) : parseInt(document.getElementById('vid-duration-select')?.value);
+  const duration = (!isNaN(_dur) && _dur > 0) ? _dur : 4; // safe fallback to 4s
+  const res = resOverride || document.getElementById('vid-res-select')?.value || '480p';
   const ratio    = document.getElementById('vid-ratio-select').value;
 
   let modelPath, body;
@@ -2350,14 +2351,7 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora') {
         panelOuter2.innerHTML = '';
         extendOpen = false;
         extendBtn.disabled = true;
-        const durEl = document.getElementById('vid-duration-select');
-        const resEl = document.getElementById('vid-res-select');
-        const prevDur = durEl?.value; const prevRes = resEl?.value;
-        if (durEl && duration) durEl.value = duration;
-        if (resEl && resolution) resEl.value = resolution;
-        await generateVideo(prompt || 'continue the scene naturally', null, engine, src);
-        if (durEl && prevDur) durEl.value = prevDur;
-        if (resEl && prevRes) resEl.value = prevRes;
+        await generateVideo(prompt || 'continue the scene naturally', null, engine, src, duration, resolution);
         extendBtn.disabled = false;
       }, true);
       panelOuter2.innerHTML = '';
@@ -2661,15 +2655,7 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
           panelOuter.innerHTML = '';
           panelOpen = false;
           animBtn.disabled = true;
-          // Temporarily override video controls with panel values
-          const durEl = document.getElementById('vid-duration-select');
-          const resEl = document.getElementById('vid-res-select');
-          const prevDur = durEl?.value; const prevRes = resEl?.value;
-          if (durEl && duration) durEl.value = duration;
-          if (resEl && resolution) resEl.value = resolution;
-          await generateVideo(prompt || 'cinematic motion, smooth camera movement', hostedUrl, engine, null);
-          if (durEl && prevDur) durEl.value = prevDur;
-          if (resEl && prevRes) resEl.value = prevRes;
+          await generateVideo(prompt || 'cinematic motion, smooth camera movement', hostedUrl, engine, null, duration, resolution);
           animBtn.disabled = false;
         });
         panelOuter.innerHTML = '';
