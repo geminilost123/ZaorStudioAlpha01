@@ -1077,7 +1077,7 @@
           <button id="edit-img-btn" class="edit-img-btn visible" title="Edit last image">✏️ Edit</button>
           <select id="edit-model-select" class="img-control-select" title="Edit model">
             <option value="qwen">Qwen Edit — $0.02</option>
-            <option value="flux-kontext">Flux Kontext — $0.02</option>
+            <option value="fluxkontext">Flux Kontext — $0.02</option>
             <option value="wan27" selected>Wan 2.7 — $0.03</option>
             <option value="wan27pro">Wan 2.7 Pro — $0.06</option>
             <option value="aurora">Aurora — ~$0.04</option>
@@ -1178,7 +1178,7 @@
           <span class="mode-label" style="color:#a8e6cf;">Clean</span>
           <select id="clean-model-select" class="img-control-select">
             <option value="qwen">Qwen Edit — $0.02</option>
-            <option value="flux-kontext">Flux Kontext — $0.02</option>
+            <option value="fluxkontext">Flux Kontext — $0.02</option>
             <option value="wan27">Wan 2.7 — $0.03</option>
             <option value="wan27pro">Wan 2.7 Pro — $0.06</option>
           </select>
@@ -1690,7 +1690,7 @@ document.getElementById('enhance-toggle')?.addEventListener('click', () => {
 // Clean model changes button label
 document.getElementById('clean-model-select')?.addEventListener('change', () => {
   const model = document.getElementById('clean-model-select').value;
-  const labels = { qwen: 'Qwen Edit', 'flux-kontext': 'Flux Kontext', wan27: 'Wan 2.7', wan27pro: 'Wan 2.7 Pro' };
+  const labels = { qwen: 'Qwen Edit', fluxkontext: 'Flux Kontext', wan27: 'Wan 2.7', wan27pro: 'Wan 2.7 Pro' };
   const btn = document.getElementById('auto-clean-btn');
   if (btn) btn.textContent = `🧹 Clean via ${labels[model]}`;
   updateCostEstimate();
@@ -1802,9 +1802,9 @@ async function handleSend() {
 // ═══════════════════════════════════════════════════════
 // IMAGE EDITING
 // ═══════════════════════════════════════════════════════
-async function editImage(prompt, imageUrl, skipStyleLock = false) {
+async function editImage(prompt, imageUrl, skipStyleLock = false, modelOverride = null) {
   const typingId = appendTyping();
-  const editModel = document.getElementById('edit-model-select')?.value || 'wan27';
+  const editModel = modelOverride || document.getElementById('edit-model-select')?.value || 'wan27';
   const fullPrompt = skipStyleLock ? prompt : applyStyleLock(prompt);
 
   try {
@@ -1849,7 +1849,7 @@ async function editImage(prompt, imageUrl, skipStyleLock = false) {
       removeTyping(typingId);
       if (!resultUrl) throw new Error('Edit timed out');
       src = resultUrl; hostedUrl = resultUrl;
-      const editLabels = { wan27pro: 'Wan 2.7 Pro Edit', wan27: 'Wan 2.7 Edit', fluxkontext: 'Flux Kontext Edit', qwen: 'Qwen Edit' };
+      const editLabels = { wan27pro: 'Wan 2.7 Pro Edit', wan27: 'Wan 2.7 Edit', fluxkontext: 'Flux Kontext Edit', qwen: 'Qwen Edit', aurora: 'Aurora Edit' };
       modelLabel = editLabels[editModel] || 'Qwen Edit';
     }
 
@@ -2737,28 +2737,22 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
         applyStyleBtn.disabled = true;
         applyStyleBtn.textContent = '…';
 
-        const editSel = document.getElementById('edit-model-select');
-        const prevModel = editSel?.value;
-        if (editSel) editSel.value = chosenModel;
-
         const imageTarget = hostedUrl || src;
         if (!imageTarget || imageTarget.startsWith('data:')) {
           appendError('Apply Style requires a hosted image URL. Edit the image first to get a hosted version, then apply the style.');
           applyStyleBtn.disabled = false;
           applyStyleBtn.textContent = '🔒 Apply Style';
-          if (editSel && prevModel) editSel.value = prevModel;
           return;
         }
 
         const stylePrompt = `Apply this visual style to the image: ${lockedStyle.trim()}. Preserve all subjects, characters, composition, and content exactly. Only change the visual aesthetic and style.`;
 
         try {
-          // Pass skipStyleLock=true to avoid double-applying the style
-          await editImage(stylePrompt, imageTarget, true);
+          // Pass model directly via modelOverride — no dropdown swap needed
+          await editImage(stylePrompt, imageTarget, true, chosenModel);
         } catch(e) {
           appendError('Style apply failed: ' + e.message);
         } finally {
-          if (editSel && prevModel) editSel.value = prevModel;
           applyStyleBtn.disabled = false;
           applyStyleBtn.textContent = '🔒 Apply Style';
         }
@@ -3023,7 +3017,7 @@ function updateCostEstimate() {
   } else if (editMode) {
     // Edit = input image + output image at xAI pricing
     const editMod = document.getElementById('edit-model-select')?.value || 'wan27';
-    const editCostMap = { aurora: '~$0.04', wan27pro: '$0.06', wan27: '$0.03', 'flux-kontext': '$0.02', qwen: '$0.02' };
+    const editCostMap = { aurora: '~$0.04', wan27pro: '$0.06', wan27: '$0.03', fluxkontext: '$0.02', qwen: '$0.02' };
     const editCost = editCostMap[editMod] || '$0.02';
     el.textContent = editCost;
     modeText.textContent = 'Edit image mode';
@@ -3044,7 +3038,7 @@ function updateCostEstimate() {
     const upModel = document.getElementById('upscale-model-select')?.value || 'standard';
     const cleanMod = document.getElementById('clean-model-select')?.value || 'qwen';
     const upCosts = { standard: '$0.01+', precision: '$0.03+', premium: '$0.06+' };
-    const cleanCosts = { qwen: '$0.02', 'flux-kontext': '$0.02', wan27: '$0.03', wan27pro: '$0.06' };
+    const cleanCosts = { qwen: '$0.02', fluxkontext: '$0.02', wan27: '$0.03', wan27pro: '$0.06' };
     el.textContent = `Clean ${cleanCosts[cleanMod]} / Up ${upCosts[upModel]}`;
     modeText.textContent = 'Enhance mode';
     el.style.display = 'inline-block';
