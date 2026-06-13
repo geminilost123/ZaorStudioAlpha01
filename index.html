@@ -305,6 +305,7 @@
       max-width: 85%;
       animation: fadeUp 0.2s ease;
     }
+    @keyframes fadeOut { from { opacity:1; } to { opacity:0; } }
     @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
     .msg.user { align-self: flex-end; align-items: flex-end; }
@@ -778,6 +779,119 @@
       color: var(--text);
     }
 
+
+    /* ── Style Lock ── */
+    #style-lock-row {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 6px;
+      padding: 0 4px;
+    }
+    #input-area.image-mode #style-lock-row { display: flex; }
+    #input-area.image-mode.edit-active #style-lock-row { display: flex; }
+
+    .style-lock-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .style-lock-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+
+    .style-lock-active-badge {
+      font-size: 10px;
+      background: rgba(201,184,232,0.2);
+      border: 1px solid rgba(201,184,232,0.35);
+      color: var(--lavender);
+      padding: 2px 8px;
+      border-radius: 10px;
+      display: none;
+    }
+    .style-lock-active-badge.on { display: inline-block; }
+
+    #style-lock-input {
+      background: var(--bg);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 8px 10px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      width: 100%;
+      resize: none;
+      outline: none;
+      min-height: 36px;
+      max-height: 80px;
+      transition: border-color 0.2s;
+    }
+    #style-lock-input:focus { border-color: var(--lavender); }
+    #style-lock-input::placeholder { color: var(--text-dim); }
+
+    .style-lock-btns {
+      display: flex;
+      gap: 6px;
+    }
+
+    /* ── Prompt Engineer mode ── */
+    #pe-btn {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-dim);
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      letter-spacing: 0.03em;
+    }
+    #pe-btn:hover { border-color: var(--lavender); color: var(--lavender); }
+    #pe-btn.active {
+      background: rgba(201,184,232,0.15);
+      border-color: var(--lavender);
+      color: var(--lavender);
+    }
+
+    #pe-model-row {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      padding: 0 4px;
+    }
+    #pe-model-row.visible { display: flex; }
+
+    /* ── Edit target highlight ── */
+    .img-wrapper.edit-target {
+      outline: 2px solid var(--lavender);
+      outline-offset: 3px;
+      border-radius: 16px;
+    }
+
+    /* ── Retry button ── */
+    .retry-btn {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--text-dim);
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .retry-btn:hover { border-color: var(--lavender); color: var(--lavender); }
+    .retry-btn:active { transform: scale(0.95); }
+
     .pin-error-msg { font-size: 13px; color: var(--rose); height: 18px; letter-spacing: 0.03em; }
   </style>
 </head>
@@ -830,11 +944,22 @@
         <select id="model-select">
           <option value="grok-4.3" selected>Zaor</option>
         </select>
+        <button id="pe-btn" title="Prompt Engineer mode">✦ PE</button>
         <button id="api-key-btn">Set API Key</button>
       </div>
     </header>
 
-    <div id="messages">
+    <div id="pe-model-row">
+    <span class="mode-label" style="padding-left:14px;">PE Model</span>
+    <select id="pe-model-select" class="img-control-select">
+      <option value="aurora">Aurora / Flux</option>
+      <option value="wan26t2v">Wan 2.6 T2I</option>
+      <option value="qwen">Qwen Edit</option>
+      <option value="wan27">Wan 2.7 Edit</option>
+    </select>
+    <span style="font-size:11px;color:var(--text-dim);padding-left:4px;">Prompts optimized for selected model</span>
+  </div>
+  <div id="messages">
       <div id="empty-state">
         <div class="star">✦</div>
         <p>Your private creative studio.<br/>Chat with Zaor or generate images.</p>
@@ -843,6 +968,17 @@
 
     <div id="input-area">
       <div id="mode-indicator"><span id="mode-label-text">Chat mode</span><span id="cost-estimate"></span></div>
+      <div id="style-lock-row">
+        <div class="style-lock-header">
+          <span class="style-lock-label">Style Lock</span>
+          <span id="style-lock-badge" class="style-lock-active-badge">Active</span>
+        </div>
+        <textarea id="style-lock-input" rows="1" placeholder="e.g. 1980s Frank Miller ink style, high contrast, gritty…"></textarea>
+        <div class="style-lock-btns">
+          <button class="save-btn" id="style-lock-set-btn">🔒 Lock Style</button>
+          <button class="save-btn" id="style-lock-clear-btn">✕ Clear</button>
+        </div>
+      </div>
       <div id="upload-edit-row" style="display:flex;gap:6px;margin-bottom:6px;padding:0 4px;flex-wrap:wrap;align-items:center;">
         <button id="upload-img-btn" class="edit-img-btn visible" title="Upload an image to edit or animate">🖼 Upload Image</button>
         <div id="edit-btn-row" style="display:none;gap:6px;align-items:center;">
@@ -1054,6 +1190,9 @@ let wavespeedKey = localStorage.getItem('ws_key') || '';
 let imageMode = false;
 let videoMode = false;
 let lastImageUrl = null; // tracks most recently generated image for editing
+let activeEditTarget = null; // manually selected edit target (null = use lastImageUrl)
+let lockedStyle = localStorage.getItem('zaor_style_lock') || ''; // persisted style
+let promptEngineerMode = false; // PE mode for chat
 let isLoading = false;
 let currentThreadId = null;
 let pendingDeleteId = null;
@@ -1069,7 +1208,6 @@ const promptEl      = document.getElementById('prompt');
 const sendBtn       = document.getElementById('send-btn');
 const imgToggle     = document.getElementById('img-toggle');
 const inputArea     = document.getElementById('input-area');
-const modeIndicator = document.getElementById('mode-indicator');
 const apiKeyBtn     = document.getElementById('api-key-btn');
 const modelSelect   = document.getElementById('model-select');
 const threadList    = document.getElementById('thread-list');
@@ -1470,8 +1608,8 @@ async function handleSend() {
   promptEl.style.height = 'auto';
   setLoading(true);
 
-  if (editMode && lastImageUrl) {
-    await editImage(text, lastImageUrl);
+  if (editMode && (activeEditTarget || lastImageUrl)) {
+    await editImage(text, activeEditTarget || lastImageUrl);
   } else if (imageMode) {
     await generateImage(text);
   } else if (videoMode) {
@@ -1571,6 +1709,7 @@ async function editImage(prompt, imageUrl) {
     }
 
     lastImageUrl = hostedUrl || src;
+    activeEditTarget = hostedUrl || src;
     showEditButton();
     addMessageToThread({ role: 'assistant', type: 'image', src, hostedUrl, alt: prompt, modelLabel });
     renderImage(src, prompt, true, hostedUrl, modelLabel);
@@ -1591,12 +1730,20 @@ async function generateText(userText) {
     // Build messages array from history
     const messages = getHistory();
 
+    // Inject PE system prompt if active
+    let apiMessages = [...messages];
+    if (promptEngineerMode) {
+      const peModel = document.getElementById('pe-model-select')?.value || 'aurora';
+      const sysPrompt = PE_SYSTEM_PROMPTS[peModel] || PE_SYSTEM_PROMPTS.aurora;
+      apiMessages = [{ role: 'system', content: sysPrompt }, ...messages];
+    }
+
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: modelSelect.value,
-        messages,
+        messages: apiMessages,
         max_tokens: 2048
       })
     });
@@ -2002,9 +2149,22 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora') {
     }
   });
 
+  const retryVidBtn = document.createElement('button');
+  retryVidBtn.className = 'retry-btn';
+  retryVidBtn.textContent = '↺ Retry';
+  retryVidBtn.addEventListener('click', async () => {
+    if (isLoading) return;
+    retryVidBtn.textContent = '…';
+    retryVidBtn.disabled = true;
+    await generateVideo(altText, null, engineLabel.toLowerCase().replace(/ /g,'').replace('video','').replace('t2v','') || 'aurora', null);
+    retryVidBtn.textContent = '↺ Retry';
+    retryVidBtn.disabled = false;
+  });
+
   wrapper.appendChild(video);
   wrapper.appendChild(saveBtn);
   wrapper.appendChild(extendBtn);
+  wrapper.appendChild(retryVidBtn);
   div.appendChild(label);
   div.appendChild(wrapper);
   div.appendChild(panelOuter2);
@@ -2182,6 +2342,27 @@ function renderMessage(role, text, animate = true) {
   div.appendChild(bubble);
   div.appendChild(copyBtn);
 
+  // Retry button — re-runs this generation
+  if (role === 'assistant' && text) {
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'retry-btn';
+    retryBtn.textContent = '↺ Retry';
+    retryBtn.addEventListener('click', async () => {
+      if (isLoading) return;
+      // Find the last user message before this one
+      const history = getHistory();
+      const lastUser = [...history].reverse().find(m => m.role === 'user');
+      if (!lastUser) return;
+      retryBtn.textContent = '…';
+      retryBtn.disabled = true;
+      addToHistory('user', lastUser.content);
+      await generateText(lastUser.content);
+      retryBtn.textContent = '↺ Retry';
+      retryBtn.disabled = false;
+    });
+    div.appendChild(retryBtn);
+  }
+
   messagesEl.appendChild(div);
   if (animate) scrollToBottom();
   return div;
@@ -2203,6 +2384,25 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   img.alt = altText;
   img.className = 'gen-image';
   wrapper.appendChild(img);
+
+  // Tap image to set as edit target
+  img.style.cursor = 'pointer';
+  img.addEventListener('click', () => {
+    // Remove highlight from previous target
+    document.querySelectorAll('.img-wrapper.edit-target').forEach(w => w.classList.remove('edit-target'));
+    // Set this as new target
+    wrapper.classList.add('edit-target');
+    lastImageUrl = hostedUrl || src;
+    activeEditTarget = hostedUrl || src;
+    showEditButton();
+    if (!editMode) setEditMode(true);
+    // Brief visual confirmation
+    const flash = document.createElement('div');
+    flash.style.cssText = 'position:absolute;inset:0;background:rgba(201,184,232,0.2);border-radius:14px;pointer-events:none;animation:fadeOut 0.5s forwards;';
+    wrapper.style.position = 'relative';
+    wrapper.appendChild(flash);
+    setTimeout(() => flash.remove(), 500);
+  });
 
   // Button bar below image
   const btnBar = document.createElement('div');
@@ -2265,8 +2465,27 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
     });
   }
 
+  // Retry button
+  const retryImgBtn = document.createElement('button');
+  retryImgBtn.className = 'retry-btn';
+  retryImgBtn.textContent = '↺ Retry';
+  retryImgBtn.addEventListener('click', async () => {
+    if (isLoading) return;
+    retryImgBtn.textContent = '…';
+    retryImgBtn.disabled = true;
+    document.getElementById('empty-state')?.remove();
+    if (editMode) {
+      await editImage(altText, activeEditTarget || lastImageUrl);
+    } else {
+      await generateImage(altText);
+    }
+    retryImgBtn.textContent = '↺ Retry';
+    retryImgBtn.disabled = false;
+  });
+
   btnBar.appendChild(saveBtn);
   btnBar.appendChild(copyPromptBtn);
+  btnBar.appendChild(retryImgBtn);
   btnBar.appendChild(animBtn);
 
   div.appendChild(label);
@@ -2363,6 +2582,55 @@ function showEditButton() {
   const row = document.getElementById('edit-btn-row');
   if (row) row.style.display = 'flex';
 }
+
+// ── Style Lock ──
+function getActiveStyle() {
+  return lockedStyle.trim();
+}
+
+function applyStyleLock(prompt) {
+  const style = getActiveStyle();
+  if (!style) return prompt;
+  return prompt + ', ' + style;
+}
+
+function updateStyleBadge() {
+  const badge = document.getElementById('style-lock-badge');
+  const input = document.getElementById('style-lock-input');
+  if (!badge) return;
+  if (lockedStyle.trim()) {
+    badge.classList.add('on');
+    if (input) input.value = lockedStyle;
+  } else {
+    badge.classList.remove('on');
+  }
+}
+
+document.getElementById('style-lock-set-btn')?.addEventListener('click', () => {
+  const val = document.getElementById('style-lock-input')?.value.trim();
+  if (val) {
+    lockedStyle = val;
+    localStorage.setItem('zaor_style_lock', val);
+    updateStyleBadge();
+  }
+});
+
+document.getElementById('style-lock-clear-btn')?.addEventListener('click', () => {
+  lockedStyle = '';
+  localStorage.removeItem('zaor_style_lock');
+  const input = document.getElementById('style-lock-input');
+  if (input) input.value = '';
+  updateStyleBadge();
+});
+
+// Init style lock UI
+updateStyleBadge();
+
+// Auto-resize style lock textarea
+document.getElementById('style-lock-input')?.addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+});
 
 // Per-model constraints
 const MODEL_CONSTRAINTS = {
@@ -2461,6 +2729,28 @@ function updateCostEstimate() {
     modeText.textContent = 'Chat mode';
   }
 }
+
+// ── Prompt Engineer Mode ──
+const PE_SYSTEM_PROMPTS = {
+  aurora: "You are an expert image prompt engineer for Aurora/Flux diffusion models. When the user describes what they want, respond with ONLY a single optimized image generation prompt. No explanation, no preamble, no quotes, no markdown. Just the raw prompt text. Include quality tags, lighting descriptors, style keywords, and technical details that Aurora responds well to. Keep it under 200 words.",
+  wan26t2v: "You are an expert image prompt engineer for Wan 2.6 text-to-image model. When the user describes what they want, respond with ONLY a single structured prompt. No explanation, no preamble. Format: [subject description], [scene/environment], [style], [lighting], [technical quality]. Keep it concise and direct.",
+  qwen: "You are an expert image prompt engineer for Qwen image editing. When the user describes a transformation or edit, respond with ONLY a single clear edit instruction prompt. No explanation. Be specific about what changes to make, what to preserve, and the desired style outcome.",
+  wan27: "You are an expert image prompt engineer for Wan 2.7 image editing. When the user describes what they want, respond with ONLY a single optimized prompt describing the transformation. No explanation, no preamble. Be explicit about the subject, the change, and the visual style."
+};
+
+document.getElementById('pe-btn')?.addEventListener('click', () => {
+  promptEngineerMode = !promptEngineerMode;
+  const btn = document.getElementById('pe-btn');
+  const modelRow = document.getElementById('pe-model-row');
+  btn?.classList.toggle('active', promptEngineerMode);
+  if (modelRow) modelRow.classList.toggle('visible', promptEngineerMode);
+  // Visual feedback
+  if (promptEngineerMode) {
+    btn.textContent = '✦ PE ON';
+  } else {
+    btn.textContent = '✦ PE';
+  }
+});
 
 function updateKeyBtn() {
   apiKeyBtn.textContent = apiKey ? 'Key ✓' : 'Set API Key';
