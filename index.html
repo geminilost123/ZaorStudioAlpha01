@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.14" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio</title>
+  <title>Zaor Studio 0.14</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -766,6 +766,23 @@
     .enhance-action-btn:hover { background: rgba(168,230,207,0.15); border-color: #a8e6cf; color: #a8e6cf; }
     .enhance-action-btn:disabled { opacity: 0.4; cursor: default; }
 
+    /* PE pin button — distinct from edit target */
+    .pe-pin-btn {
+      background: transparent;
+      border: 1px solid rgba(201,184,232,0.4);
+      color: var(--lavender);
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .pe-pin-btn:hover { background: rgba(201,184,232,0.12); }
+    .pe-pin-btn.active { background: rgba(201,184,232,0.2); border-color: var(--lavender); font-weight: 600; }
+
     /* Set as edit target button */
     .set-target-btn {
       background: transparent;
@@ -1024,7 +1041,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio</span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.14</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1111,6 +1128,7 @@
         <div id="edit-btn-row" style="display:none;gap:6px;align-items:center;">
           <button id="edit-img-btn" class="edit-img-btn visible" title="Edit last image">✏️ Edit</button>
           <select id="edit-model-select" class="img-control-select" title="Edit model">
+            <option value="qwen2">Qwen 2.0 Edit — $0.03</option>
             <option value="qwen">Qwen Edit — $0.02</option>
             <option value="fluxkontext">Flux Kontext — $0.02</option>
             <option value="wan27" selected>Wan 2.7 — $0.03</option>
@@ -1221,6 +1239,7 @@
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.06);">
           <span class="mode-label" style="color:#a8e6cf;">Clean</span>
           <select id="clean-model-select" class="img-control-select">
+            <option value="qwen2">Qwen 2.0 Edit — $0.03</option>
             <option value="qwen">Qwen Edit — $0.02</option>
             <option value="fluxkontext">Flux Kontext — $0.02</option>
             <option value="wan27">Wan 2.7 — $0.03</option>
@@ -1751,7 +1770,7 @@ document.getElementById('enhance-toggle')?.addEventListener('click', () => {
 // Clean model changes button label
 document.getElementById('clean-model-select')?.addEventListener('change', () => {
   const model = document.getElementById('clean-model-select').value;
-  const labels = { qwen: 'Qwen Edit', fluxkontext: 'Flux Kontext', wan27: 'Wan 2.7', wan27pro: 'Wan 2.7 Pro' };
+  const labels = { qwen2: 'Qwen 2.0 Edit', qwen: 'Qwen Edit', fluxkontext: 'Flux Kontext', wan27: 'Wan 2.7', wan27pro: 'Wan 2.7 Pro' };
   const btn = document.getElementById('auto-clean-btn');
   if (btn) btn.textContent = `🧹 Clean via ${labels[model]}`;
   updateCostEstimate();
@@ -1779,7 +1798,7 @@ document.getElementById('auto-clean-btn')?.addEventListener('click', async () =>
   if (!target) { appendError('No image selected. Tap 🎯 Edit Target on any image first.'); return; }
   const btn = document.getElementById('auto-clean-btn');
   const cleanModel = document.getElementById('clean-model-select')?.value || 'qwen';
-  const modelLabels = { qwen: 'Qwen Edit', fluxkontext: 'Flux Kontext', wan27: 'Wan 2.7', wan27pro: 'Wan 2.7 Pro' };
+  const modelLabels = { qwen2: 'Qwen 2.0 Edit', qwen: 'Qwen Edit', fluxkontext: 'Flux Kontext', wan27: 'Wan 2.7', wan27pro: 'Wan 2.7 Pro' };
   const origLabel = `🧹 Clean via ${modelLabels[cleanModel]}`;
   btn.disabled = true; btn.textContent = '…';
   const cleanPrompt = 'Sharpen and clarify this image. Remove compression artifacts, noise, and blur. Improve technical quality and crispness only. Preserve all content, colors, composition, characters, and scene elements exactly as they are. Do not change anything about the subject matter.';
@@ -1903,15 +1922,17 @@ async function editImage(prompt, imageUrl, skipStyleLock = false, modelOverride 
         wan27pro:    { path: 'alibaba/wan-2.7/image-edit-pro',          body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
         wan27:       { path: 'alibaba/wan-2.7/image-edit',              body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
         fluxkontext: { path: 'wavespeed-ai/flux-kontext-dev-ultra-fast', body: { prompt: fullPrompt, image: imageUrl, seed: -1, enable_safety_checker: false } },
-        qwen:        { path: 'wavespeed-ai/qwen-image/edit',            body: { prompt: fullPrompt, image: imageUrl, seed: -1, enable_safety_checker: false } },
+        qwen2:       { path: 'wavespeed-ai/qwen-image-2.0/edit',        body: { prompt: fullPrompt, image: imageUrl, seed: -1, enable_safety_checker: false } },
+        qwen:        { path: 'wavespeed-ai/qwen-image/edit',            body: { prompt: fullPrompt, image: imageUrl, seed: -1, enable_safety_checker: false }, timeout: 180000 },
       };
-      const { path: wsPath, body: wsBody } = wsModels[editModel] || wsModels.qwen;
-      const resultUrl = await callWaveSpeed(wsPath, wsBody, 120000, 3000);
+      const wsModel = wsModels[editModel] || wsModels.qwen;
+      const { path: wsPath, body: wsBody, timeout: wsTimeout = 120000 } = wsModel;
+      const resultUrl = await callWaveSpeed(wsPath, wsBody, wsTimeout, 3000);
 
       removeTyping(typingId);
       if (!resultUrl) throw new Error('Edit timed out');
       src = resultUrl; hostedUrl = resultUrl;
-      const editLabels = { wan27pro: 'Wan 2.7 Pro Edit', wan27: 'Wan 2.7 Edit', fluxkontext: 'Flux Kontext Edit', qwen: 'Qwen Edit', aurora: 'Aurora Edit' };
+      const editLabels = { wan27pro: 'Wan 2.7 Pro Edit', wan27: 'Wan 2.7 Edit', fluxkontext: 'Flux Kontext Edit', qwen2: 'Qwen 2.0 Edit', qwen: 'Qwen Edit', aurora: 'Aurora Edit' };
       modelLabel = editLabels[editModel] || 'Qwen Edit';
     }
 
@@ -2154,7 +2175,7 @@ async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUr
   // Determine engine — from override (animate/extend buttons) or UI selector
   const engine = engineOverride || document.getElementById('vid-engine-select')?.value || 'aurora';
   // Aurora always uses xAI directly; Wan models use WaveSpeed
-  const useWaveSpeed = engine !== 'aurora';
+  const useWaveSpeed = engine !== 'aurora' && engine !== 'aurora_extend';
 
   try {
     if (useWaveSpeed) {
@@ -2463,14 +2484,14 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
 
   // Pin for PE button on videos
   const pinVidPEBtn = document.createElement('button');
-  pinVidPEBtn.className = 'animate-btn';
-  pinVidPEBtn.textContent = '📌 Pin for PE';
+  pinVidPEBtn.className = 'pe-pin-btn';
+  pinVidPEBtn.textContent = '✦ PE';
   pinVidPEBtn.title = 'Pin this video as context for Prompt Engineer extend prompts';
   pinVidPEBtn.addEventListener('click', () => {
     pinForPE(src, 'video', engineLabel + ' Video');
-    pinVidPEBtn.textContent = '📌 Pinned';
-    pinVidPEBtn.style.color = 'var(--lavender)';
-    pinVidPEBtn.style.borderColor = 'var(--lavender)';
+    document.querySelectorAll('.pe-pin-btn').forEach(b => { b.classList.remove('active'); b.textContent = '✦ PE'; });
+    pinVidPEBtn.classList.add('active');
+    pinVidPEBtn.textContent = '✦ PE ✓';
   });
 
   // Extend button
@@ -2824,16 +2845,14 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
 
   // Pin for PE button
   const pinPEBtn = document.createElement('button');
-  pinPEBtn.className = 'set-target-btn';
-  pinPEBtn.textContent = '📌 Pin for PE';
+  pinPEBtn.className = 'pe-pin-btn';
+  pinPEBtn.textContent = '✦ PE';
   pinPEBtn.title = 'Pin this image as visual context for Prompt Engineer mode';
   pinPEBtn.addEventListener('click', () => {
     pinForPE(hostedUrl || src, 'image', modelLabel);
-    // Visual confirmation
-    document.querySelectorAll('.pe-pinned-btn').forEach(b => { b.classList.remove('is-target'); b.textContent = '📌 Pin for PE'; });
-    pinPEBtn.classList.add('is-target');
-    pinPEBtn.textContent = '📌 Pinned';
-    pinPEBtn.classList.add('pe-pinned-btn');
+    document.querySelectorAll('.pe-pin-btn').forEach(b => { b.classList.remove('active'); b.textContent = '✦ PE'; });
+    pinPEBtn.classList.add('active');
+    pinPEBtn.textContent = '✦ PE ✓';
   });
 
   // Set as edit target button
@@ -3223,7 +3242,7 @@ function updateCostEstimate() {
   } else if (editMode) {
     // Edit = input image + output image at xAI pricing
     const editMod = document.getElementById('edit-model-select')?.value || 'wan27';
-    const editCostMap = { aurora: '~$0.04', wan27pro: '$0.06', wan27: '$0.03', fluxkontext: '$0.02', qwen: '$0.02' };
+    const editCostMap = { aurora: '~$0.04', wan27pro: '$0.06', wan27: '$0.03', fluxkontext: '$0.02', qwen2: '$0.03', qwen: '$0.02' };
     const editCost = editCostMap[editMod] || '$0.02';
     el.textContent = editCost;
     modeText.textContent = 'Edit image mode';
@@ -3259,7 +3278,7 @@ function updateCostEstimate() {
     const upModel = document.getElementById('upscale-model-select')?.value || 'standard';
     const cleanMod = document.getElementById('clean-model-select')?.value || 'qwen';
     const upCosts = { standard: '$0.01+', precision: '$0.03+', premium: '$0.06+' };
-    const cleanCosts = { qwen: '$0.02', fluxkontext: '$0.02', wan27: '$0.03', wan27pro: '$0.06' };
+    const cleanCosts = { qwen2: '$0.03', qwen: '$0.02', fluxkontext: '$0.02', wan27: '$0.03', wan27pro: '$0.06' };
     el.textContent = `Clean ${cleanCosts[cleanMod]} / Up ${upCosts[upModel]}`;
     modeText.textContent = 'Enhance mode';
     el.style.display = 'inline-block';
@@ -3297,6 +3316,7 @@ const PE_SYSTEM_PROMPTS = {
   // ── Image generation ──
   aurora: "You are an expert image prompt engineer for Aurora/Flux diffusion models. When the user describes what they want, respond with ONLY a single optimized image generation prompt. No explanation, no preamble, no quotes, no markdown. Just the raw prompt text. Include quality tags, lighting descriptors, style keywords, and technical details that Aurora responds well to. Keep it under 200 words.",
   wan26t2v: "You are an expert image prompt engineer for Wan 2.6 text-to-image model. When the user describes what they want, respond with ONLY a single structured prompt. No explanation, no preamble. Format: [subject description], [scene/environment], [style], [lighting], [technical quality]. Keep it concise and direct.",
+  qwen2: "You are an expert image prompt engineer for Qwen Image 2.0 editing. Qwen 2.0 is a unified 7B model with strong instruction-following and native 2K output. When the user describes a transformation or edit, respond with ONLY a single clear edit instruction prompt. Be specific about what to change, what to preserve, and any style or quality notes. No explanation, no preamble.",
   qwen: "You are an expert image prompt engineer for Qwen image editing. When the user describes a transformation or edit, respond with ONLY a single clear edit instruction prompt. No explanation. Be specific about what changes to make, what to preserve, and the desired style outcome.",
   wan27: "You are an expert image prompt engineer for Wan 2.7 image editing. When the user describes what they want, respond with ONLY a single optimized prompt describing the transformation. No explanation, no preamble. Be explicit about the subject, the change, and the visual style.",
   fluxkontext: "You are an expert image prompt engineer for Flux Kontext image editing. Flux Kontext excels at precise instruction-following while preserving character identity. When the user describes what they want, respond with ONLY a single edit instruction. Use the format: Keep [what must stay unchanged]. Change [what to edit]. Ensure [style/lighting constraints]. No explanation, no preamble.",
