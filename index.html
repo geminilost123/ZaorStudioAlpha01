@@ -957,10 +957,12 @@
 
     #pe-model-row {
       display: none;
-      align-items: center;
-      gap: 8px;
-      margin-top: 4px;
-      padding: 0 4px;
+      flex-direction: column;
+      gap: 0;
+      margin-top: 0;
+      background: var(--surface);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding: 8px 0 0;
     }
     #pe-model-row.visible { display: flex; }
 
@@ -1046,42 +1048,44 @@
     </header>
 
     <div id="pe-model-row">
-    <span class="mode-label" style="padding-left:14px;">PE Model</span>
-    <select id="pe-model-select" class="img-control-select">
-      <optgroup label="── Image ──">
-        <option value="aurora">Aurora / Flux</option>
-        <option value="wan26t2v">Wan 2.6 T2I</option>
-        <option value="qwen">Qwen Edit</option>
-        <option value="wan27">Wan 2.7 Edit</option>
-        <option value="fluxkontext">Flux Kontext Edit</option>
-      </optgroup>
-      <optgroup label="── Animate (I2V) ──">
-        <option value="aurora_i2v">Aurora I2V</option>
-        <option value="seedance_i2v">Seedance 1.5 Spicy I2V</option>
-        <option value="wan22spicy_i2v">Wan 2.2 Spicy I2V</option>
-        <option value="wan27spicy_i2v">Wan 2.7 Spicy I2V</option>
-      </optgroup>
-      <optgroup label="── Video Extend ──">
-        <option value="aurora_extend">Aurora Extend</option>
-        <option value="seedance_extend">Seedance Extend</option>
-        <option value="wan22spicy_extend">Wan 2.2 Spicy Extend</option>
-      </optgroup>
-    </select>
-    <button id="pe-img-toggle" title="Feed current edit target image to Zaor for visual context" style="
-      background: transparent;
-      border: 1px solid rgba(255,255,255,0.1);
-      color: var(--text-dim);
-      font-family: 'Inter', sans-serif;
-      font-size: 11px;
-      padding: 3px 9px;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: all 0.2s;
-      white-space: nowrap;
-      flex-shrink: 0;
-    ">🖼 Use Image</button>
-    <span id="pe-img-status" style="font-size:11px;color:var(--text-dim);padding-left:4px;">Prompts optimized for selected tool</span>
-  </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:0 14px 6px;">
+        <span class="mode-label">Tool</span>
+        <select id="pe-model-select" class="img-control-select" style="flex:1;min-width:140px;">
+          <optgroup label="── Image ──">
+            <option value="aurora">Aurora / Flux</option>
+            <option value="wan26t2v">Wan 2.6 T2I</option>
+            <option value="qwen">Qwen Edit</option>
+            <option value="wan27">Wan 2.7 Edit</option>
+            <option value="fluxkontext">Flux Kontext Edit</option>
+          </optgroup>
+          <optgroup label="── Animate (I2V) ──">
+            <option value="aurora_i2v">Aurora I2V</option>
+            <option value="seedance_i2v">Seedance 1.5 Spicy I2V</option>
+            <option value="wan22spicy_i2v">Wan 2.2 Spicy I2V</option>
+            <option value="wan27spicy_i2v">Wan 2.7 Spicy I2V</option>
+          </optgroup>
+          <optgroup label="── Video Extend ──">
+            <option value="aurora_extend">Aurora Extend</option>
+            <option value="seedance_extend">Seedance Extend</option>
+            <option value="wan22spicy_extend">Wan 2.2 Spicy Extend</option>
+          </optgroup>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:0 14px 8px;border-top:1px solid rgba(255,255,255,0.05);padding-top:8px;">
+        <span class="mode-label">Visual context</span>
+        <button id="pe-img-toggle" style="
+          background:transparent;border:1px solid rgba(255,255,255,0.1);
+          color:var(--text-dim);font-family:'Inter',sans-serif;font-size:11px;
+          padding:3px 9px;border-radius:10px;cursor:pointer;transition:all 0.2s;white-space:nowrap;
+        ">🖼 Pin Image/Video</button>
+        <span id="pe-pin-status" style="font-size:11px;color:var(--text-dim);font-style:italic;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">None pinned — works without image context too</span>
+        <button id="pe-pin-clear" style="
+          display:none;background:transparent;border:none;
+          color:var(--text-dim);font-size:11px;cursor:pointer;padding:2px 6px;
+          font-family:'Inter',sans-serif;
+        ">✕</button>
+      </div>
+    </div>
   <div id="messages">
       <div id="empty-state">
         <div class="star">✦</div>
@@ -1366,6 +1370,9 @@ let lockedStyle = localStorage.getItem('zaor_style_lock') || ''; // persisted st
 let styleLockActive = localStorage.getItem('zaor_style_active') === '1'; // whether lock is engaged
 let promptEngineerMode = false; // PE mode for chat
 let peUseImage = false; // whether to feed current image to Zaor in PE mode
+let pePinnedUrl = null;   // independently pinned image or video URL for PE
+let pePinnedType = null;  // 'image' or 'video'
+let pePinnedLabel = '';   // display label for pinned item
 let isLoading = false;
 let currentThreadId = null;
 let pendingDeleteId = null;
@@ -1655,7 +1662,7 @@ function setMode(mode) {
   // PE mode only relevant in chat — deactivate when switching away
   if (mode !== 'chat' && promptEngineerMode) {
     promptEngineerMode = false;
-    peUseImage = false;
+    peUseImage = pePinnedUrl != null; // keep if something is pinned
     updatePeImgToggle();
   }
   const peBtn = document.getElementById('pe-btn');
@@ -1966,23 +1973,19 @@ async function generateText(userText) {
       const sysPrompt = PE_SYSTEM_PROMPTS[peModel] || PE_SYSTEM_PROMPTS.aurora;
       apiMessages = [{ role: 'system', content: sysPrompt }, ...messages];
 
-      // If image mode is on, replace the last user message with a vision-capable content array
-      if (peUseImage && lastImageUrl) {
+      // If a PE target is pinned, include it in the message
+      const peUrl = pePinnedUrl || (peUseImage ? lastImageUrl : null);
+      if (peUrl) {
         const lastUserIdx = [...apiMessages].reverse().findIndex(m => m.role === 'user');
         if (lastUserIdx !== -1) {
           const realIdx = apiMessages.length - 1 - lastUserIdx;
-          const userText = apiMessages[realIdx].content;
+          const userText = typeof apiMessages[realIdx].content === 'string'
+            ? apiMessages[realIdx].content : '';
           apiMessages[realIdx] = {
             role: 'user',
             content: [
-              {
-                type: 'image_url',
-                image_url: { url: lastImageUrl, detail: 'high' }
-              },
-              {
-                type: 'text',
-                text: userText
-              }
+              { type: 'image_url', image_url: { url: peUrl, detail: 'high' } },
+              { type: 'text', text: userText }
             ]
           };
         }
@@ -2149,43 +2152,19 @@ async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progres
       progressId, isCancelled
     );
     if (t2vUrl) {
-      const t2vDur = body.duration;
-      const t2vRes = body.resolution;
-      addMessageToThread({ role: 'assistant', type: 'video', src: t2vUrl, alt: prompt, engineLabel: 'Aurora T2V', storedDuration: t2vDur, storedRes: t2vRes });
-      renderVideo(t2vUrl, prompt, true, 'Aurora T2V', t2vDur, t2vRes);
+      addMessageToThread({ role: 'assistant', type: 'video', src: t2vUrl, alt: prompt, engineLabel: 'Aurora T2V', storedDuration: Math.min(duration, 10), storedRes: res });
+      renderVideo(t2vUrl, prompt, true, 'Aurora T2V', Math.min(duration, 10), res);
     }
     return;
   }
 
-  const submitRes = await fetch(`https://api.wavespeed.ai/api/v3/${modelPath}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wavespeedKey}` },
-    body: JSON.stringify(body)
-  });
-
-  if (!submitRes.ok) {
-    const e = await submitRes.json().catch(()=>({}));
-    throw new Error(`Aurora video error ${submitRes.status}: ${e.message || JSON.stringify(e)}`);
-  }
-
-  const submitData = await submitRes.json();
-  const taskId = submitData.data?.id || submitData.id;
-  if (!taskId) throw new Error('No task ID returned');
-
-  const videoUrl = await pollForVideo(
-    () => fetch(`https://api.wavespeed.ai/api/v3/predictions/${taskId}/result`, { headers: { 'Authorization': `Bearer ${wavespeedKey}` } }),
-    data => {
-      const status = data.data?.status || data.status;
-      if (status === 'completed') return data.data?.outputs?.[0] || data.outputs?.[0] || null;
-      if (status === 'failed') return 'FAILED';
-      return null;
-    },
-    progressId, isCancelled
-  );
+  // Use callWaveSpeed for submit+poll — same pattern as all other WaveSpeed calls
+  if (!wavespeedKey) throw new Error('WaveSpeed API key required for Aurora I2V. Tap "Set API Key" to add it.');
+  const videoUrl = await callWaveSpeed(modelPath, body);
 
   if (videoUrl) {
-    addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: 'Aurora' });
-    renderVideo(videoUrl, prompt, true, 'Aurora');
+    addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: 'Aurora', storedDuration: body.duration, storedRes: res });
+    renderVideo(videoUrl, prompt, true, 'Aurora', body.duration, res);
   }
 }
 
@@ -2201,15 +2180,10 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   let modelPath, body;
 
   if (extendVideoUrl) {
-    if (engine === 'seedance15spicy') {
-      // Seedance doesn't have a video-extend model — use I2V on the video URL as a continuation
-      modelPath = 'bytedance/seedance-v1.5-pro/image-to-video-spicy';
-      body = { prompt: prompt || 'continue the scene naturally with smooth motion', image: extendVideoUrl, resolution: res, duration: Math.min(duration, 12), aspect_ratio: '16:9', generate_audio: false, seed: -1 };
-    } else {
-      // Wan 2.2 Spicy extend
-      modelPath = 'wavespeed-ai/wan-2.2-spicy/video-extend';
-      body = { prompt, video: extendVideoUrl, resolution: res, duration: 5, seed: -1 }; // 5s only
-    }
+    // Aurora extend routes through xAI (handled in generateVideoAurora)
+    // Wan 2.2 Spicy is the only WaveSpeed extend option
+    modelPath = 'wavespeed-ai/wan-2.2-spicy/video-extend';
+    body = { prompt, video: extendVideoUrl, resolution: res, duration: 5, seed: -1 }; // 5s fixed
   } else if (imageDataUrl) {
     // I2V
     if (engine === 'seedance15spicy') {
@@ -2397,6 +2371,18 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
   saveBtn.innerHTML = '&#8681; Save';
   saveBtn.addEventListener('click', () => saveVideoToFiles(src, altText));
 
+  // Pin for PE button on videos
+  const pinVidPEBtn = document.createElement('button');
+  pinVidPEBtn.className = 'animate-btn';
+  pinVidPEBtn.textContent = '📌 Pin for PE';
+  pinVidPEBtn.title = 'Pin this video as context for Prompt Engineer extend prompts';
+  pinVidPEBtn.addEventListener('click', () => {
+    pinForPE(src, 'video', engineLabel + ' Video');
+    pinVidPEBtn.textContent = '📌 Pinned';
+    pinVidPEBtn.style.color = 'var(--lavender)';
+    pinVidPEBtn.style.borderColor = 'var(--lavender)';
+  });
+
   // Extend button
   const extendBtn = document.createElement('button');
   extendBtn.className = 'animate-btn';
@@ -2443,6 +2429,7 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
 
   wrapper.appendChild(video);
   wrapper.appendChild(saveBtn);
+  wrapper.appendChild(pinVidPEBtn);
   wrapper.appendChild(extendBtn);
   wrapper.appendChild(retryVidBtn);
   div.appendChild(label);
@@ -2497,7 +2484,6 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   if (isExtend) {
     engineSel.innerHTML = `
       <option value="aurora" selected>Aurora — $0.05/s</option>
-      <option value="seedance15spicy">Seedance 1.5 Spicy — ~$0.05/run</option>
       <option value="wan22spicy">Wan 2.2 Spicy — $0.15/run</option>
     `;
   } else {
@@ -2746,6 +2732,20 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
     });
   }
 
+  // Pin for PE button
+  const pinPEBtn = document.createElement('button');
+  pinPEBtn.className = 'set-target-btn';
+  pinPEBtn.textContent = '📌 Pin for PE';
+  pinPEBtn.title = 'Pin this image as visual context for Prompt Engineer mode';
+  pinPEBtn.addEventListener('click', () => {
+    pinForPE(hostedUrl || src, 'image', modelLabel);
+    // Visual confirmation
+    document.querySelectorAll('.pe-pinned-btn').forEach(b => { b.classList.remove('is-target'); b.textContent = '📌 Pin for PE'; });
+    pinPEBtn.classList.add('is-target');
+    pinPEBtn.textContent = '📌 Pinned';
+    pinPEBtn.classList.add('pe-pinned-btn');
+  });
+
   // Set as edit target button
   const setTargetBtn = document.createElement('button');
   setTargetBtn.className = 'set-target-btn';
@@ -2877,6 +2877,7 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
 
   btnBar.appendChild(saveBtn);
   btnBar.appendChild(copyPromptBtn);
+  btnBar.appendChild(pinPEBtn);
   btnBar.appendChild(setTargetBtn);
   btnBar.appendChild(applyStyleBtn);
   btnBar.appendChild(retryImgBtn);
@@ -3225,7 +3226,7 @@ document.getElementById('pe-btn')?.addEventListener('click', () => {
     btn.textContent = '✦ PE ON';
   } else {
     btn.textContent = '✦ PE';
-    // Reset image toggle when PE deactivates
+    // Keep pin but deactivate use
     peUseImage = false;
     updatePeImgToggle();
   }
@@ -3233,31 +3234,54 @@ document.getElementById('pe-btn')?.addEventListener('click', () => {
 
 function updatePeImgToggle() {
   const btn = document.getElementById('pe-img-toggle');
-  const status = document.getElementById('pe-img-status');
+  const status = document.getElementById('pe-pin-status');
+  const clearBtn = document.getElementById('pe-pin-clear');
   if (!btn) return;
-  if (peUseImage && lastImageUrl) {
+  if (pePinnedUrl) {
     btn.style.borderColor = 'var(--lavender)';
     btn.style.color = 'var(--lavender)';
     btn.style.background = 'rgba(201,184,232,0.12)';
-    btn.textContent = '🖼 Image ON';
-    if (status) status.textContent = 'Zaor will analyze the current image';
+    btn.textContent = pePinnedType === 'video' ? '🎬 Video Pinned' : '🖼 Image Pinned';
+    if (status) { status.textContent = pePinnedLabel || 'Pinned for context'; status.style.color = 'var(--lavender)'; }
+    if (clearBtn) clearBtn.style.display = 'inline';
+    peUseImage = true;
   } else {
     btn.style.borderColor = 'rgba(255,255,255,0.1)';
     btn.style.color = 'var(--text-dim)';
     btn.style.background = 'transparent';
-    btn.textContent = '🖼 Use Image';
-    if (status) status.textContent = 'Prompts optimized for selected tool';
+    btn.textContent = '🖼 Pin Image/Video';
+    if (status) { status.textContent = 'None pinned — works without image context too'; status.style.color = 'var(--text-dim)'; }
+    if (clearBtn) clearBtn.style.display = 'none';
+    peUseImage = false;
   }
 }
 
-document.getElementById('pe-img-toggle')?.addEventListener('click', () => {
-  if (!lastImageUrl) {
-    appendError('No image available. Generate or upload an image first.');
-    return;
-  }
-  peUseImage = !peUseImage;
+// Pin clear button
+document.getElementById('pe-pin-clear')?.addEventListener('click', () => {
+  pePinnedUrl = null; pePinnedType = null; pePinnedLabel = '';
   updatePeImgToggle();
 });
+
+// Pin button — cycles through showing instructions
+document.getElementById('pe-img-toggle')?.addEventListener('click', () => {
+  if (pePinnedUrl) {
+    // Already pinned — clear it
+    pePinnedUrl = null; pePinnedType = null; pePinnedLabel = '';
+    updatePeImgToggle();
+  } else {
+    // Show instruction
+    const status = document.getElementById('pe-pin-status');
+    if (status) { status.textContent = '👆 Tap 📌 Pin on any image or 📌 Pin on any video below'; status.style.color = '#f4d03f'; }
+  }
+});
+
+// Global function to pin an item for PE — called from image/video buttons
+function pinForPE(url, type, label) {
+  pePinnedUrl = url;
+  pePinnedType = type;
+  pePinnedLabel = label || (type === 'video' ? 'Video' : 'Image');
+  updatePeImgToggle();
+}
 
 function updateKeyBtn() {
   apiKeyBtn.textContent = apiKey ? 'Key ✓' : 'Set API Key';
