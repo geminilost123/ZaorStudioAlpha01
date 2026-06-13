@@ -2147,9 +2147,15 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   let modelPath, body;
 
   if (extendVideoUrl) {
-    // Extend — always use Wan 2.2 Spicy extend
-    modelPath = 'wavespeed-ai/wan-2.2-spicy/video-extend';
-    body = { prompt, video: extendVideoUrl, resolution: res, duration: 5, seed: -1 }; // Wan 2.2 Spicy extend: 5s only
+    if (engine === 'seedance15spicy') {
+      // Seedance doesn't have a video-extend model — use I2V on the video URL as a continuation
+      modelPath = 'bytedance/seedance-v1.5-pro/image-to-video-spicy';
+      body = { prompt: prompt || 'continue the scene naturally with smooth motion', image: extendVideoUrl, resolution: res, duration: Math.min(duration, 12), aspect_ratio: '16:9', generate_audio: false, seed: -1 };
+    } else {
+      // Wan 2.2 Spicy extend
+      modelPath = 'wavespeed-ai/wan-2.2-spicy/video-extend';
+      body = { prompt, video: extendVideoUrl, resolution: res, duration: 5, seed: -1 }; // 5s only
+    }
   } else if (imageDataUrl) {
     // I2V
     if (engine === 'seedance15spicy') {
@@ -2429,6 +2435,7 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   if (isExtend) {
     engineSel.innerHTML = `
       <option value="aurora" selected>Aurora — $0.05/s</option>
+      <option value="seedance15spicy">Seedance 1.5 Spicy — ~$0.05/run</option>
       <option value="wan22spicy">Wan 2.2 Spicy — $0.15/run</option>
     `;
   } else {
@@ -2458,10 +2465,15 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
 
   // Apply initial constraints with cheapest defaults
   applyModelConstraints('aurora', durSel, resSel, null, isExtend, true, !isExtend);
+  // Explicitly set values after populating options (select.value is empty until attached to DOM)
+  if (durSel.options.length) durSel.value = durSel.options[0].value;
+  if (resSel.options.length) resSel.value = resSel.options[0].value;
 
   // Update when engine changes — apply cheapest defaults
   engineSel.addEventListener('change', () => {
     applyModelConstraints(engineSel.value, durSel, resSel, null, isExtend, true, !isExtend);
+    if (durSel.options.length) durSel.value = durSel.options[0].value;
+    if (resSel.options.length) resSel.value = resSel.options[0].value;
   });
 
   const generateBtn = document.createElement('button');
@@ -2481,7 +2493,9 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   `;
 
   generateBtn.addEventListener('click', () => {
-    onSubmit(promptInput.value.trim(), engineSel.value, parseInt(durSel.value), resSel.value);
+    const dur = parseInt(durSel.value);
+    const res = resSel.value || '480p';
+    onSubmit(promptInput.value.trim(), engineSel.value, isNaN(dur) ? 4 : dur, res);
   });
 
   promptInput.addEventListener('keydown', e => {
