@@ -845,7 +845,7 @@
       <div id="mode-indicator"><span id="mode-label-text">Chat mode</span><span id="cost-estimate"></span></div>
       <div id="upload-edit-row" style="display:flex;gap:6px;margin-bottom:6px;padding:0 4px;flex-wrap:wrap;align-items:center;">
         <button id="upload-img-btn" class="edit-img-btn visible" title="Upload an image to edit or animate">🖼 Upload Image</button>
-        <div id="edit-btn-row" style="display:none;display:flex;gap:6px;align-items:center;">
+        <div id="edit-btn-row" style="display:none;gap:6px;align-items:center;">
           <button id="edit-img-btn" class="edit-img-btn visible" title="Edit last image">✏️ Edit</button>
           <select id="edit-model-select" class="img-control-select" title="Edit model">
             <option value="aurora">Aurora — ~$0.04</option>
@@ -2350,7 +2350,7 @@ keyInput.addEventListener('keydown', e => { if (e.key === 'Enter') document.getE
 
 function showEditButton() {
   const row = document.getElementById('edit-btn-row');
-  if (row) row.style.display = 'block';
+  if (row) row.style.display = 'flex';
 }
 
 // Per-model constraints
