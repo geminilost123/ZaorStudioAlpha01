@@ -375,21 +375,16 @@
     .edit-img-btn.visible { display: inline-flex; align-items: center; gap: 5px; }
 
     .save-btn {
-      position: absolute;
-      bottom: 10px; right: 10px;
-      background: rgba(26,26,46,0.82);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      border: 1px solid rgba(255,255,255,0.15);
-      color: var(--text);
+      background: var(--surface);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text-dim);
       font-family: 'Inter', sans-serif;
-      font-size: 12px;
-      font-weight: 500;
-      padding: 6px 12px;
-      border-radius: 20px;
+      font-size: 12px; font-weight: 500;
+      padding: 5px 12px; border-radius: 20px;
       cursor: pointer;
       display: flex; align-items: center; gap: 5px;
-      transition: background 0.2s, border-color 0.2s;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      flex-shrink: 0;
     }
     .save-btn:hover { background: rgba(201,184,232,0.18); border-color: var(--lavender); color: var(--lavender); }
     .save-btn:active { transform: scale(0.96); }
@@ -488,11 +483,30 @@
     #input-area.image-mode #send-btn { background: var(--rose); }
 
     #mode-indicator {
-      text-align: center; font-size: 11px; color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-size: 11px; color: var(--text-dim);
       margin-bottom: 6px; letter-spacing: 0.06em; text-transform: uppercase;
-      height: 14px; transition: color 0.3s;
+      min-height: 14px; transition: color 0.3s;
     }
     #input-area.image-mode #mode-indicator { color: var(--rose); }
+
+    #cost-estimate {
+      font-size: 11px;
+      color: var(--text-dim);
+      background: var(--surface);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 2px 8px;
+      letter-spacing: 0.03em;
+      text-transform: none;
+      white-space: nowrap;
+      display: none;
+    }
+    #input-area.image-mode #cost-estimate,
+    #input-area.video-mode #cost-estimate { display: inline-block; }
 
     /* ── Modals ── */
     .modal-overlay {
@@ -623,23 +637,27 @@
     }
     .vid-save-btn:hover { background: rgba(100,180,255,0.18); border-color: #64b4ff; color: #64b4ff; }
 
-    /* Animate button on images */
+    /* Image button bar — sits below image, not on top of it */
+    .img-btn-bar {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+
     .animate-btn {
-      position: absolute;
-      bottom: 10px; left: 10px;
-      background: rgba(26,26,46,0.82);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      border: 1px solid rgba(255,255,255,0.15);
-      color: var(--text);
+      background: var(--surface);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text-dim);
       font-family: 'Inter', sans-serif;
       font-size: 12px; font-weight: 500;
-      padding: 6px 12px; border-radius: 20px;
+      padding: 5px 12px; border-radius: 20px;
       cursor: pointer;
       display: flex; align-items: center; gap: 5px;
-      transition: background 0.2s, border-color 0.2s;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      flex-shrink: 0;
     }
-    .animate-btn:hover { background: rgba(100,180,255,0.18); border-color: #64b4ff; color: #64b4ff; }
+    .animate-btn:hover { background: rgba(100,180,255,0.15); border-color: #64b4ff; color: #64b4ff; }
     .animate-btn:disabled { opacity: 0.4; cursor: default; }
 
     /* Video progress */
@@ -658,6 +676,32 @@
     .animate-panel input:focus {
       border-color: #64b4ff !important;
     }
+
+    /* Animate panel sits below the button bar, not inside image wrapper */
+    .animate-panel-outer {
+      margin-top: 6px;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    /* Copy button on text bubbles */
+    .copy-btn {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--text-dim);
+      font-size: 11px;
+      cursor: pointer;
+      padding: 3px 8px;
+      border-radius: 10px;
+      opacity: 1;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      align-self: flex-end;
+      margin-top: 4px;
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 0.03em;
+    }
+    .copy-btn:active { background: rgba(201,184,232,0.1); }
+    .copy-btn.copied { color: #7ec87e; border-color: rgba(126,200,126,0.3); }
 
     .vid-spinner {
       width: 16px; height: 16px;
@@ -808,12 +852,14 @@
     </div>
 
     <div id="input-area">
-      <div id="mode-indicator">Chat mode</div>
+      <div id="mode-indicator"><span id="mode-label-text">Chat mode</span><span id="cost-estimate"></span></div>
+      <div id="edit-btn-row" style="display:none;margin-bottom:6px;padding:0 4px;">
+        <button id="edit-img-btn" class="edit-img-btn visible" title="Edit last image">✏️ Edit Last Image</button>
+      </div>
       <div class="input-row">
         <textarea id="prompt" rows="1" placeholder="Say something…"></textarea>
         <button id="img-toggle" title="Toggle image generation">🎨</button>
         <button id="vid-toggle" title="Toggle video generation">🎬</button>
-        <button id="edit-img-btn" class="edit-img-btn" title="Edit last image">✏️ Edit</button>
         <button id="send-btn" title="Send">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M2 8L14 2L8 14L7 9L2 8Z" fill="currentColor"/>
@@ -833,8 +879,8 @@
           <div class="img-control-group">
             <span class="mode-label">Model</span>
             <select id="img-model-select" class="img-control-select">
-              <option value="grok-imagine-image">Aurora Simple</option>
-              <option value="grok-imagine-image-quality" selected>Aurora Mega</option>
+              <option value="grok-imagine-image" selected>Aurora Simple</option>
+              <option value="grok-imagine-image-quality">Aurora Mega</option>
             </select>
           </div>
           <div class="img-control-group">
@@ -1307,8 +1353,8 @@ function setImageMode(on) {
   document.getElementById('edit-img-btn').classList.remove('active');
   inputArea.classList.toggle('image-mode', on);
   inputArea.classList.remove('video-mode');
-  modeIndicator.textContent = on ? 'Image mode' : 'Chat mode';
   promptEl.placeholder = on ? 'Describe an image…' : 'Say something…';
+  updateCostEstimate();
 }
 
 function setEditMode(on) {
@@ -1320,8 +1366,8 @@ function setEditMode(on) {
   document.getElementById('edit-img-btn').classList.toggle('active', on);
   inputArea.classList.toggle('image-mode', on); // reuse image-mode styling
   inputArea.classList.remove('video-mode');
-  modeIndicator.textContent = on ? 'Edit image mode' : 'Chat mode';
   promptEl.placeholder = on ? 'Describe your edit…' : 'Say something…';
+  updateCostEstimate();
 }
 
 imgToggle.addEventListener('click', () => setImageMode(!imageMode));
@@ -1339,8 +1385,8 @@ document.getElementById('vid-toggle').addEventListener('click', () => {
   document.getElementById('edit-img-btn').classList.remove('active');
   inputArea.classList.toggle('video-mode', videoMode);
   inputArea.classList.remove('image-mode');
-  modeIndicator.textContent = videoMode ? 'Video mode' : 'Chat mode';
   promptEl.placeholder = videoMode ? 'Describe a video…' : 'Say something…';
+  updateCostEstimate();
 });
 
 pills.forEach(pill => {
@@ -1349,6 +1395,29 @@ pills.forEach(pill => {
     pill.classList.add('active');
     contentMode = pill.dataset.mode;
   });
+});
+
+// Apply cheapest defaults for initial video mode state (Aurora)
+(function initVideoDefaults() {
+  const durEl = document.getElementById('vid-duration-select');
+  const resEl = document.getElementById('vid-res-select');
+  const ratioEl = document.getElementById('vid-ratio-select');
+  applyModelConstraints('aurora', durEl, resEl, ratioEl, false, true);
+})();
+
+// Update cost estimate when video/image selectors change
+['vid-engine-select','vid-duration-select','img-model-select'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', updateCostEstimate);
+});
+
+// When engine changes in main video mode, update duration/resolution/ratio options
+document.getElementById('vid-engine-select')?.addEventListener('change', () => {
+  const engine = document.getElementById('vid-engine-select').value;
+  const durEl = document.getElementById('vid-duration-select');
+  const resEl = document.getElementById('vid-res-select');
+  const ratioEl = document.getElementById('vid-ratio-select');
+  applyModelConstraints(engine, durEl, resEl, ratioEl, false, true); // use cheapest defaults on engine switch
+  updateCostEstimate();
 });
 
 sendBtn.addEventListener('click', handleSend);
@@ -1409,12 +1478,11 @@ async function editImage(prompt, imageUrl) {
 
   try {
     const body = {
+      model: imgModel === 'grok-imagine-image' ? 'grok-imagine-image' : 'grok-imagine-image-quality',
       prompt: fullPrompt,
-      image: imageUrl,
-      aspect_ratio: aspectRatio,
-      resolution: resolution.toLowerCase(),
-      response_format: 'url',
-      n: 1
+      image: { url: imageUrl, type: 'image_url' },
+      response_format: 'url'
+      // Note: aspect_ratio ignored for single-image edits per xAI docs
     };
 
     const res = await fetch('https://api.x.ai/v1/images/edits', {
@@ -1659,7 +1727,7 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   if (extendVideoUrl) {
     // Extend — always use Wan 2.2 Spicy extend
     modelPath = 'wavespeed-ai/wan-2.2-spicy/video-extend';
-    body = { prompt, video: extendVideoUrl, resolution: res, duration: Math.min(duration, 8), seed: -1 };
+    body = { prompt, video: extendVideoUrl, resolution: res, duration: 5, seed: -1 }; // Wan 2.2 Spicy extend: 5s only
   } else if (imageDataUrl) {
     // I2V
     modelPath = engine === 'wan26spicy'
@@ -1795,20 +1863,35 @@ function renderVideo(src, altText, animate = true) {
   saveBtn.innerHTML = '&#8681; Save';
   saveBtn.addEventListener('click', () => saveVideoToFiles(src, altText));
 
-  // Extend button — bottom left
+  // Extend button
   const extendBtn = document.createElement('button');
   extendBtn.className = 'animate-btn';
   extendBtn.innerHTML = '⟳ Extend';
+  const panelOuter2 = document.createElement('div');
+  panelOuter2.className = 'animate-panel-outer';
+  let extendOpen = false;
   extendBtn.addEventListener('click', () => {
-    const existingPanel = wrapper.querySelector('.animate-panel');
-    if (existingPanel) { existingPanel.remove(); return; }
-    const panel = buildAnimatePanel(async (prompt, engine) => {
-      panel.remove();
-      extendBtn.disabled = true;
-      await generateVideo(prompt || 'continue the scene naturally', null, engine, src);
-      extendBtn.disabled = false;
-    }, true);
-    wrapper.appendChild(panel);
+    extendOpen = !extendOpen;
+    if (extendOpen) {
+      const panel = buildAnimatePanel(async (prompt, engine, duration, resolution) => {
+        panelOuter2.innerHTML = '';
+        extendOpen = false;
+        extendBtn.disabled = true;
+        const durEl = document.getElementById('vid-duration-select');
+        const resEl = document.getElementById('vid-res-select');
+        const prevDur = durEl?.value; const prevRes = resEl?.value;
+        if (durEl && duration) durEl.value = duration;
+        if (resEl && resolution) resEl.value = resolution;
+        await generateVideo(prompt || 'continue the scene naturally', null, engine, src);
+        if (durEl && prevDur) durEl.value = prevDur;
+        if (resEl && prevRes) resEl.value = prevRes;
+        extendBtn.disabled = false;
+      }, true);
+      panelOuter2.innerHTML = '';
+      panelOuter2.appendChild(panel);
+    } else {
+      panelOuter2.innerHTML = '';
+    }
   });
 
   wrapper.appendChild(video);
@@ -1816,6 +1899,7 @@ function renderVideo(src, altText, animate = true) {
   wrapper.appendChild(extendBtn);
   div.appendChild(label);
   div.appendChild(wrapper);
+  div.appendChild(panelOuter2);
   messagesEl.appendChild(div);
   if (animate) scrollToBottom();
 }
@@ -1859,6 +1943,7 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   engineLabel.className = 'mode-label';
   engineLabel.textContent = 'Engine';
 
+  // Engine selector
   const engineSel = document.createElement('select');
   engineSel.className = 'img-control-select';
   if (isExtend) {
@@ -1869,14 +1954,37 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   } else {
     engineSel.innerHTML = `
       <option value="aurora" selected>Aurora</option>
-      <option value="wan26t2v">Wan 2.6</option>
       <option value="wan22spicy">Wan 2.2 Spicy</option>
       <option value="wan26spicy">Wan 2.7 Spicy</option>
     `;
   }
 
+  // Duration selector
+  const durLabel = document.createElement('span');
+  durLabel.className = 'mode-label';
+  durLabel.textContent = 'Dur';
+
+  const durSel = document.createElement('select');
+  durSel.className = 'img-control-select';
+
+  // Resolution selector
+  const resLabel = document.createElement('span');
+  resLabel.className = 'mode-label';
+  resLabel.textContent = 'Res';
+
+  const resSel = document.createElement('select');
+  resSel.className = 'img-control-select';
+
+  // Apply initial constraints with cheapest defaults
+  applyModelConstraints('aurora', durSel, resSel, null, isExtend, true);
+
+  // Update when engine changes — apply cheapest defaults
+  engineSel.addEventListener('change', () => {
+    applyModelConstraints(engineSel.value, durSel, resSel, null, isExtend, true);
+  });
+
   const generateBtn = document.createElement('button');
-  generateBtn.textContent = isExtend ? '⟳ Extend' : '▶ Animate';
+  generateBtn.textContent = isExtend ? '⟳ Extend' : '▶ Go';
   generateBtn.style.cssText = `
     background: #64b4ff;
     color: #1a1a2e;
@@ -1888,10 +1996,11 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
     font-weight: 500;
     cursor: pointer;
     margin-left: auto;
+    flex-shrink: 0;
   `;
 
   generateBtn.addEventListener('click', () => {
-    onSubmit(promptInput.value.trim(), engineSel.value);
+    onSubmit(promptInput.value.trim(), engineSel.value, parseInt(durSel.value), resSel.value);
   });
 
   promptInput.addEventListener('keydown', e => {
@@ -1900,6 +2009,10 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
 
   controlRow.appendChild(engineLabel);
   controlRow.appendChild(engineSel);
+  controlRow.appendChild(durLabel);
+  controlRow.appendChild(durSel);
+  controlRow.appendChild(resLabel);
+  controlRow.appendChild(resSel);
   controlRow.appendChild(generateBtn);
   panel.appendChild(promptInput);
   panel.appendChild(controlRow);
@@ -1939,8 +2052,33 @@ function renderMessage(role, text, animate = true) {
   bubble.className = 'bubble';
   bubble.textContent = text;
 
-  div.appendChild(label);
-  div.appendChild(bubble);
+  // Copy button — only on Zaor responses
+  if (role === 'assistant') {
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'copy-btn';
+    copyBtn.textContent = 'Copy';
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(text);
+        copyBtn.textContent = 'Copied ✓';
+        copyBtn.classList.add('copied');
+        setTimeout(() => {
+          copyBtn.textContent = 'Copy';
+          copyBtn.classList.remove('copied');
+        }, 2000);
+      } catch(e) {
+        copyBtn.textContent = 'Failed';
+        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+      }
+    });
+    div.appendChild(label);
+    div.appendChild(bubble);
+    div.appendChild(copyBtn);
+  } else {
+    div.appendChild(label);
+    div.appendChild(bubble);
+  }
+
   messagesEl.appendChild(div);
   if (animate) scrollToBottom();
   return div;
@@ -1954,35 +2092,69 @@ function renderImage(src, altText, animate = true, hostedUrl = null) {
   label.className = 'msg-label';
   label.textContent = 'Aurora';
 
+  // Image
   const wrapper = document.createElement('div');
   wrapper.className = 'img-wrapper';
-
   const img = document.createElement('img');
   img.src = src;
   img.alt = altText;
   img.className = 'gen-image';
+  wrapper.appendChild(img);
+
+  // Button bar below image
+  const btnBar = document.createElement('div');
+  btnBar.className = 'img-btn-bar';
 
   const saveBtn = document.createElement('button');
   saveBtn.className = 'save-btn';
-  saveBtn.innerHTML = '&#8681; Save to Files';
+  saveBtn.innerHTML = '&#8681; Save';
   saveBtn.addEventListener('click', () => saveImageToFiles(src, altText));
+
+  // Copy prompt button
+  const copyPromptBtn = document.createElement('button');
+  copyPromptBtn.className = 'save-btn';
+  copyPromptBtn.innerHTML = '⎘ Prompt';
+  copyPromptBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(altText);
+      copyPromptBtn.innerHTML = '✓ Copied';
+      setTimeout(() => { copyPromptBtn.innerHTML = '⎘ Prompt'; }, 2000);
+    } catch(e) {}
+  });
 
   const animBtn = document.createElement('button');
   animBtn.className = 'animate-btn';
   animBtn.innerHTML = '▶ Animate';
 
+  // Animate panel — lives outside wrapper, below btn bar
+  const panelOuter = document.createElement('div');
+  panelOuter.className = 'animate-panel-outer';
+  let panelOpen = false;
+
   if (hostedUrl) {
     animBtn.addEventListener('click', () => {
-      // Show animate panel below image
-      const existingPanel = wrapper.querySelector('.animate-panel');
-      if (existingPanel) { existingPanel.remove(); return; }
-      const panel = buildAnimatePanel(async (prompt, engine) => {
-        panel.remove();
-        animBtn.disabled = true;
-        await generateVideo(prompt || 'cinematic motion, smooth camera movement', hostedUrl, engine, null);
-        animBtn.disabled = false;
-      });
-      wrapper.appendChild(panel);
+      panelOpen = !panelOpen;
+      if (panelOpen) {
+        const panel = buildAnimatePanel(async (prompt, engine, duration, resolution) => {
+          panelOuter.innerHTML = '';
+          panelOpen = false;
+          animBtn.disabled = true;
+          // Temporarily override video controls with panel values
+          const durEl = document.getElementById('vid-duration-select');
+          const resEl = document.getElementById('vid-res-select');
+          const prevDur = durEl?.value; const prevRes = resEl?.value;
+          if (durEl && duration) durEl.value = duration;
+          if (resEl && resolution) resEl.value = resolution;
+          await generateVideo(prompt || 'cinematic motion, smooth camera movement', hostedUrl, engine, null);
+          if (durEl && prevDur) durEl.value = prevDur;
+          if (resEl && prevRes) resEl.value = prevRes;
+          animBtn.disabled = false;
+        });
+        panelOuter.innerHTML = '';
+        panelOuter.appendChild(panel);
+      } else {
+        panelOuter.innerHTML = '';
+      }
     });
   } else {
     animBtn.addEventListener('click', () => {
@@ -1990,11 +2162,14 @@ function renderImage(src, altText, animate = true, hostedUrl = null) {
     });
   }
 
-  wrapper.appendChild(img);
-  wrapper.appendChild(saveBtn);
-  wrapper.appendChild(animBtn);
+  btnBar.appendChild(saveBtn);
+  btnBar.appendChild(copyPromptBtn);
+  btnBar.appendChild(animBtn);
+
   div.appendChild(label);
   div.appendChild(wrapper);
+  div.appendChild(btnBar);
+  div.appendChild(panelOuter);
   messagesEl.appendChild(div);
   if (animate) scrollToBottom();
 }
@@ -2082,8 +2257,88 @@ modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) mod
 keyInput.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('modal-save').click(); });
 
 function showEditButton() {
-  const btn = document.getElementById('edit-img-btn');
-  if (btn) btn.classList.add('visible');
+  const row = document.getElementById('edit-btn-row');
+  if (row) row.style.display = 'block';
+}
+
+// Per-model constraints
+const MODEL_CONSTRAINTS = {
+  // defaultDur and defaultRes = cheapest option
+  aurora:     { durations: [4,6,8,10,15], resolutions: ['480p','720p'], hasRatio: true,  maxDur: 15, defaultDur: 4,  defaultRes: '480p' },
+  wan26t2v:   { durations: [5,8,10,15],   resolutions: ['720p','1080p'], hasRatio: true,  maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
+  wan22spicy: { durations: [5,8],          resolutions: ['480p','720p'], hasRatio: false, maxDur: 8,  defaultDur: 5,  defaultRes: '480p' },
+  wan26spicy: { durations: [5,10,15],      resolutions: ['720p','1080p'], hasRatio: false, maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
+  // extend variants
+  aurora_extend:     { durations: [6,10],  resolutions: ['480p','720p'], hasRatio: false, maxDur: 10, defaultDur: 6,  defaultRes: '480p' },
+  wan22spicy_extend: { durations: [5],     resolutions: ['480p','720p'], hasRatio: false, maxDur: 5,  defaultDur: 5,  defaultRes: '480p' },
+};
+
+function applyModelConstraints(engine, durEl, resEl, ratioEl, isExtend, useDefaults = false) {
+  const key = isExtend
+    ? (engine === 'wan22spicy' ? 'wan22spicy_extend' : 'aurora_extend')
+    : engine;
+  const c = MODEL_CONSTRAINTS[key] || MODEL_CONSTRAINTS['aurora'];
+
+  if (durEl) {
+    const curDur = useDefaults ? c.defaultDur : parseInt(durEl.value);
+    durEl.innerHTML = c.durations.map(d =>
+      `<option value="${d}"${d === curDur || (curDur > c.maxDur && d === c.defaultDur) ? ' selected' : ''}>${d}s</option>`
+    ).join('');
+  }
+
+  if (resEl) {
+    const curRes = useDefaults ? c.defaultRes : resEl.value;
+    resEl.innerHTML = c.resolutions.map(r =>
+      `<option value="${r}"${r === curRes ? ' selected' : ''}>${r}</option>`
+    ).join('');
+    if (!c.resolutions.includes(useDefaults ? c.defaultRes : resEl.value)) resEl.value = c.defaultRes;
+  }
+
+  if (ratioEl) {
+    ratioEl.style.display = c.hasRatio ? '' : 'none';
+    const ratioLabel = ratioEl.previousElementSibling;
+    if (ratioLabel) ratioLabel.style.display = c.hasRatio ? '' : 'none';
+  }
+}
+
+function updateCostEstimate() {
+  const el = document.getElementById('cost-estimate');
+  const modeText = document.getElementById('mode-label-text');
+  if (!el) return;
+
+  if (videoMode) {
+    const engine = document.getElementById('vid-engine-select')?.value || 'aurora';
+    const duration = parseInt(document.getElementById('vid-duration-select')?.value || 8);
+    let cost, label;
+    if (engine === 'aurora') {
+      // T2V via xAI: ~$0.07/s
+      cost = (duration * 0.07).toFixed(2);
+      label = `~$${cost}`;
+    } else if (engine === 'wan26t2v') {
+      cost = (duration * 0.068).toFixed(2);
+      label = `~$${cost}`;
+    } else if (engine === 'wan22spicy') {
+      label = '~$0.15';
+    } else if (engine === 'wan26spicy') {
+      label = '~$0.50';
+    }
+    el.textContent = label;
+    modeText.textContent = 'Video mode';
+
+  } else if (editMode) {
+    el.textContent = '~$0.06';
+    modeText.textContent = 'Edit image mode';
+
+  } else if (imageMode) {
+    const model = document.getElementById('img-model-select')?.value || 'grok-imagine-image-quality';
+    const cost = model === 'grok-imagine-image' ? '$0.005' : '$0.022';
+    el.textContent = cost;
+    modeText.textContent = 'Image mode';
+
+  } else {
+    el.textContent = '';
+    modeText.textContent = 'Chat mode';
+  }
 }
 
 function updateKeyBtn() {
