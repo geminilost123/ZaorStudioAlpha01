@@ -2180,10 +2180,21 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   let modelPath, body;
 
   if (extendVideoUrl) {
-    // Aurora extend routes through xAI (handled in generateVideoAurora)
-    // Wan 2.2 Spicy is the only WaveSpeed extend option
-    modelPath = 'wavespeed-ai/wan-2.2-spicy/video-extend';
-    body = { prompt, video: extendVideoUrl, resolution: res, duration: 5, seed: -1 }; // 5s fixed
+    if (engine === 'seedance15spicy') {
+      // Extract last frame from video, then feed as image to Seedance I2V
+      let frameDataUrl;
+      try {
+        frameDataUrl = await extractLastFrame(extendVideoUrl);
+      } catch(e) {
+        throw new Error('Could not extract last frame for Seedance extend: ' + e.message);
+      }
+      modelPath = 'bytedance/seedance-v1.5-pro/image-to-video-spicy';
+      body = { prompt: prompt || 'continue the scene naturally with smooth motion', image: frameDataUrl, resolution: res, duration: Math.min(duration, 12), aspect_ratio: '16:9', generate_audio: false, seed: -1 };
+    } else {
+      // Wan 2.2 Spicy has a dedicated extend endpoint
+      modelPath = 'wavespeed-ai/wan-2.2-spicy/video-extend';
+      body = { prompt, video: extendVideoUrl, resolution: res, duration: 5, seed: -1 }; // 5s fixed
+    }
   } else if (imageDataUrl) {
     // I2V
     if (engine === 'seedance15spicy') {
@@ -2270,6 +2281,41 @@ async function pollForVideo(fetchFn, extractFn, progressId, isCancelled) {
   }
 
   throw new Error('Video generation timed out after 10 minutes');
+}
+
+// ═══════════════════════════════════════════════════════
+// EXTRACT LAST FRAME FROM VIDEO
+// ═══════════════════════════════════════════════════════
+function extractLastFrame(videoUrl) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.preload = 'metadata';
+    video.muted = true;
+
+    video.addEventListener('loadedmetadata', () => {
+      // Seek to last frame (slightly before end to avoid black frames)
+      video.currentTime = Math.max(0, video.duration - 0.1);
+    });
+
+    video.addEventListener('seeked', () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 854;
+        canvas.height = video.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/png');
+        video.src = ''; // release
+        resolve(dataUrl);
+      } catch(e) {
+        reject(new Error('Could not extract frame: ' + e.message));
+      }
+    });
+
+    video.addEventListener('error', () => reject(new Error('Could not load video for frame extraction')));
+    video.src = videoUrl;
+  });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2484,6 +2530,7 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   if (isExtend) {
     engineSel.innerHTML = `
       <option value="aurora" selected>Aurora — $0.05/s</option>
+      <option value="seedance15spicy">Seedance 1.5 Spicy — ~$0.05/run</option>
       <option value="wan22spicy">Wan 2.2 Spicy — $0.15/run</option>
     `;
   } else {
