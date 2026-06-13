@@ -1637,26 +1637,12 @@ document.getElementById('img-file-input').addEventListener('change', async (e) =
     if (!currentThreadId) createThread('New Game');
     document.getElementById('empty-state')?.remove();
 
-    // Render as a user-uploaded image in chat
-    const div = document.createElement('div');
-    div.className = 'msg user';
-    const label = document.createElement('div');
-    label.className = 'msg-label';
-    label.textContent = 'You (uploaded)';
-    const wrapper = document.createElement('div');
-    wrapper.className = 'img-wrapper';
-    const img = document.createElement('img');
-    img.src = dataUrl;
-    img.className = 'gen-image';
-    wrapper.appendChild(img);
-    div.appendChild(label);
-    div.appendChild(wrapper);
-    messagesEl.appendChild(div);
-    scrollToBottom();
-
-    // Save to thread + make it the editable image
-    addMessageToThread({ role: 'user', type: 'image', src: dataUrl, hostedUrl: null, alt: 'Uploaded image' });
+    // Render uploaded image using renderImage so it gets all buttons
+    // Note: hostedUrl is null for uploads — Animate won't work until after an edit
+    addMessageToThread({ role: 'user', type: 'image', src: dataUrl, hostedUrl: null, alt: 'Uploaded image', modelLabel: 'Uploaded' });
+    renderImage(dataUrl, 'Uploaded image', true, null, 'Uploaded');
     lastImageUrl = dataUrl;
+    activeEditTarget = dataUrl;
     showEditButton();
     setEditMode(true);
   };
