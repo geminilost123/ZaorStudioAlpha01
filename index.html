@@ -848,9 +848,10 @@
         <div id="edit-btn-row" style="display:none;gap:6px;align-items:center;">
           <button id="edit-img-btn" class="edit-img-btn visible" title="Edit last image">✏️ Edit</button>
           <select id="edit-model-select" class="img-control-select" title="Edit model">
-            <option value="aurora">Aurora — ~$0.04</option>
+            <option value="qwen">Qwen Edit — $0.02</option>
             <option value="wan27" selected>Wan 2.7 — $0.03</option>
             <option value="wan27pro">Wan 2.7 Pro — $0.06</option>
+            <option value="aurora">Aurora — ~$0.04</option>
           </select>
         </div>
       </div>
@@ -1520,14 +1521,24 @@ async function editImage(prompt, imageUrl) {
     } else {
       // ── Wan 2.7 edit via WaveSpeed ──
       if (!wavespeedKey) throw new Error('WaveSpeed API key required for Wan edit. Tap "Set API Key" to add it.');
-      const modelPath = editModel === 'wan27pro'
-        ? 'alibaba/wan-2.7/image-edit-pro'
-        : 'alibaba/wan-2.7/image-edit';
+      let modelPath;
+      let reqBody;
+      if (editModel === 'wan27pro') {
+        modelPath = 'alibaba/wan-2.7/image-edit-pro';
+        reqBody = { prompt, images: [imageUrl], seed: -1, enable_safety_checker: false };
+      } else if (editModel === 'wan27') {
+        modelPath = 'alibaba/wan-2.7/image-edit';
+        reqBody = { prompt, images: [imageUrl], seed: -1, enable_safety_checker: false };
+      } else {
+        // Qwen Image Edit
+        modelPath = 'wavespeed-ai/qwen-image/edit';
+        reqBody = { prompt, image: imageUrl, seed: -1, enable_safety_checker: false };
+      }
 
       const submitRes = await fetch(`https://api.wavespeed.ai/api/v3/${modelPath}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wavespeedKey}` },
-        body: JSON.stringify({ prompt, images: [imageUrl], seed: -1, enable_safety_checker: false })
+        body: JSON.stringify(reqBody)
       });
       if (!submitRes.ok) {
         const e = await submitRes.json().catch(()=>({}));
@@ -1556,7 +1567,7 @@ async function editImage(prompt, imageUrl) {
       removeTyping(typingId);
       if (!resultUrl) throw new Error('Wan edit timed out');
       src = resultUrl; hostedUrl = resultUrl;
-      modelLabel = editModel === 'wan27pro' ? 'Wan 2.7 Pro Edit' : 'Wan 2.7 Edit';
+      modelLabel = editModel === 'wan27pro' ? 'Wan 2.7 Pro Edit' : editModel === 'wan27' ? 'Wan 2.7 Edit' : 'Qwen Edit';
     }
 
     lastImageUrl = hostedUrl || src;
@@ -2429,7 +2440,7 @@ function updateCostEstimate() {
   } else if (editMode) {
     // Edit = input image + output image at xAI pricing
     const editMod = document.getElementById('edit-model-select')?.value || 'wan27';
-    const editCost = editMod === 'aurora' ? '~$0.04' : editMod === 'wan27pro' ? '$0.06' : '$0.03';
+    const editCost = editMod === 'aurora' ? '~$0.04' : editMod === 'wan27pro' ? '$0.06' : editMod === 'wan27' ? '$0.03' : '$0.02';
     el.textContent = editCost;
     modeText.textContent = 'Edit image mode';
 
