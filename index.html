@@ -1819,7 +1819,7 @@ document.getElementById('vid-engine-select')?.addEventListener('change', () => {
   const durEl = document.getElementById('vid-duration-select');
   const resEl = document.getElementById('vid-res-select');
   const ratioEl = document.getElementById('vid-ratio-select');
-  applyModelConstraints(engine, durEl, resEl, ratioEl, false, true); // use cheapest defaults on engine switch
+  applyModelConstraints(engine, durEl, resEl, ratioEl, false, true, engine !== 'aurora' && engine !== 'wan26t2v'); // isI2V for spicy models
   updateCostEstimate();
 });
 
@@ -2180,21 +2180,9 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   let modelPath, body;
 
   if (extendVideoUrl) {
-    if (engine === 'seedance15spicy') {
-      // Extract last frame from video, then feed as image to Seedance I2V
-      let frameDataUrl;
-      try {
-        frameDataUrl = await extractLastFrame(extendVideoUrl);
-      } catch(e) {
-        throw new Error('Could not extract last frame for Seedance extend: ' + e.message);
-      }
-      modelPath = 'bytedance/seedance-v1.5-pro/image-to-video-spicy';
-      body = { prompt: prompt || 'continue the scene naturally with smooth motion', image: frameDataUrl, resolution: res, duration: Math.min(duration, 12), aspect_ratio: '16:9', generate_audio: false, seed: -1 };
-    } else {
-      // Wan 2.2 Spicy has a dedicated extend endpoint
-      modelPath = 'wavespeed-ai/wan-2.2-spicy/video-extend';
-      body = { prompt, video: extendVideoUrl, resolution: res, duration: 5, seed: -1 }; // 5s fixed
-    }
+    // Wan 2.2 Spicy — dedicated extend endpoint
+    modelPath = 'wavespeed-ai/wan-2.2-spicy/video-extend';
+    body = { prompt, video: extendVideoUrl, resolution: res, duration: 5, seed: -1 }; // 5s fixed
   } else if (imageDataUrl) {
     // I2V
     if (engine === 'seedance15spicy') {
@@ -2243,7 +2231,7 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   );
 
   if (videoUrl) {
-    const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', seedance15spicy: 'Seedance 1.5 Spicy', aurora: 'Aurora' };
+    const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', seedance15spicy: 'Seedance 1.5 Spicy', aurora: 'Aurora', 'aurora_extend': 'Aurora Extend' };
     const vidLabel = engineLabels[engine] || engine;
     addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: vidLabel, storedDuration: duration, storedRes: res });
     renderVideo(videoUrl, prompt, true, vidLabel, duration, res);
@@ -2530,7 +2518,6 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   if (isExtend) {
     engineSel.innerHTML = `
       <option value="aurora" selected>Aurora — $0.05/s</option>
-      <option value="seedance15spicy">Seedance 1.5 Spicy — ~$0.05/run</option>
       <option value="wan22spicy">Wan 2.2 Spicy — $0.15/run</option>
     `;
   } else {
@@ -3106,14 +3093,21 @@ const MODEL_CONSTRAINTS = {
   wan26spicy:     { durations: [5,10,15],      resolutions: ['720p','1080p'], hasRatio: false, maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
   seedance15spicy: { durations: [4,5,6,8,10,12], resolutions: ['480p','720p','1080p'], hasRatio: true, maxDur: 12, defaultDur: 4,  defaultRes: '480p' },
   // extend variants
-  aurora_extend:     { durations: [6,10],  resolutions: ['480p','720p'], hasRatio: false, maxDur: 10, defaultDur: 6,  defaultRes: '480p' },
-  wan22spicy_extend: { durations: [5],     resolutions: ['480p','720p'], hasRatio: false, maxDur: 5,  defaultDur: 5,  defaultRes: '480p' },
+  aurora_extend:        { durations: [4,6,8,10],       resolutions: ['480p','720p'],        hasRatio: false, maxDur: 10, defaultDur: 4,  defaultRes: '480p' },
+  wan22spicy_extend:    { durations: [5],               resolutions: ['480p','720p'],        hasRatio: false, maxDur: 5,  defaultDur: 5,  defaultRes: '480p' },
 };
 
 function applyModelConstraints(engine, durEl, resEl, ratioEl, isExtend, useDefaults = false, isI2V = false) {
-  const key = isExtend
-    ? (engine === 'wan22spicy' ? 'wan22spicy_extend' : 'aurora_extend')
-    : (isI2V && engine === 'aurora' ? 'aurora_i2v' : engine);
+  let key;
+  if (isExtend) {
+    const extendKeyMap = {
+      wan22spicy: 'wan22spicy_extend',
+      aurora:     'aurora_extend',
+    };
+    key = extendKeyMap[engine] || 'aurora_extend';
+  } else {
+    key = (isI2V && engine === 'aurora') ? 'aurora_i2v' : engine;
+  }
   const c = MODEL_CONSTRAINTS[key] || MODEL_CONSTRAINTS['aurora'];
 
   if (durEl) {
