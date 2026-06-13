@@ -448,27 +448,16 @@
     #img-toggle:hover { color: var(--lavender); }
     #img-toggle.active { background: rgba(196,122,138,0.18); color: var(--rose); }
 
-    #mode-row {
+    #img-mode-row {
       display: none;
-      align-items: center;
+      flex-direction: column;
       gap: 8px;
-      margin-top: 8px;
+      margin-top: 7px;
       padding: 0 4px;
     }
-    #input-area.image-mode #mode-row { display: flex; }
+    #input-area.image-mode #img-mode-row { display: flex; }
 
     .mode-label { font-size: 11px; color: var(--text-dim); letter-spacing: 0.05em; text-transform: uppercase; }
-    .mode-pills { display: flex; gap: 6px; }
-
-    .pill {
-      font-size: 12px; padding: 3px 10px;
-      border-radius: 20px;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: transparent; color: var(--text-dim);
-      cursor: pointer; font-family: 'Inter', sans-serif;
-      transition: all 0.18s;
-    }
-    .pill.active { background: rgba(196,122,138,0.2); border-color: var(--rose); color: var(--rose); }
 
     #send-btn {
       width: 36px; height: 36px;
@@ -600,6 +589,7 @@
       padding: 0 4px;
     }
     #input-area.video-mode #vid-mode-row { display: flex; }
+    #input-area.video-mode #img-mode-row { display: none; }
 
     /* Video player */
     .vid-wrapper {
@@ -870,21 +860,13 @@
           </svg>
         </button>
       </div>
-      <div id="mode-row">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <span class="mode-label">Mode</span>
-          <div class="mode-pills">
-            <button class="pill" data-mode="fun">Easy</button>
-            <button class="pill active" data-mode="normal">Normal</button>
-            <button class="pill" data-mode="spicy">Hard</button>
-          </div>
-        </div>
+      <div id="img-mode-row">
         <div class="img-controls-row">
           <div class="img-control-group">
             <span class="mode-label">Model</span>
             <select id="img-model-select" class="img-control-select">
-              <option value="grok-imagine-image" selected>Aurora Simple</option>
-              <option value="grok-imagine-image-quality">Aurora Mega</option>
+              <option value="grok-imagine-image" selected>Aurora Simple — $0.005</option>
+              <option value="grok-imagine-image-quality">Aurora Mega — $0.022</option>
             </select>
           </div>
           <div class="img-control-group">
@@ -904,8 +886,8 @@
           <div class="img-control-group">
             <span class="mode-label">Res</span>
             <select id="img-res-select" class="img-control-select">
-              <option value="1K" selected>1K</option>
-              <option value="2K">2K</option>
+              <option value="1K" selected>1K (cheaper)</option>
+              <option value="2K">2K (+cost)</option>
             </select>
           </div>
         </div>
@@ -915,18 +897,18 @@
           <div class="img-control-group">
             <span class="mode-label">Engine</span>
             <select id="vid-engine-select" class="img-control-select">
-              <option value="aurora" selected>Aurora</option>
-              <option value="wan26t2v">Wan 2.6</option>
-              <option value="wan22spicy">Wan 2.2 Spicy</option>
-              <option value="wan26spicy">Wan 2.7 Spicy</option>
+              <option value="aurora" selected>Aurora — $0.05/s</option>
+              <option value="wan26t2v">Wan 2.6 — ~$0.34/5s</option>
+              <option value="wan22spicy">Wan 2.2 Spicy — $0.15/run</option>
+              <option value="wan26spicy">Wan 2.7 Spicy — $0.50/run</option>
             </select>
           </div>
           <div class="img-control-group">
             <span class="mode-label">Duration</span>
             <select id="vid-duration-select" class="img-control-select">
-              <option value="4">4s</option>
+              <option value="4" selected>4s</option>
               <option value="6">6s</option>
-              <option value="8" selected>8s</option>
+              <option value="8">8s</option>
               <option value="10">10s</option>
               <option value="15">15s</option>
             </select>
@@ -944,8 +926,8 @@
           <div class="img-control-group">
             <span class="mode-label">Res</span>
             <select id="vid-res-select" class="img-control-select">
-              <option value="480p">480p</option>
-              <option value="720p" selected>720p</option>
+              <option value="480p" selected>480p</option>
+              <option value="720p">720p</option>
             </select>
           </div>
         </div>
@@ -1066,7 +1048,6 @@ let wavespeedKey = localStorage.getItem('ws_key') || '';
 let imageMode = false;
 let videoMode = false;
 let lastImageUrl = null; // tracks most recently generated image for editing
-let contentMode = 'normal';
 let isLoading = false;
 let currentThreadId = null;
 let pendingDeleteId = null;
@@ -1085,7 +1066,6 @@ const inputArea     = document.getElementById('input-area');
 const modeIndicator = document.getElementById('mode-indicator');
 const apiKeyBtn     = document.getElementById('api-key-btn');
 const modelSelect   = document.getElementById('model-select');
-const pills         = document.querySelectorAll('.pill');
 const threadList    = document.getElementById('thread-list');
 const threadLabel   = document.getElementById('thread-label');
 const storageInfo   = document.getElementById('storage-info');
@@ -1238,7 +1218,7 @@ function loadThread(id) {
       } else if (m.type === 'image') {
         renderImage(m.src, m.alt, false, m.hostedUrl || null, m.modelLabel || 'Aurora');
       } else if (m.type === 'video') {
-        renderVideo(m.src, m.alt, false);
+        renderVideo(m.src, m.alt, false, m.engineLabel || 'Aurora');
       } else if (m.type === 'error') {
         const div = document.createElement('div');
         div.className = 'error-bubble';
@@ -1444,14 +1424,6 @@ document.getElementById('vid-toggle').addEventListener('click', () => {
   updateCostEstimate();
 });
 
-pills.forEach(pill => {
-  pill.addEventListener('click', () => {
-    pills.forEach(p => p.classList.remove('active'));
-    pill.classList.add('active');
-    contentMode = pill.dataset.mode;
-  });
-});
-
 // Update cost estimate when any selector changes
 ['vid-engine-select','vid-duration-select','vid-res-select',
  'img-model-select','img-res-select','img-ratio-select'].forEach(id => {
@@ -1520,9 +1492,7 @@ async function editImage(prompt, imageUrl) {
     ? 'grok-imagine-image/edit'
     : 'grok-imagine-image-quality/edit';
 
-  // Apply content mode via prompt prefix
-  const styleMap = { fun: 'Playful, fun style. ', normal: '', spicy: 'Sensual, provocative, mature style. ' };
-  const fullPrompt = (styleMap[contentMode] || '') + prompt;
+  const fullPrompt = prompt;
 
   try {
     const body = {
@@ -1624,9 +1594,7 @@ async function generateImage(prompt) {
     const aspectRatio = document.getElementById('img-ratio-select').value;
     const resolution = document.getElementById('img-res-select').value;
 
-    // Easy/Normal/Hard mode applied via prompt prefix
-    const modePrefix = { fun: 'Playful, fun style. ', normal: '', spicy: 'Sensual, provocative, mature style. ' };
-    const fullPrompt = (contentMode !== 'normal' ? modePrefix[contentMode] : '') + prompt;
+    const fullPrompt = prompt;
 
     // Confirmed path: x-ai/grok-imagine-image-quality/text-to-image
     // Simple variant path is unconfirmed on WaveSpeed; fallback handles 404
@@ -1712,11 +1680,12 @@ async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUr
 
   // Determine engine — from override (animate/extend buttons) or UI selector
   const engine = engineOverride || document.getElementById('vid-engine-select')?.value || 'aurora';
-  const useWaveSpeed = true; // All video routes through WaveSpeed
+  // Aurora always uses xAI directly; Wan models use WaveSpeed
+  const useWaveSpeed = engine !== 'aurora';
 
   try {
     if (useWaveSpeed) {
-      if (!wavespeedKey) throw new Error('WaveSpeed API key required for video. Tap "Set API Key" to add it.');
+      if (!wavespeedKey) throw new Error('WaveSpeed API key required for Wan models. Tap "Set API Key" to add it.');
       await generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engine, progressId, () => cancelled);
     } else {
       await generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progressId, () => cancelled);
@@ -1766,8 +1735,8 @@ async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progres
       progressId, isCancelled
     );
     if (t2vUrl) {
-      addMessageToThread({ role: 'assistant', type: 'video', src: t2vUrl, alt: prompt });
-      renderVideo(t2vUrl, prompt);
+      addMessageToThread({ role: 'assistant', type: 'video', src: t2vUrl, alt: prompt, engineLabel: 'Aurora T2V' });
+      renderVideo(t2vUrl, prompt, true, 'Aurora T2V');
     }
     return;
   }
@@ -1799,8 +1768,8 @@ async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progres
   );
 
   if (videoUrl) {
-    addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt });
-    renderVideo(videoUrl, prompt);
+    addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: 'Aurora' });
+    renderVideo(videoUrl, prompt, true, 'Aurora');
   }
 }
 
@@ -1861,8 +1830,10 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   );
 
   if (videoUrl) {
-    addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt });
-    renderVideo(videoUrl, prompt);
+    const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', aurora: 'Aurora' };
+    const vidLabel = engineLabels[engine] || engine;
+    addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: vidLabel });
+    renderVideo(videoUrl, prompt, true, vidLabel);
   }
 }
 
@@ -1929,13 +1900,13 @@ function removeVideoProgress(id) {
   document.getElementById(id)?.remove();
 }
 
-function renderVideo(src, altText, animate = true) {
+function renderVideo(src, altText, animate = true, engineLabel = 'Aurora') {
   const div = document.createElement('div');
   div.className = 'msg assistant' + (animate ? '' : ' no-anim');
 
   const label = document.createElement('div');
   label.className = 'msg-label';
-  label.textContent = 'Video';
+  label.textContent = engineLabel + ' Video';
 
   const wrapper = document.createElement('div');
   wrapper.className = 'vid-wrapper';
@@ -2038,14 +2009,14 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   engineSel.className = 'img-control-select';
   if (isExtend) {
     engineSel.innerHTML = `
-      <option value="aurora" selected>Aurora</option>
-      <option value="wan22spicy">Wan 2.2 Spicy</option>
+      <option value="aurora" selected>Aurora — $0.05/s</option>
+      <option value="wan22spicy">Wan 2.2 Spicy — $0.15/run</option>
     `;
   } else {
     engineSel.innerHTML = `
-      <option value="aurora" selected>Aurora</option>
-      <option value="wan22spicy">Wan 2.2 Spicy</option>
-      <option value="wan26spicy">Wan 2.7 Spicy</option>
+      <option value="aurora" selected>Aurora — $0.05/s</option>
+      <option value="wan22spicy">Wan 2.2 Spicy — $0.15/run</option>
+      <option value="wan26spicy">Wan 2.7 Spicy — $0.50/run</option>
     `;
   }
 
@@ -2142,32 +2113,27 @@ function renderMessage(role, text, animate = true) {
   bubble.className = 'bubble';
   bubble.textContent = text;
 
-  // Copy button — only on Zaor responses
-  if (role === 'assistant') {
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'copy-btn';
-    copyBtn.textContent = 'Copy';
-    copyBtn.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(text);
-        copyBtn.textContent = 'Copied ✓';
-        copyBtn.classList.add('copied');
-        setTimeout(() => {
-          copyBtn.textContent = 'Copy';
-          copyBtn.classList.remove('copied');
-        }, 2000);
-      } catch(e) {
-        copyBtn.textContent = 'Failed';
-        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
-      }
-    });
-    div.appendChild(label);
-    div.appendChild(bubble);
-    div.appendChild(copyBtn);
-  } else {
-    div.appendChild(label);
-    div.appendChild(bubble);
-  }
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'copy-btn';
+  copyBtn.textContent = 'Copy';
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      copyBtn.textContent = 'Copied ✓';
+      copyBtn.classList.add('copied');
+      setTimeout(() => {
+        copyBtn.textContent = 'Copy';
+        copyBtn.classList.remove('copied');
+      }, 2000);
+    } catch(e) {
+      copyBtn.textContent = 'Failed';
+      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+    }
+  });
+
+  div.appendChild(label);
+  div.appendChild(bubble);
+  div.appendChild(copyBtn);
 
   messagesEl.appendChild(div);
   if (animate) scrollToBottom();
