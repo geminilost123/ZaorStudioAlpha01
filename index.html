@@ -1048,12 +1048,39 @@
     <div id="pe-model-row">
     <span class="mode-label" style="padding-left:14px;">PE Model</span>
     <select id="pe-model-select" class="img-control-select">
-      <option value="aurora">Aurora / Flux</option>
-      <option value="wan26t2v">Wan 2.6 T2I</option>
-      <option value="qwen">Qwen Edit</option>
-      <option value="wan27">Wan 2.7 Edit</option>
+      <optgroup label="── Image ──">
+        <option value="aurora">Aurora / Flux</option>
+        <option value="wan26t2v">Wan 2.6 T2I</option>
+        <option value="qwen">Qwen Edit</option>
+        <option value="wan27">Wan 2.7 Edit</option>
+        <option value="fluxkontext">Flux Kontext Edit</option>
+      </optgroup>
+      <optgroup label="── Animate (I2V) ──">
+        <option value="aurora_i2v">Aurora I2V</option>
+        <option value="seedance_i2v">Seedance 1.5 Spicy I2V</option>
+        <option value="wan22spicy_i2v">Wan 2.2 Spicy I2V</option>
+        <option value="wan27spicy_i2v">Wan 2.7 Spicy I2V</option>
+      </optgroup>
+      <optgroup label="── Video Extend ──">
+        <option value="aurora_extend">Aurora Extend</option>
+        <option value="seedance_extend">Seedance Extend</option>
+        <option value="wan22spicy_extend">Wan 2.2 Spicy Extend</option>
+      </optgroup>
     </select>
-    <span style="font-size:11px;color:var(--text-dim);padding-left:4px;">Prompts optimized for selected model</span>
+    <button id="pe-img-toggle" title="Feed current edit target image to Zaor for visual context" style="
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-dim);
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    ">🖼 Use Image</button>
+    <span id="pe-img-status" style="font-size:11px;color:var(--text-dim);padding-left:4px;">Prompts optimized for selected tool</span>
   </div>
   <div id="messages">
       <div id="empty-state">
@@ -1338,6 +1365,7 @@ let enhanceMode = false; // manually selected edit target (null = use lastImageU
 let lockedStyle = localStorage.getItem('zaor_style_lock') || ''; // persisted style text
 let styleLockActive = localStorage.getItem('zaor_style_active') === '1'; // whether lock is engaged
 let promptEngineerMode = false; // PE mode for chat
+let peUseImage = false; // whether to feed current image to Zaor in PE mode
 let isLoading = false;
 let currentThreadId = null;
 let pendingDeleteId = null;
@@ -1507,7 +1535,7 @@ function loadThread(id) {
       } else if (m.type === 'image') {
         renderImage(m.src, m.alt, false, m.hostedUrl || null, m.modelLabel || 'Aurora');
       } else if (m.type === 'video') {
-        renderVideo(m.src, m.alt, false, m.engineLabel || 'Aurora');
+        renderVideo(m.src, m.alt, false, m.engineLabel || 'Aurora', m.storedDuration || null, m.storedRes || null);
       } else if (m.type === 'error') {
         const div = document.createElement('div');
         div.className = 'error-bubble';
@@ -1627,6 +1655,8 @@ function setMode(mode) {
   // PE mode only relevant in chat — deactivate when switching away
   if (mode !== 'chat' && promptEngineerMode) {
     promptEngineerMode = false;
+    peUseImage = false;
+    updatePeImgToggle();
   }
   const peBtn = document.getElementById('pe-btn');
   if (peBtn) {
@@ -1935,6 +1965,28 @@ async function generateText(userText) {
       const peModel = document.getElementById('pe-model-select')?.value || 'aurora';
       const sysPrompt = PE_SYSTEM_PROMPTS[peModel] || PE_SYSTEM_PROMPTS.aurora;
       apiMessages = [{ role: 'system', content: sysPrompt }, ...messages];
+
+      // If image mode is on, replace the last user message with a vision-capable content array
+      if (peUseImage && lastImageUrl) {
+        const lastUserIdx = [...apiMessages].reverse().findIndex(m => m.role === 'user');
+        if (lastUserIdx !== -1) {
+          const realIdx = apiMessages.length - 1 - lastUserIdx;
+          const userText = apiMessages[realIdx].content;
+          apiMessages[realIdx] = {
+            role: 'user',
+            content: [
+              {
+                type: 'image_url',
+                image_url: { url: lastImageUrl, detail: 'high' }
+              },
+              {
+                type: 'text',
+                text: userText
+              }
+            ]
+          };
+        }
+      }
     }
 
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
@@ -2097,8 +2149,10 @@ async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progres
       progressId, isCancelled
     );
     if (t2vUrl) {
-      addMessageToThread({ role: 'assistant', type: 'video', src: t2vUrl, alt: prompt, engineLabel: 'Aurora T2V' });
-      renderVideo(t2vUrl, prompt, true, 'Aurora T2V');
+      const t2vDur = body.duration;
+      const t2vRes = body.resolution;
+      addMessageToThread({ role: 'assistant', type: 'video', src: t2vUrl, alt: prompt, engineLabel: 'Aurora T2V', storedDuration: t2vDur, storedRes: t2vRes });
+      renderVideo(t2vUrl, prompt, true, 'Aurora T2V', t2vDur, t2vRes);
     }
     return;
   }
@@ -2206,8 +2260,8 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   if (videoUrl) {
     const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', seedance15spicy: 'Seedance 1.5 Spicy', aurora: 'Aurora' };
     const vidLabel = engineLabels[engine] || engine;
-    addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: vidLabel });
-    renderVideo(videoUrl, prompt, true, vidLabel);
+    addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: vidLabel, storedDuration: duration, storedRes: res });
+    renderVideo(videoUrl, prompt, true, vidLabel, duration, res);
   }
 }
 
@@ -2319,7 +2373,7 @@ function removeVideoProgress(id) {
   document.getElementById(id)?.remove();
 }
 
-function renderVideo(src, altText, animate = true, engineLabel = 'Aurora') {
+function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', storedDuration = null, storedRes = null) {
   const div = document.createElement('div');
   div.className = 'msg assistant' + (animate ? '' : ' no-anim');
 
@@ -2374,7 +2428,15 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora') {
     if (isLoading) return;
     retryVidBtn.textContent = '…';
     retryVidBtn.disabled = true;
-    await generateVideo(altText, null, engineLabel.toLowerCase().replace(/ /g,'').replace('video','').replace('t2v','') || 'aurora', null);
+    // Derive engine key from label
+    const engineKeyMap = {
+      'aurora t2v': 'aurora', 'aurora': 'aurora',
+      'wan 2.2 spicy': 'wan22spicy', 'wan 2.7 spicy': 'wan26spicy',
+      'wan 2.6': 'wan26t2v', 'seedance 1.5 spicy': 'seedance15spicy'
+    };
+    const labelKey = engineLabel.toLowerCase().replace(' video','').trim();
+    const engineKey = engineKeyMap[labelKey] || 'aurora';
+    await generateVideo(altText, null, engineKey, null, storedDuration, storedRes);
     retryVidBtn.textContent = '↺ Retry';
     retryVidBtn.disabled = false;
   });
@@ -3134,10 +3196,23 @@ document.getElementById('refresh-btn')?.addEventListener('click', async () => {
 
 // ── Prompt Engineer Mode ──
 const PE_SYSTEM_PROMPTS = {
+  // ── Image generation ──
   aurora: "You are an expert image prompt engineer for Aurora/Flux diffusion models. When the user describes what they want, respond with ONLY a single optimized image generation prompt. No explanation, no preamble, no quotes, no markdown. Just the raw prompt text. Include quality tags, lighting descriptors, style keywords, and technical details that Aurora responds well to. Keep it under 200 words.",
   wan26t2v: "You are an expert image prompt engineer for Wan 2.6 text-to-image model. When the user describes what they want, respond with ONLY a single structured prompt. No explanation, no preamble. Format: [subject description], [scene/environment], [style], [lighting], [technical quality]. Keep it concise and direct.",
   qwen: "You are an expert image prompt engineer for Qwen image editing. When the user describes a transformation or edit, respond with ONLY a single clear edit instruction prompt. No explanation. Be specific about what changes to make, what to preserve, and the desired style outcome.",
-  wan27: "You are an expert image prompt engineer for Wan 2.7 image editing. When the user describes what they want, respond with ONLY a single optimized prompt describing the transformation. No explanation, no preamble. Be explicit about the subject, the change, and the visual style."
+  wan27: "You are an expert image prompt engineer for Wan 2.7 image editing. When the user describes what they want, respond with ONLY a single optimized prompt describing the transformation. No explanation, no preamble. Be explicit about the subject, the change, and the visual style.",
+  fluxkontext: "You are an expert image prompt engineer for Flux Kontext image editing. Flux Kontext excels at precise instruction-following while preserving character identity. When the user describes what they want, respond with ONLY a single edit instruction. Use the format: Keep [what must stay unchanged]. Change [what to edit]. Ensure [style/lighting constraints]. No explanation, no preamble.",
+
+  // ── Animate / Image-to-Video ──
+  aurora_i2v: "You are an expert motion prompt engineer for Aurora Image-to-Video. The user will describe what they want to happen in a video starting from a still image. Respond with ONLY a single motion prompt. Describe camera movement, subject motion, mood, and pacing. Aurora responds well to cinematic language: 'slow push in', 'gentle parallax', 'subject turns to camera'. No explanation, no preamble. Keep it under 80 words.",
+  seedance_i2v: "You are an expert motion prompt engineer for Seedance 1.5 Spicy Image-to-Video. Seedance produces expressive, bold motion with cinematic realism. Respond with ONLY a single motion prompt describing the action, camera behavior, emotional tone, and visual style. Use vivid, physical language. Seedance handles complex motion well. No explanation, no preamble. Keep it under 100 words.",
+  wan22spicy_i2v: "You are an expert motion prompt engineer for Wan 2.2 Spicy Image-to-Video. Wan 2.2 responds best to clear, direct motion descriptions. Respond with ONLY a single motion prompt. Be explicit about what moves, how it moves, and the camera behavior. Avoid overly complex multi-action descriptions — pick one clear motion. No explanation, no preamble. Keep it under 60 words.",
+  wan27spicy_i2v: "You are an expert motion prompt engineer for Wan 2.7 Spicy Image-to-Video. Wan 2.7 supports longer clips and multi-shot dynamics. Respond with ONLY a single motion prompt describing the full scene arc: opening motion, development, and resolution. Include camera work and subject movement. No explanation, no preamble. Keep it under 100 words.",
+
+  // ── Video Extend ──
+  aurora_extend: "You are an expert continuation prompt engineer for Aurora Video Extend. The user has a video clip and wants to extend it. Respond with ONLY a single continuation prompt describing what happens next: how the scene continues, camera movement, and mood. Match the implied style of the original. Use phrases like 'continues into', 'camera pulls back to reveal', 'scene transitions to'. No explanation, no preamble. Keep it under 80 words.",
+  seedance_extend: "You are an expert continuation prompt engineer for Seedance video extension via I2V. The model will use the last frame of a video as an image and generate a continuation clip. Respond with ONLY a single prompt describing the next scene: what action follows, the camera behavior, and the emotional arc. Write it as if describing a new shot that naturally follows from the current one. No explanation, no preamble. Keep it under 100 words.",
+  wan22spicy_extend: "You are an expert continuation prompt engineer for Wan 2.2 Spicy Video Extend. Respond with ONLY a single short continuation prompt. Wan 2.2 extend works best with simple, clear continuation instructions. Describe what happens next in one or two clear actions. Keep it direct and under 50 words. No explanation, no preamble."
 };
 
 document.getElementById('pe-btn')?.addEventListener('click', () => {
@@ -3146,12 +3221,42 @@ document.getElementById('pe-btn')?.addEventListener('click', () => {
   const modelRow = document.getElementById('pe-model-row');
   btn?.classList.toggle('active', promptEngineerMode);
   if (modelRow) modelRow.classList.toggle('visible', promptEngineerMode);
-  // Visual feedback
   if (promptEngineerMode) {
     btn.textContent = '✦ PE ON';
   } else {
     btn.textContent = '✦ PE';
+    // Reset image toggle when PE deactivates
+    peUseImage = false;
+    updatePeImgToggle();
   }
+});
+
+function updatePeImgToggle() {
+  const btn = document.getElementById('pe-img-toggle');
+  const status = document.getElementById('pe-img-status');
+  if (!btn) return;
+  if (peUseImage && lastImageUrl) {
+    btn.style.borderColor = 'var(--lavender)';
+    btn.style.color = 'var(--lavender)';
+    btn.style.background = 'rgba(201,184,232,0.12)';
+    btn.textContent = '🖼 Image ON';
+    if (status) status.textContent = 'Zaor will analyze the current image';
+  } else {
+    btn.style.borderColor = 'rgba(255,255,255,0.1)';
+    btn.style.color = 'var(--text-dim)';
+    btn.style.background = 'transparent';
+    btn.textContent = '🖼 Use Image';
+    if (status) status.textContent = 'Prompts optimized for selected tool';
+  }
+}
+
+document.getElementById('pe-img-toggle')?.addEventListener('click', () => {
+  if (!lastImageUrl) {
+    appendError('No image available. Generate or upload an image first.');
+    return;
+  }
+  peUseImage = !peUseImage;
+  updatePeImgToggle();
 });
 
 function updateKeyBtn() {
