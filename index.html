@@ -389,6 +389,11 @@
     }
     .save-btn:hover { background: rgba(201,184,232,0.18); border-color: var(--lavender); color: var(--lavender); }
     .save-btn:active { transform: scale(0.96); }
+    .save-btn.lock-active {
+      background: rgba(201,184,232,0.15);
+      border-color: var(--lavender);
+      color: var(--lavender);
+    }
 
     /* Typing */
     .typing .bubble { display: flex; align-items: center; gap: 5px; padding: 14px 16px; }
@@ -1317,7 +1322,8 @@ let videoMode = false;
 let lastImageUrl = null; // tracks most recently generated image for editing
 let activeEditTarget = null;
 let enhanceMode = false; // manually selected edit target (null = use lastImageUrl)
-let lockedStyle = localStorage.getItem('zaor_style_lock') || ''; // persisted style
+let lockedStyle = localStorage.getItem('zaor_style_lock') || ''; // persisted style text
+let styleLockActive = localStorage.getItem('zaor_style_active') === '1'; // whether lock is engaged
 let promptEngineerMode = false; // PE mode for chat
 let isLoading = false;
 let currentThreadId = null;
@@ -1796,10 +1802,10 @@ async function handleSend() {
 // ═══════════════════════════════════════════════════════
 // IMAGE EDITING
 // ═══════════════════════════════════════════════════════
-async function editImage(prompt, imageUrl) {
+async function editImage(prompt, imageUrl, skipStyleLock = false) {
   const typingId = appendTyping();
   const editModel = document.getElementById('edit-model-select')?.value || 'wan27';
-  const fullPrompt = applyStyleLock(prompt);
+  const fullPrompt = skipStyleLock ? prompt : applyStyleLock(prompt);
 
   try {
     let src, hostedUrl, modelLabel;
@@ -1960,7 +1966,7 @@ async function generateImage(prompt) {
     const imgModel = document.getElementById('img-model-select').value;
     const aspectRatio = document.getElementById('img-ratio-select').value;
     const resolution = document.getElementById('img-res-select').value;
-    const fullPrompt = applyStyleLock(prompt);
+    const fullPrompt = skipStyleLock ? prompt : applyStyleLock(prompt);
     const modelPath = imgModel === 'grok-imagine-image'
       ? 'x-ai/grok-imagine-image/text-to-image'
       : 'x-ai/grok-imagine-image-quality/text-to-image';
@@ -2681,7 +2687,7 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   const applyStyleBtn = document.createElement('button');
   applyStyleBtn.className = 'animate-btn';
   applyStyleBtn.innerHTML = '🔒 Apply Style';
-  applyStyleBtn.style.display = lockedStyle.trim() ? 'inline-flex' : 'none';
+  applyStyleBtn.style.display = (styleLockActive && lockedStyle.trim()) ? 'inline-flex' : 'none';
 
   const stylePanelOuter = document.createElement('div');
   stylePanelOuter.className = 'animate-panel-outer';
@@ -2689,7 +2695,7 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
 
   applyStyleBtn.addEventListener('click', () => {
     // Refresh visibility in case style was set after render
-    if (!lockedStyle.trim()) { appendError('No style lock active. Set a style in the Style Lock field first.'); return; }
+    if (!styleLockActive || !lockedStyle.trim()) { appendError('No style lock active. Enter a style and tap 🔒 Lock Style first.'); return; }
     stylePanelOpen = !stylePanelOpen;
     if (stylePanelOpen) {
       // Build panel
@@ -2730,21 +2736,31 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
         applyStyleBtn.disabled = true;
         applyStyleBtn.textContent = '…';
 
-        // Temporarily set edit model to chosen model
         const editSel = document.getElementById('edit-model-select');
         const prevModel = editSel?.value;
         if (editSel) editSel.value = chosenModel;
 
-        // Edit with style as prompt
-        const stylePrompt = `Apply this visual style to the image: ${lockedStyle.trim()}. Preserve all subjects, characters, composition, and content exactly. Only change the visual aesthetic and style.`;
-        const prevEdit = editMode;
-        editMode = true;
-        await editImage(stylePrompt, hostedUrl || src);
-        editMode = prevEdit;
-        if (editSel && prevModel) editSel.value = prevModel;
+        const imageTarget = hostedUrl || src;
+        if (!imageTarget || imageTarget.startsWith('data:')) {
+          appendError('Apply Style requires a hosted image URL. Edit the image first to get a hosted version, then apply the style.');
+          applyStyleBtn.disabled = false;
+          applyStyleBtn.textContent = '🔒 Apply Style';
+          if (editSel && prevModel) editSel.value = prevModel;
+          return;
+        }
 
-        applyStyleBtn.disabled = false;
-        applyStyleBtn.textContent = '🔒 Apply Style';
+        const stylePrompt = `Apply this visual style to the image: ${lockedStyle.trim()}. Preserve all subjects, characters, composition, and content exactly. Only change the visual aesthetic and style.`;
+
+        try {
+          // Pass skipStyleLock=true to avoid double-applying the style
+          await editImage(stylePrompt, imageTarget, true);
+        } catch(e) {
+          appendError('Style apply failed: ' + e.message);
+        } finally {
+          if (editSel && prevModel) editSel.value = prevModel;
+          applyStyleBtn.disabled = false;
+          applyStyleBtn.textContent = '🔒 Apply Style';
+        }
       });
 
       modelRow.appendChild(modelLabel);
@@ -2862,35 +2878,53 @@ function showEditButton() {
 
 // ── Style Lock ──
 function applyStyleLock(prompt) {
-  const style = getActiveStyle();
-  if (!style) return prompt;
-  return prompt + ', ' + style;
+  if (!styleLockActive || !lockedStyle.trim()) return prompt;
+  return prompt + ', ' + lockedStyle.trim();
 }
 
 function updateStyleBadge() {
   const badge = document.getElementById('style-lock-badge');
+  const btn = document.getElementById('style-lock-set-btn');
   const input = document.getElementById('style-lock-input');
   if (!badge) return;
-  if (lockedStyle.trim()) {
+  if (styleLockActive && lockedStyle.trim()) {
     badge.classList.add('on');
+    badge.textContent = 'Active';
+    if (btn) { btn.textContent = '🔓 Unlock Style'; btn.classList.add('lock-active'); }
     if (input) input.value = lockedStyle;
   } else {
     badge.classList.remove('on');
+    badge.textContent = 'Inactive';
+    if (btn) { btn.textContent = '🔒 Lock Style'; btn.classList.remove('lock-active'); }
+    if (input && lockedStyle) input.value = lockedStyle;
   }
 }
 
 document.getElementById('style-lock-set-btn')?.addEventListener('click', () => {
   const val = document.getElementById('style-lock-input')?.value.trim();
-  if (val) {
-    lockedStyle = val;
-    localStorage.setItem('zaor_style_lock', val);
-    updateStyleBadge();
+  if (styleLockActive) {
+    // Disengage without clearing text
+    styleLockActive = false;
+    localStorage.setItem('zaor_style_active', '0');
+  } else {
+    // Engage — save current text and activate
+    if (val) {
+      lockedStyle = val;
+      localStorage.setItem('zaor_style_lock', val);
+    }
+    if (lockedStyle.trim()) {
+      styleLockActive = true;
+      localStorage.setItem('zaor_style_active', '1');
+    }
   }
+  updateStyleBadge();
 });
 
 document.getElementById('style-lock-clear-btn')?.addEventListener('click', () => {
   lockedStyle = '';
+  styleLockActive = false;
   localStorage.removeItem('zaor_style_lock');
+  localStorage.setItem('zaor_style_active', '0');
   const input = document.getElementById('style-lock-input');
   if (input) input.value = '';
   updateStyleBadge();
