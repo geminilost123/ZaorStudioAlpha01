@@ -1799,6 +1799,7 @@ async function handleSend() {
 async function editImage(prompt, imageUrl) {
   const typingId = appendTyping();
   const editModel = document.getElementById('edit-model-select')?.value || 'wan27';
+  const fullPrompt = applyStyleLock(prompt);
 
   try {
     let src, hostedUrl, modelLabel;
@@ -1808,7 +1809,7 @@ async function editImage(prompt, imageUrl) {
       const imgModel = document.getElementById('img-model-select').value;
       const body = {
         model: imgModel === 'grok-imagine-image' ? 'grok-imagine-image' : 'grok-imagine-image-quality',
-        prompt,
+        prompt: fullPrompt,
         image: { url: imageUrl, type: 'image_url' },
         response_format: 'url'
       };
@@ -2676,15 +2677,97 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
     retryImgBtn.disabled = false;
   });
 
+  // Apply Style Lock button — only shown when a style is active
+  const applyStyleBtn = document.createElement('button');
+  applyStyleBtn.className = 'animate-btn';
+  applyStyleBtn.innerHTML = '🔒 Apply Style';
+  applyStyleBtn.style.display = lockedStyle.trim() ? 'inline-flex' : 'none';
+
+  const stylePanelOuter = document.createElement('div');
+  stylePanelOuter.className = 'animate-panel-outer';
+  let stylePanelOpen = false;
+
+  applyStyleBtn.addEventListener('click', () => {
+    // Refresh visibility in case style was set after render
+    if (!lockedStyle.trim()) { appendError('No style lock active. Set a style in the Style Lock field first.'); return; }
+    stylePanelOpen = !stylePanelOpen;
+    if (stylePanelOpen) {
+      // Build panel
+      const panel = document.createElement('div');
+      panel.style.cssText = 'background:var(--surface);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:10px 12px;margin-top:8px;display:flex;flex-direction:column;gap:8px;';
+
+      // Style preview
+      const preview = document.createElement('div');
+      preview.style.cssText = 'font-size:11px;color:var(--lavender);padding:4px 8px;background:rgba(201,184,232,0.1);border-radius:8px;line-height:1.4;';
+      preview.textContent = '🔒 ' + lockedStyle.trim().slice(0, 80) + (lockedStyle.length > 80 ? '…' : '');
+      panel.appendChild(preview);
+
+      // Model selector row
+      const modelRow = document.createElement('div');
+      modelRow.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
+
+      const modelLabel = document.createElement('span');
+      modelLabel.className = 'mode-label';
+      modelLabel.textContent = 'Model';
+
+      const modelSel = document.createElement('select');
+      modelSel.className = 'img-control-select';
+      modelSel.innerHTML = `
+        <option value="fluxkontext" selected>Flux Kontext — $0.02 ★ Best</option>
+        <option value="qwen">Qwen Edit — $0.02</option>
+        <option value="wan27">Wan 2.7 — $0.03</option>
+        <option value="wan27pro">Wan 2.7 Pro — $0.06</option>
+        <option value="aurora">Aurora — ~$0.04</option>
+      `;
+
+      const applyBtn = document.createElement('button');
+      applyBtn.style.cssText = 'background:var(--lavender);color:#1a1a2e;border:none;border-radius:20px;padding:6px 14px;font-family:"Inter",sans-serif;font-size:12px;font-weight:500;cursor:pointer;margin-left:auto;flex-shrink:0;';
+      applyBtn.textContent = '✓ Apply';
+      applyBtn.addEventListener('click', async () => {
+        const chosenModel = modelSel.value;
+        stylePanelOuter.innerHTML = '';
+        stylePanelOpen = false;
+        applyStyleBtn.disabled = true;
+        applyStyleBtn.textContent = '…';
+
+        // Temporarily set edit model to chosen model
+        const editSel = document.getElementById('edit-model-select');
+        const prevModel = editSel?.value;
+        if (editSel) editSel.value = chosenModel;
+
+        // Edit with style as prompt
+        const stylePrompt = `Apply this visual style to the image: ${lockedStyle.trim()}. Preserve all subjects, characters, composition, and content exactly. Only change the visual aesthetic and style.`;
+        const prevEdit = editMode;
+        editMode = true;
+        await editImage(stylePrompt, hostedUrl || src);
+        editMode = prevEdit;
+        if (editSel && prevModel) editSel.value = prevModel;
+
+        applyStyleBtn.disabled = false;
+        applyStyleBtn.textContent = '🔒 Apply Style';
+      });
+
+      modelRow.appendChild(modelLabel);
+      modelRow.appendChild(modelSel);
+      modelRow.appendChild(applyBtn);
+      panel.appendChild(modelRow);
+      stylePanelOuter.appendChild(panel);
+    } else {
+      stylePanelOuter.innerHTML = '';
+    }
+  });
+
   btnBar.appendChild(saveBtn);
   btnBar.appendChild(copyPromptBtn);
   btnBar.appendChild(setTargetBtn);
+  btnBar.appendChild(applyStyleBtn);
   btnBar.appendChild(retryImgBtn);
   btnBar.appendChild(animBtn);
 
   div.appendChild(label);
   div.appendChild(wrapper);
   div.appendChild(btnBar);
+  div.appendChild(stylePanelOuter);
   div.appendChild(panelOuter);
   messagesEl.appendChild(div);
   if (animate) scrollToBottom();
