@@ -1976,18 +1976,74 @@ async function generateText(userText) {
       // If a PE target is pinned, include it in the message
       const peUrl = pePinnedUrl || (peUseImage ? lastImageUrl : null);
       if (peUrl) {
-        const lastUserIdx = [...apiMessages].reverse().findIndex(m => m.role === 'user');
-        if (lastUserIdx !== -1) {
-          const realIdx = apiMessages.length - 1 - lastUserIdx;
-          const userText = typeof apiMessages[realIdx].content === 'string'
-            ? apiMessages[realIdx].content : '';
-          apiMessages[realIdx] = {
-            role: 'user',
-            content: [
-              { type: 'image_url', image_url: { url: peUrl, detail: 'high' } },
-              { type: 'text', text: userText }
-            ]
-          };
+        // xAI vision only accepts JPG/PNG/WebP/ICO image URLs — not video, not base64, not expired CDN
+        const isVideo = pePinnedType === 'video' || /\.mp4|video/i.test(peUrl);
+        const isBase64 = peUrl.startsWith('data:');
+        const isLikelyImage = !isVideo && !isBase64;
+
+        if (isVideo) {
+          // Video pinned — extract last frame and send as image context
+          try {
+            const frameDataUrl = await extractLastFrame(peUrl);
+            const lastUserIdx = [...apiMessages].reverse().findIndex(m => m.role === 'user');
+            if (lastUserIdx !== -1) {
+              const realIdx = apiMessages.length - 1 - lastUserIdx;
+              const userText = typeof apiMessages[realIdx].content === 'string'
+                ? apiMessages[realIdx].content : '';
+              apiMessages[realIdx] = {
+                role: 'user',
+                content: [
+                  { type: 'image_url', image_url: { url: frameDataUrl, detail: 'high' } },
+                  { type: 'text', text: userText }
+                ]
+              };
+            }
+          } catch(e) {
+            // Frame extraction failed (e.g. CORS) — fall back to text-only with note
+            const lastUserIdx = [...apiMessages].reverse().findIndex(m => m.role === 'user');
+            if (lastUserIdx !== -1) {
+              const realIdx = apiMessages.length - 1 - lastUserIdx;
+              const userText = typeof apiMessages[realIdx].content === 'string'
+                ? apiMessages[realIdx].content : '';
+              apiMessages[realIdx] = {
+                role: 'user',
+                content: userText + (userText ? '\n\n' : '') + '[Note: Could not extract a frame from the pinned video for visual context — ' + e.message + '. Write the extend prompt based on the text description alone.]'
+              };
+            }
+          }
+        } else if (isBase64) {
+          // Base64 — extract mime type and send as base64 image_url
+          const mimeMatch = peUrl.match(/^data:(image\/[^;]+);base64,/);
+          if (mimeMatch) {
+            const lastUserIdx = [...apiMessages].reverse().findIndex(m => m.role === 'user');
+            if (lastUserIdx !== -1) {
+              const realIdx = apiMessages.length - 1 - lastUserIdx;
+              const userText = typeof apiMessages[realIdx].content === 'string'
+                ? apiMessages[realIdx].content : '';
+              apiMessages[realIdx] = {
+                role: 'user',
+                content: [
+                  { type: 'image_url', image_url: { url: peUrl, detail: 'high' } },
+                  { type: 'text', text: userText }
+                ]
+              };
+            }
+          }
+        } else if (isLikelyImage) {
+          // Hosted image URL — pass directly
+          const lastUserIdx = [...apiMessages].reverse().findIndex(m => m.role === 'user');
+          if (lastUserIdx !== -1) {
+            const realIdx = apiMessages.length - 1 - lastUserIdx;
+            const userText = typeof apiMessages[realIdx].content === 'string'
+              ? apiMessages[realIdx].content : '';
+            apiMessages[realIdx] = {
+              role: 'user',
+              content: [
+                { type: 'image_url', image_url: { url: peUrl, detail: 'high' } },
+                { type: 'text', text: userText }
+              ]
+            };
+          }
         }
       }
     }
