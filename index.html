@@ -2151,11 +2151,16 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
     body = { prompt, video: extendVideoUrl, resolution: res, duration: 5, seed: -1 }; // Wan 2.2 Spicy extend: 5s only
   } else if (imageDataUrl) {
     // I2V
-    modelPath = engine === 'wan26spicy'
-      ? 'alibaba/wan-2.7/image-to-video-spicy'
-      : 'wavespeed-ai/wan-2.2-spicy/image-to-video';
-    const wanDuration = engine === 'wan26spicy' ? Math.min(duration, 15) : Math.min(duration, 5);
-    body = { prompt, image: imageDataUrl, resolution: res, duration: wanDuration, aspect_ratio: ratio, seed: -1 };
+    if (engine === 'seedance15spicy') {
+      modelPath = 'bytedance/seedance-v1.5-pro/image-to-video-spicy';
+      body = { prompt, image: imageDataUrl, resolution: res, duration: Math.min(duration, 12), aspect_ratio: ratio, generate_audio: false, seed: -1 };
+    } else if (engine === 'wan26spicy') {
+      modelPath = 'alibaba/wan-2.7/image-to-video-spicy';
+      body = { prompt, image: imageDataUrl, resolution: res, duration: Math.min(duration, 15), aspect_ratio: ratio, seed: -1 };
+    } else {
+      modelPath = 'wavespeed-ai/wan-2.2-spicy/image-to-video';
+      body = { prompt, image: imageDataUrl, resolution: res, duration: Math.min(duration, 5), aspect_ratio: ratio, seed: -1 };
+    }
   } else if (engine === 'wan26t2v') {
     // Text-to-video
     modelPath = 'alibaba/wan-2.6/text-to-video';
@@ -2192,7 +2197,7 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   );
 
   if (videoUrl) {
-    const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', aurora: 'Aurora' };
+    const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', seedance15spicy: 'Seedance 1.5 Spicy', aurora: 'Aurora' };
     const vidLabel = engineLabels[engine] || engine;
     addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: vidLabel });
     renderVideo(videoUrl, prompt, true, vidLabel);
@@ -2435,6 +2440,7 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   } else {
     engineSel.innerHTML = `
       <option value="aurora" selected>Aurora — $0.05/s</option>
+      <option value="seedance15spicy">Seedance 1.5 Spicy — ~$0.05/run</option>
       <option value="wan22spicy">Wan 2.2 Spicy — $0.15/run</option>
       <option value="wan26spicy">Wan 2.7 Spicy — $0.50/run</option>
     `;
@@ -2987,7 +2993,8 @@ const MODEL_CONSTRAINTS = {
   aurora_i2v: { durations: [4,6,8,10],    resolutions: ['480p','720p'], hasRatio: false, maxDur: 10, defaultDur: 4,  defaultRes: '480p' },
   wan26t2v:   { durations: [5,8,10,15],   resolutions: ['720p','1080p'], hasRatio: true,  maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
   wan22spicy: { durations: [5,8],          resolutions: ['480p','720p'], hasRatio: false, maxDur: 8,  defaultDur: 5,  defaultRes: '480p' },
-  wan26spicy: { durations: [5,10,15],      resolutions: ['720p','1080p'], hasRatio: false, maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
+  wan26spicy:     { durations: [5,10,15],      resolutions: ['720p','1080p'], hasRatio: false, maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
+  seedance15spicy: { durations: [4,5,6,8,10,12], resolutions: ['480p','720p','1080p'], hasRatio: true, maxDur: 12, defaultDur: 4,  defaultRes: '480p' },
   // extend variants
   aurora_extend:     { durations: [6,10],  resolutions: ['480p','720p'], hasRatio: false, maxDur: 10, defaultDur: 6,  defaultRes: '480p' },
   wan22spicy_extend: { durations: [5],     resolutions: ['480p','720p'], hasRatio: false, maxDur: 5,  defaultDur: 5,  defaultRes: '480p' },
@@ -3081,6 +3088,7 @@ function updateCostEstimate() {
     let cost;
     if (engine === 'aurora') cost = `~$${(duration * 0.07).toFixed(2)}`;
     else if (engine === 'wan26t2v') cost = `~$${(duration * 0.068).toFixed(2)}`;
+    else if (engine === 'seedance15spicy') cost = '~$0.05';
     else if (engine === 'wan22spicy') cost = '$0.15';
     else if (engine === 'wan26spicy') cost = '$0.50';
     el.textContent = cost;
