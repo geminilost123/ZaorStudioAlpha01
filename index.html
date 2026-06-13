@@ -734,6 +734,13 @@
       padding: 0 4px;
     }
     #input-area.enhance-mode #enhance-mode-row { display: flex; }
+    #input-area.enhance-mode #style-lock-row { display: none !important; }
+    #input-area.enhance-mode #upload-edit-row { display: none !important; }
+    #input-area.enhance-mode #img-mode-row { display: none !important; }
+    #input-area.enhance-mode #vid-mode-row { display: none !important; }
+    #input-area.enhance-mode #send-btn { display: none; }
+    #input-area.enhance-mode .input-row { display: none; }
+    #input-area.enhance-mode #mode-indicator { color: #a8e6cf; }
 
     .enhance-btn-row {
       display: flex;
@@ -1065,6 +1072,7 @@
           <button id="edit-img-btn" class="edit-img-btn visible" title="Edit last image">✏️ Edit</button>
           <select id="edit-model-select" class="img-control-select" title="Edit model">
             <option value="qwen">Qwen Edit — $0.02</option>
+            <option value="flux-kontext">Flux Kontext — $0.02</option>
             <option value="wan27" selected>Wan 2.7 — $0.03</option>
             <option value="wan27pro">Wan 2.7 Pro — $0.06</option>
             <option value="aurora">Aurora — ~$0.04</option>
@@ -1156,16 +1164,29 @@
         </div>
       </div>
       <div id="enhance-mode-row">
-        <div class="enhance-btn-row">
-          <button class="enhance-action-btn" id="auto-clean-btn">🧹 Auto-Clean</button>
-          <div class="img-control-group">
-            <span class="mode-label">Upscale</span>
-            <select id="upscale-model-select" class="img-control-select">
-              <option value="standard">Standard — $0.01</option>
-              <option value="precision">Precision — $0.03</option>
-              <option value="premium">Premium — $0.06</option>
-            </select>
-          </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-size:11px;color:#a8e6cf;letter-spacing:0.05em;text-transform:uppercase;">✨ Enhance Tools</span>
+          <button id="enhance-close-btn" style="background:transparent;border:1px solid rgba(255,255,255,0.1);color:var(--text-dim);font-size:12px;padding:2px 10px;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif;">✕ Close</button>
+        </div>
+        <!-- Clean section -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.06);">
+          <span class="mode-label" style="color:#a8e6cf;">Clean</span>
+          <select id="clean-model-select" class="img-control-select">
+            <option value="qwen">Qwen Edit — $0.02</option>
+            <option value="flux-kontext">Flux Kontext — $0.02</option>
+            <option value="wan27">Wan 2.7 — $0.03</option>
+            <option value="wan27pro">Wan 2.7 Pro — $0.06</option>
+          </select>
+          <button class="enhance-action-btn" id="auto-clean-btn">🧹 Clean via Qwen Edit</button>
+        </div>
+        <!-- Upscale section -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="mode-label" style="color:#a8e6cf;">Upscale</span>
+          <select id="upscale-model-select" class="img-control-select">
+            <option value="standard">Standard — $0.01</option>
+            <option value="precision">Precision — $0.03</option>
+            <option value="premium">Premium — $0.06</option>
+          </select>
           <div class="img-control-group" id="upscale-res-group">
             <span class="mode-label">Target</span>
             <select id="upscale-res-select" class="img-control-select">
@@ -1176,7 +1197,7 @@
           </div>
           <button class="enhance-action-btn" id="upscale-btn">⬆ Upscale</button>
         </div>
-        <div style="font-size:11px;color:var(--text-dim);padding:2px 4px;">Works on current edit target image</div>
+        <div style="font-size:11px;color:var(--text-dim);padding:4px 4px 0;">Works on current 🎯 edit target image</div>
       </div>
     </div>
   </div>
@@ -1577,40 +1598,37 @@ promptEl.addEventListener('keydown', e => {
 
 let editMode = false;
 
-function setImageMode(on) {
-  imageMode = on;
-  editMode = false;
-  videoMode = false;
-  enhanceMode = false;
-  document.getElementById('enhance-toggle')?.classList.remove('active');
-  document.getElementById('input-area')?.classList.remove('enhance-mode');
-  imgToggle.classList.toggle('active', on);
-  document.getElementById('vid-toggle').classList.remove('active');
-  document.getElementById('edit-img-btn').classList.remove('active');
-  inputArea.classList.toggle('image-mode', on);
-  inputArea.classList.remove('video-mode');
-  promptEl.placeholder = on ? 'Describe an image…' : 'Say something…';
+// ── Unified mode setter ──
+function setMode(mode) {
+  imageMode   = mode === 'image';
+  editMode    = mode === 'edit';
+  videoMode   = mode === 'video';
+  enhanceMode = mode === 'enhance';
+
+  imgToggle?.classList.toggle('active', mode === 'image');
+  document.getElementById('vid-toggle')?.classList.toggle('active', mode === 'video');
+  document.getElementById('enhance-toggle')?.classList.toggle('active', mode === 'enhance');
+  document.getElementById('edit-img-btn')?.classList.toggle('active', mode === 'edit');
+
+  inputArea?.classList.toggle('image-mode', mode === 'image' || mode === 'edit');
+  inputArea?.classList.toggle('video-mode', mode === 'video');
+  inputArea?.classList.toggle('enhance-mode', mode === 'enhance');
+
+  const placeholders = { image: 'Describe an image…', edit: 'Describe your edit…', video: 'Describe a video…', enhance: '', chat: 'Say something…' };
+  promptEl.placeholder = placeholders[mode] || 'Say something…';
+
   updateCostEstimate();
 }
 
-function setEditMode(on) {
-  editMode = on;
-  imageMode = false;
-  videoMode = false;
-  imgToggle.classList.remove('active');
-  document.getElementById('vid-toggle').classList.remove('active');
-  document.getElementById('edit-img-btn').classList.toggle('active', on);
-  inputArea.classList.toggle('image-mode', on); // reuse image-mode styling
-  inputArea.classList.remove('video-mode');
-  promptEl.placeholder = on ? 'Describe your edit…' : 'Say something…';
-  updateCostEstimate();
-}
+// Legacy wrappers
+function setImageMode(on) { setMode(on ? 'image' : 'chat'); }
+function setEditMode(on)  { setMode(on ? 'edit'  : 'chat'); }
 
-imgToggle.addEventListener('click', () => setImageMode(!imageMode));
+imgToggle.addEventListener('click', () => setMode(imageMode ? 'chat' : 'image'));
 
 document.getElementById('edit-img-btn').addEventListener('click', () => {
   if (!lastImageUrl) return;
-  setEditMode(!editMode);
+  setMode(editMode ? 'chat' : 'edit');
 });
 
 // ── Upload image for editing/animating ──
@@ -1651,32 +1669,24 @@ document.getElementById('img-file-input').addEventListener('change', async (e) =
 });
 
 document.getElementById('vid-toggle').addEventListener('click', () => {
-  videoMode = !videoMode;
-  if (videoMode) { imageMode = false; editMode = false; }
-  document.getElementById('vid-toggle').classList.toggle('active', videoMode);
-  imgToggle.classList.remove('active');
-  document.getElementById('edit-img-btn').classList.remove('active');
-  inputArea.classList.toggle('video-mode', videoMode);
-  inputArea.classList.remove('image-mode');
-  promptEl.placeholder = videoMode ? 'Describe a video…' : 'Say something…';
-  updateCostEstimate();
+  setMode(videoMode ? 'chat' : 'video');
 });
 
 // ── Enhance toggle ──
+document.getElementById('enhance-close-btn')?.addEventListener('click', () => {
+  setMode('chat');
+});
+
 document.getElementById('enhance-toggle')?.addEventListener('click', () => {
-  enhanceMode = !enhanceMode;
-  if (enhanceMode) { imageMode = false; videoMode = false; editMode = false; }
-  document.getElementById('enhance-toggle').classList.toggle('active', enhanceMode);
-  imgToggle.classList.remove('active');
-  document.getElementById('vid-toggle').classList.remove('active');
-  document.getElementById('edit-img-btn')?.classList.remove('active');
-  const inputArea = document.getElementById('input-area');
-  inputArea.classList.toggle('enhance-mode', enhanceMode);
-  inputArea.classList.remove('image-mode','video-mode');
-  const modeText = document.getElementById('mode-label-text');
-  const costEl = document.getElementById('cost-estimate');
-  if (modeText) modeText.textContent = enhanceMode ? 'Enhance mode' : 'Chat mode';
-  if (costEl) costEl.style.display = enhanceMode ? 'inline-block' : 'none';
+  setMode(enhanceMode ? 'chat' : 'enhance');
+});
+
+// Clean model changes button label
+document.getElementById('clean-model-select')?.addEventListener('change', () => {
+  const model = document.getElementById('clean-model-select').value;
+  const labels = { qwen: 'Qwen Edit', 'flux-kontext': 'Flux Kontext', wan27: 'Wan 2.7', wan27pro: 'Wan 2.7 Pro' };
+  const btn = document.getElementById('auto-clean-btn');
+  if (btn) btn.textContent = `🧹 Clean via ${labels[model]}`;
   updateCostEstimate();
 });
 
@@ -1699,16 +1709,23 @@ document.getElementById('upscale-model-select')?.addEventListener('change', () =
 // Auto-Clean button
 document.getElementById('auto-clean-btn')?.addEventListener('click', async () => {
   const target = activeEditTarget || lastImageUrl;
-  if (!target) { appendError('No image selected. Generate or upload an image first, then set it as edit target.'); return; }
+  if (!target) { appendError('No image selected. Tap 🎯 Edit Target on any image first.'); return; }
   const btn = document.getElementById('auto-clean-btn');
+  const cleanModel = document.getElementById('clean-model-select')?.value || 'qwen';
+  const modelLabels = { qwen: 'Qwen Edit', fluxkontext: 'Flux Kontext', wan27: 'Wan 2.7', wan27pro: 'Wan 2.7 Pro' };
+  const origLabel = `🧹 Clean via ${modelLabels[cleanModel]}`;
   btn.disabled = true; btn.textContent = '…';
   const cleanPrompt = 'Sharpen and clarify this image. Remove compression artifacts, noise, and blur. Improve technical quality and crispness only. Preserve all content, colors, composition, characters, and scene elements exactly as they are. Do not change anything about the subject matter.';
-  // Temporarily switch to edit mode for the clean
+  // Override edit model temporarily
+  const editSel = document.getElementById('edit-model-select');
+  const prevModel = editSel?.value;
+  if (editSel) editSel.value = cleanModel === 'fluxkontext' ? 'fluxkontext' : cleanModel;
   const prevEdit = editMode;
   editMode = true;
   await editImage(cleanPrompt, target);
   editMode = prevEdit;
-  btn.disabled = false; btn.textContent = '🧹 Auto-Clean';
+  if (editSel && prevModel) editSel.value = prevModel;
+  btn.disabled = false; btn.textContent = origLabel;
 });
 
 // Upscale button
@@ -1724,7 +1741,7 @@ document.getElementById('upscale-btn')?.addEventListener('click', async () => {
 
 // Update cost estimate when any selector changes
 ['vid-engine-select','vid-duration-select','vid-res-select',
- 'img-model-select','img-res-select','img-ratio-select','edit-model-select','upscale-model-select'].forEach(id => {
+ 'img-model-select','img-res-select','img-ratio-select','edit-model-select','upscale-model-select','clean-model-select'].forEach(id => {
   document.getElementById(id)?.addEventListener('change', updateCostEstimate);
 });
 
@@ -1813,53 +1830,20 @@ async function editImage(prompt, imageUrl) {
     } else {
       // ── Wan 2.7 edit via WaveSpeed ──
       if (!wavespeedKey) throw new Error('WaveSpeed API key required for Wan edit. Tap "Set API Key" to add it.');
-      let modelPath;
-      let reqBody;
-      if (editModel === 'wan27pro') {
-        modelPath = 'alibaba/wan-2.7/image-edit-pro';
-        reqBody = { prompt, images: [imageUrl], seed: -1, enable_safety_checker: false };
-      } else if (editModel === 'wan27') {
-        modelPath = 'alibaba/wan-2.7/image-edit';
-        reqBody = { prompt, images: [imageUrl], seed: -1, enable_safety_checker: false };
-      } else {
-        // Qwen Image Edit
-        modelPath = 'wavespeed-ai/qwen-image/edit';
-        reqBody = { prompt, image: imageUrl, seed: -1, enable_safety_checker: false };
-      }
-
-      const submitRes = await fetch(`https://api.wavespeed.ai/api/v3/${modelPath}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wavespeedKey}` },
-        body: JSON.stringify(reqBody)
-      });
-      if (!submitRes.ok) {
-        const e = await submitRes.json().catch(()=>({}));
-        throw new Error(`Wan edit error ${submitRes.status}: ${e.message || JSON.stringify(e)}`);
-      }
-      const submitData = await submitRes.json();
-      const taskId = submitData.data?.id || submitData.id;
-      if (!taskId) throw new Error('No task ID from WaveSpeed');
-
-      // Poll
-      let resultUrl = null;
-      let elapsed = 0;
-      while (elapsed < 120000) {
-        await new Promise(r => setTimeout(r, 3000));
-        elapsed += 3000;
-        const pollRes = await fetch(`https://api.wavespeed.ai/api/v3/predictions/${taskId}/result`, {
-          headers: { 'Authorization': `Bearer ${wavespeedKey}` }
-        });
-        if (!pollRes.ok) continue;
-        const pollData = await pollRes.json();
-        const status = pollData.data?.status || pollData.status;
-        if (status === 'completed') { resultUrl = pollData.data?.outputs?.[0] || pollData.outputs?.[0]; break; }
-        if (status === 'failed') throw new Error(pollData.data?.error || 'Wan edit failed');
-      }
+      const wsModels = {
+        wan27pro:    { path: 'alibaba/wan-2.7/image-edit-pro',          body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
+        wan27:       { path: 'alibaba/wan-2.7/image-edit',              body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
+        fluxkontext: { path: 'wavespeed-ai/flux-kontext-dev-ultra-fast', body: { prompt: fullPrompt, image: imageUrl, seed: -1, enable_safety_checker: false } },
+        qwen:        { path: 'wavespeed-ai/qwen-image/edit',            body: { prompt: fullPrompt, image: imageUrl, seed: -1, enable_safety_checker: false } },
+      };
+      const { path: wsPath, body: wsBody } = wsModels[editModel] || wsModels.qwen;
+      const resultUrl = await callWaveSpeed(wsPath, wsBody, 120000, 3000);
 
       removeTyping(typingId);
-      if (!resultUrl) throw new Error('Wan edit timed out');
+      if (!resultUrl) throw new Error('Edit timed out');
       src = resultUrl; hostedUrl = resultUrl;
-      modelLabel = editModel === 'wan27pro' ? 'Wan 2.7 Pro Edit' : editModel === 'wan27' ? 'Wan 2.7 Edit' : 'Qwen Edit';
+      const editLabels = { wan27pro: 'Wan 2.7 Pro Edit', wan27: 'Wan 2.7 Edit', fluxkontext: 'Flux Kontext Edit', qwen: 'Qwen Edit' };
+      modelLabel = editLabels[editModel] || 'Qwen Edit';
     }
 
     lastImageUrl = hostedUrl || src;
@@ -1880,67 +1864,24 @@ async function editImage(prompt, imageUrl) {
 // ═══════════════════════════════════════════════════════
 async function upscaleImage(imageUrl) {
   const typingId = appendTyping();
-  const modelChoice = document.getElementById('upscale-model-select')?.value || 'standard';
-  const resChoice = document.getElementById('upscale-res-select')?.value || '4k';
-
-  const modelPaths = {
-    standard: 'wavespeed-ai/image-upscaler',
-    precision: 'clarity-ai/pro-upscaler',
-    premium: 'wavespeed-ai/ultimate-image-upscaler'
-  };
-  const modelPath = modelPaths[modelChoice];
-
-  let body;
-  if (modelChoice === 'precision') {
-    body = { image: imageUrl, target_megapixels: parseInt(resChoice), enable_safety_checker: false };
-  } else {
-    body = { image: imageUrl, target_resolution: resChoice, creativity: 0, output_format: 'png', enable_safety_checker: false };
-  }
-
   try {
-    const submitRes = await fetch(`https://api.wavespeed.ai/api/v3/${modelPath}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wavespeedKey}` },
-      body: JSON.stringify(body)
-    });
+    const modelChoice = document.getElementById('upscale-model-select')?.value || 'standard';
+    const resChoice = document.getElementById('upscale-res-select')?.value || '4k';
+    const modelPaths = { standard: 'wavespeed-ai/image-upscaler', precision: 'clarity-ai/pro-upscaler', premium: 'wavespeed-ai/ultimate-image-upscaler' };
+    const body = modelChoice === 'precision'
+      ? { image: imageUrl, target_megapixels: parseInt(resChoice) }
+      : { image: imageUrl, target_resolution: resChoice, creativity: 0, output_format: 'png' };
 
-    if (!submitRes.ok) {
-      const e = await submitRes.json().catch(()=>({}));
-      throw new Error(`Upscale error ${submitRes.status}: ${e.message || JSON.stringify(e)}`);
-    }
-
-    const submitData = await submitRes.json();
-    const taskId = submitData.data?.id || submitData.id;
-    if (!taskId) throw new Error('No task ID from upscaler');
-
-    // Poll
-    let resultUrl = null;
-    let elapsed = 0;
-    while (elapsed < 120000) {
-      await new Promise(r => setTimeout(r, 2000));
-      elapsed += 2000;
-      const pollRes = await fetch(`https://api.wavespeed.ai/api/v3/predictions/${taskId}/result`, {
-        headers: { 'Authorization': `Bearer ${wavespeedKey}` }
-      });
-      if (!pollRes.ok) continue;
-      const pollData = await pollRes.json();
-      const status = pollData.data?.status || pollData.status;
-      if (status === 'completed') { resultUrl = pollData.data?.outputs?.[0] || pollData.outputs?.[0]; break; }
-      if (status === 'failed') throw new Error(pollData.data?.error || 'Upscale failed');
-    }
-
+    const resultUrl = await callWaveSpeed(modelPaths[modelChoice], body);
     removeTyping(typingId);
     if (!resultUrl) throw new Error('Upscale timed out');
 
-    const modelLabels = { standard: 'Upscaled (Standard)', precision: 'Upscaled (Precision)', premium: 'Upscaled (Premium)' };
-    const label = modelLabels[modelChoice];
-
+    const label = { standard: 'Upscaled (Standard)', precision: 'Upscaled (Precision)', premium: 'Upscaled (Premium)' }[modelChoice];
     lastImageUrl = resultUrl;
     activeEditTarget = resultUrl;
     showEditButton();
     addMessageToThread({ role: 'assistant', type: 'image', src: resultUrl, hostedUrl: resultUrl, alt: `Upscaled ${resChoice}`, modelLabel: label });
     renderImage(resultUrl, `Upscaled ${resChoice}`, true, resultUrl, label);
-
   } catch(e) {
     removeTyping(typingId);
     appendError(e.message);
@@ -2005,91 +1946,46 @@ function ratioToSize(ratio, resolution) {
   }
 }
 
+
+
+
+
+// ═══════════════════════════════════════════════════════
+// IMAGE GENERATION
+// ═══════════════════════════════════════════════════════
 async function generateImage(prompt) {
   const typingId = appendTyping();
   try {
-    if (!wavespeedKey) throw new Error('WaveSpeed API key required for images. Tap "Set API Key" to add it.');
-
     const imgModel = document.getElementById('img-model-select').value;
     const aspectRatio = document.getElementById('img-ratio-select').value;
     const resolution = document.getElementById('img-res-select').value;
-
-    const fullPrompt = prompt;
-
-    // Confirmed path: x-ai/grok-imagine-image-quality/text-to-image
-    // Simple variant path is unconfirmed on WaveSpeed; fallback handles 404
+    const fullPrompt = applyStyleLock(prompt);
     const modelPath = imgModel === 'grok-imagine-image'
       ? 'x-ai/grok-imagine-image/text-to-image'
       : 'x-ai/grok-imagine-image-quality/text-to-image';
+    const body = { prompt: fullPrompt, size: ratioToSize(aspectRatio, resolution), enable_safety_checker: false };
 
-    const body = {
-      prompt: fullPrompt,
-      size: ratioToSize(aspectRatio, resolution),
-      enable_safety_checker: false
-    };
+    let imageUrl = await callWaveSpeed(modelPath, body);
 
-    let submitRes = await fetch(`https://api.wavespeed.ai/api/v3/${modelPath}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wavespeedKey}` },
-      body: JSON.stringify(body)
-    });
-
-    // Fallback: if Simple path 404s, retry with confirmed quality path
-    if (submitRes.status === 404 && modelPath.includes('grok-imagine-image/')) {
-      submitRes = await fetch('https://api.wavespeed.ai/api/v3/x-ai/grok-imagine-image-quality/text-to-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wavespeedKey}` },
-        body: JSON.stringify(body)
-      });
-    }
-
-    if (!submitRes.ok) {
-      const errData = await submitRes.json().catch(()=>({}));
-      throw new Error(`Image error ${submitRes.status}: ${errData.message || JSON.stringify(errData)}`);
-    }
-
-    const submitData = await submitRes.json();
-    const taskId = submitData.data?.id || submitData.id;
-    if (!taskId) throw new Error('No task ID returned');
-
-    // Poll every 2s, up to 2 minutes
-    let imageUrl = null;
-    let elapsed = 0;
-    while (elapsed < 120000) {
-      await new Promise(r => setTimeout(r, 2000));
-      elapsed += 2000;
-      const pollRes = await fetch(`https://api.wavespeed.ai/api/v3/predictions/${taskId}/result`, {
-        headers: { 'Authorization': `Bearer ${wavespeedKey}` }
-      });
-      if (!pollRes.ok) continue;
-      const pollData = await pollRes.json();
-      const status = pollData.data?.status || pollData.status;
-      if (status === 'completed') {
-        imageUrl = pollData.data?.outputs?.[0] || pollData.outputs?.[0];
-        break;
-      } else if (status === 'failed') {
-        throw new Error(pollData.data?.error || 'Image generation failed');
-      }
+    // Fallback if Simple model 404s
+    if (!imageUrl && modelPath.includes('grok-imagine-image/')) {
+      imageUrl = await callWaveSpeed('x-ai/grok-imagine-image-quality/text-to-image', body);
     }
 
     removeTyping(typingId);
     if (!imageUrl) throw new Error('Image generation timed out');
 
-    const src = imageUrl;
-    const hostedUrl = imageUrl;
-    lastImageUrl = hostedUrl;
-    showEditButton();
-    // Track which model actually generated (for display)
     const usedModel = imgModel === 'grok-imagine-image' ? 'Aurora Simple' : 'Aurora Mega';
-    addMessageToThread({ role: 'assistant', type: 'image', src, hostedUrl, alt: prompt, modelLabel: usedModel });
-    renderImage(src, prompt, true, hostedUrl, usedModel);
+    lastImageUrl = imageUrl;
+    showEditButton();
+    addMessageToThread({ role: 'assistant', type: 'image', src: imageUrl, hostedUrl: imageUrl, alt: prompt, modelLabel: usedModel });
+    renderImage(imageUrl, prompt, true, imageUrl, usedModel);
   } catch(e) {
     removeTyping(typingId);
     addMessageToThread({ role: 'assistant', type: 'error', content: e.message });
     appendError(e.message);
   }
 }
-
 
 // ═══════════════════════════════════════════════════════
 // VIDEO GENERATION
@@ -2288,6 +2184,51 @@ async function pollForVideo(fetchFn, extractFn, progressId, isCancelled) {
   }
 
   throw new Error('Video generation timed out after 10 minutes');
+}
+
+// ═══════════════════════════════════════════════════════
+// SHARED WAVESPEED HELPER
+// ═══════════════════════════════════════════════════════
+async function callWaveSpeed(modelPath, body, timeoutMs = 120000, intervalMs = 2000) {
+  if (!wavespeedKey) throw new Error('WaveSpeed API key required. Tap "Set API Key" to add it.');
+
+  const submitRes = await fetch(`https://api.wavespeed.ai/api/v3/${modelPath}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wavespeedKey}` },
+    body: JSON.stringify(body)
+  });
+
+  if (!submitRes.ok) {
+    const e = await submitRes.json().catch(()=>({}));
+    throw new Error(`WaveSpeed error ${submitRes.status}: ${e.message || e.error || JSON.stringify(e)}`);
+  }
+
+  const submitData = await submitRes.json();
+  const taskId = submitData.data?.id || submitData.id;
+  if (!taskId) throw new Error('No task ID returned from WaveSpeed');
+
+  // Poll for result
+  let elapsed = 0;
+  while (elapsed < timeoutMs) {
+    await new Promise(r => setTimeout(r, intervalMs));
+    elapsed += intervalMs;
+
+    const pollRes = await fetch(`https://api.wavespeed.ai/api/v3/predictions/${taskId}/result`, {
+      headers: { 'Authorization': `Bearer ${wavespeedKey}` }
+    });
+    if (!pollRes.ok) continue;
+
+    const pollData = await pollRes.json();
+    const status = pollData.data?.status || pollData.status;
+
+    if (status === 'completed') {
+      return pollData.data?.outputs?.[0] || pollData.outputs?.[0] || null;
+    }
+    if (status === 'failed') {
+      throw new Error(pollData.data?.error || 'WaveSpeed generation failed');
+    }
+  }
+  throw new Error('WaveSpeed request timed out');
 }
 
 function appendVideoProgress(msg, onCancel) {
@@ -2837,10 +2778,6 @@ function showEditButton() {
 }
 
 // ── Style Lock ──
-function getActiveStyle() {
-  return lockedStyle.trim();
-}
-
 function applyStyleLock(prompt) {
   const style = getActiveStyle();
   if (!style) return prompt;
@@ -2961,7 +2898,8 @@ function updateCostEstimate() {
   } else if (editMode) {
     // Edit = input image + output image at xAI pricing
     const editMod = document.getElementById('edit-model-select')?.value || 'wan27';
-    const editCost = editMod === 'aurora' ? '~$0.04' : editMod === 'wan27pro' ? '$0.06' : editMod === 'wan27' ? '$0.03' : '$0.02';
+    const editCostMap = { aurora: '~$0.04', wan27pro: '$0.06', wan27: '$0.03', 'flux-kontext': '$0.02', qwen: '$0.02' };
+    const editCost = editCostMap[editMod] || '$0.02';
     el.textContent = editCost;
     modeText.textContent = 'Edit image mode';
 
@@ -2979,8 +2917,10 @@ function updateCostEstimate() {
 
   } else if (enhanceMode) {
     const upModel = document.getElementById('upscale-model-select')?.value || 'standard';
-    const costs = { standard: '$0.01+', precision: '$0.03+', premium: '$0.06+' };
-    el.textContent = `Clean $0.02 / Up ${costs[upModel]}`;
+    const cleanMod = document.getElementById('clean-model-select')?.value || 'qwen';
+    const upCosts = { standard: '$0.01+', precision: '$0.03+', premium: '$0.06+' };
+    const cleanCosts = { qwen: '$0.02', 'flux-kontext': '$0.02', wan27: '$0.03', wan27pro: '$0.06' };
+    el.textContent = `Clean ${cleanCosts[cleanMod]} / Up ${upCosts[upModel]}`;
     modeText.textContent = 'Enhance mode';
     el.style.display = 'inline-block';
   } else {
