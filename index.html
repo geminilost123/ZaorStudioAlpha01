@@ -704,6 +704,70 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+
+    /* ── Enhancement mode ── */
+    #enhance-toggle {
+      width: 36px; height: 36px;
+      border-radius: 50%; border: none;
+      background: transparent;
+      color: var(--text-dim);
+      cursor: pointer; font-size: 18px;
+      transition: all 0.2s; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #enhance-toggle:hover { color: #a8e6cf; }
+    #enhance-toggle.active { background: rgba(168,230,207,0.18); color: #a8e6cf; }
+
+    #input-area.enhance-mode { border-top-color: rgba(168,230,207,0.35); }
+    #input-area.enhance-mode .input-row:focus-within {
+      border-color: #a8e6cf;
+      box-shadow: 0 0 0 3px rgba(168,230,207,0.15);
+    }
+    #input-area.enhance-mode #send-btn { background: #a8e6cf; color: #1a1a2e; }
+    #input-area.enhance-mode #mode-label-text { color: #a8e6cf; }
+
+    #enhance-mode-row {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 7px;
+      padding: 0 4px;
+    }
+    #input-area.enhance-mode #enhance-mode-row { display: flex; }
+
+    .enhance-btn-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .enhance-action-btn {
+      background: var(--surface);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 12px; font-weight: 500;
+      padding: 6px 14px; border-radius: 20px;
+      cursor: pointer; flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .enhance-action-btn:hover { background: rgba(168,230,207,0.15); border-color: #a8e6cf; color: #a8e6cf; }
+    .enhance-action-btn:disabled { opacity: 0.4; cursor: default; }
+
+    /* Set as edit target button */
+    .set-target-btn {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--text-dim);
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      padding: 3px 8px; border-radius: 10px;
+      cursor: pointer; flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .set-target-btn:hover { border-color: var(--lavender); color: var(--lavender); }
+    .set-target-btn.is-target { border-color: var(--lavender); color: var(--lavender); background: rgba(201,184,232,0.12); }
+
     /* ── PIN Screen ── */
     #pin-screen {
       position: fixed; inset: 0;
@@ -1012,6 +1076,7 @@
         <textarea id="prompt" rows="1" placeholder="Say something…"></textarea>
         <button id="img-toggle" title="Toggle image generation">🎨</button>
         <button id="vid-toggle" title="Toggle video generation">🎬</button>
+        <button id="enhance-toggle" title="Enhancement tools">✨</button>
         <button id="send-btn" title="Send">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M2 8L14 2L8 14L7 9L2 8Z" fill="currentColor"/>
@@ -1089,6 +1154,29 @@
             </select>
           </div>
         </div>
+      </div>
+      <div id="enhance-mode-row">
+        <div class="enhance-btn-row">
+          <button class="enhance-action-btn" id="auto-clean-btn">🧹 Auto-Clean</button>
+          <div class="img-control-group">
+            <span class="mode-label">Upscale</span>
+            <select id="upscale-model-select" class="img-control-select">
+              <option value="standard">Standard — $0.01</option>
+              <option value="precision">Precision — $0.03</option>
+              <option value="premium">Premium — $0.06</option>
+            </select>
+          </div>
+          <div class="img-control-group" id="upscale-res-group">
+            <span class="mode-label">Target</span>
+            <select id="upscale-res-select" class="img-control-select">
+              <option value="2k">2K</option>
+              <option value="4k" selected>4K</option>
+              <option value="8k">8K</option>
+            </select>
+          </div>
+          <button class="enhance-action-btn" id="upscale-btn">⬆ Upscale</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);padding:2px 4px;">Works on current edit target image</div>
       </div>
     </div>
   </div>
@@ -1206,7 +1294,8 @@ let wavespeedKey = localStorage.getItem('ws_key') || '';
 let imageMode = false;
 let videoMode = false;
 let lastImageUrl = null; // tracks most recently generated image for editing
-let activeEditTarget = null; // manually selected edit target (null = use lastImageUrl)
+let activeEditTarget = null;
+let enhanceMode = false; // manually selected edit target (null = use lastImageUrl)
 let lockedStyle = localStorage.getItem('zaor_style_lock') || ''; // persisted style
 let promptEngineerMode = false; // PE mode for chat
 let isLoading = false;
@@ -1492,6 +1581,9 @@ function setImageMode(on) {
   imageMode = on;
   editMode = false;
   videoMode = false;
+  enhanceMode = false;
+  document.getElementById('enhance-toggle')?.classList.remove('active');
+  document.getElementById('input-area')?.classList.remove('enhance-mode');
   imgToggle.classList.toggle('active', on);
   document.getElementById('vid-toggle').classList.remove('active');
   document.getElementById('edit-img-btn').classList.remove('active');
@@ -1584,9 +1676,69 @@ document.getElementById('vid-toggle').addEventListener('click', () => {
   updateCostEstimate();
 });
 
+// ── Enhance toggle ──
+document.getElementById('enhance-toggle')?.addEventListener('click', () => {
+  enhanceMode = !enhanceMode;
+  if (enhanceMode) { imageMode = false; videoMode = false; editMode = false; }
+  document.getElementById('enhance-toggle').classList.toggle('active', enhanceMode);
+  imgToggle.classList.remove('active');
+  document.getElementById('vid-toggle').classList.remove('active');
+  document.getElementById('edit-img-btn')?.classList.remove('active');
+  const inputArea = document.getElementById('input-area');
+  inputArea.classList.toggle('enhance-mode', enhanceMode);
+  inputArea.classList.remove('image-mode','video-mode');
+  const modeText = document.getElementById('mode-label-text');
+  const costEl = document.getElementById('cost-estimate');
+  if (modeText) modeText.textContent = enhanceMode ? 'Enhance mode' : 'Chat mode';
+  if (costEl) costEl.style.display = enhanceMode ? 'inline-block' : 'none';
+  updateCostEstimate();
+});
+
+// Upscale model changes resolution options
+document.getElementById('upscale-model-select')?.addEventListener('change', () => {
+  const model = document.getElementById('upscale-model-select').value;
+  const resEl = document.getElementById('upscale-res-select');
+  const resGroup = document.getElementById('upscale-res-group');
+  if (model === 'precision') {
+    // Clarity Pro uses megapixels — swap options
+    resEl.innerHTML = '<option value="2">2 MP</option><option value="4" selected>4 MP</option><option value="8">8 MP</option><option value="16">16 MP</option>';
+    if (resGroup) resGroup.querySelector('.mode-label').textContent = 'MP Target';
+  } else {
+    resEl.innerHTML = '<option value="2k">2K</option><option value="4k" selected>4K</option><option value="8k">8K</option>';
+    if (resGroup) resGroup.querySelector('.mode-label').textContent = 'Target';
+  }
+  updateCostEstimate();
+});
+
+// Auto-Clean button
+document.getElementById('auto-clean-btn')?.addEventListener('click', async () => {
+  const target = activeEditTarget || lastImageUrl;
+  if (!target) { appendError('No image selected. Generate or upload an image first, then set it as edit target.'); return; }
+  const btn = document.getElementById('auto-clean-btn');
+  btn.disabled = true; btn.textContent = '…';
+  const cleanPrompt = 'Sharpen and clarify this image. Remove compression artifacts, noise, and blur. Improve technical quality and crispness only. Preserve all content, colors, composition, characters, and scene elements exactly as they are. Do not change anything about the subject matter.';
+  // Temporarily switch to edit mode for the clean
+  const prevEdit = editMode;
+  editMode = true;
+  await editImage(cleanPrompt, target);
+  editMode = prevEdit;
+  btn.disabled = false; btn.textContent = '🧹 Auto-Clean';
+});
+
+// Upscale button
+document.getElementById('upscale-btn')?.addEventListener('click', async () => {
+  const target = activeEditTarget || lastImageUrl;
+  if (!target) { appendError('No image selected. Generate or upload an image first, then set it as edit target.'); return; }
+  if (!wavespeedKey) { appendError('WaveSpeed API key required for upscaling.'); return; }
+  const btn = document.getElementById('upscale-btn');
+  btn.disabled = true; btn.textContent = '…';
+  await upscaleImage(target);
+  btn.disabled = false; btn.textContent = '⬆ Upscale';
+});
+
 // Update cost estimate when any selector changes
 ['vid-engine-select','vid-duration-select','vid-res-select',
- 'img-model-select','img-res-select','img-ratio-select','edit-model-select'].forEach(id => {
+ 'img-model-select','img-res-select','img-ratio-select','edit-model-select','upscale-model-select'].forEach(id => {
   document.getElementById(id)?.addEventListener('change', updateCostEstimate);
 });
 
@@ -1733,6 +1885,78 @@ async function editImage(prompt, imageUrl) {
   } catch(e) {
     removeTyping(typingId);
     addMessageToThread({ role: 'assistant', type: 'error', content: e.message });
+    appendError(e.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// IMAGE UPSCALING
+// ═══════════════════════════════════════════════════════
+async function upscaleImage(imageUrl) {
+  const typingId = appendTyping();
+  const modelChoice = document.getElementById('upscale-model-select')?.value || 'standard';
+  const resChoice = document.getElementById('upscale-res-select')?.value || '4k';
+
+  const modelPaths = {
+    standard: 'wavespeed-ai/image-upscaler',
+    precision: 'clarity-ai/pro-upscaler',
+    premium: 'wavespeed-ai/ultimate-image-upscaler'
+  };
+  const modelPath = modelPaths[modelChoice];
+
+  let body;
+  if (modelChoice === 'precision') {
+    body = { image: imageUrl, target_megapixels: parseInt(resChoice), enable_safety_checker: false };
+  } else {
+    body = { image: imageUrl, target_resolution: resChoice, creativity: 0, output_format: 'png', enable_safety_checker: false };
+  }
+
+  try {
+    const submitRes = await fetch(`https://api.wavespeed.ai/api/v3/${modelPath}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wavespeedKey}` },
+      body: JSON.stringify(body)
+    });
+
+    if (!submitRes.ok) {
+      const e = await submitRes.json().catch(()=>({}));
+      throw new Error(`Upscale error ${submitRes.status}: ${e.message || JSON.stringify(e)}`);
+    }
+
+    const submitData = await submitRes.json();
+    const taskId = submitData.data?.id || submitData.id;
+    if (!taskId) throw new Error('No task ID from upscaler');
+
+    // Poll
+    let resultUrl = null;
+    let elapsed = 0;
+    while (elapsed < 120000) {
+      await new Promise(r => setTimeout(r, 2000));
+      elapsed += 2000;
+      const pollRes = await fetch(`https://api.wavespeed.ai/api/v3/predictions/${taskId}/result`, {
+        headers: { 'Authorization': `Bearer ${wavespeedKey}` }
+      });
+      if (!pollRes.ok) continue;
+      const pollData = await pollRes.json();
+      const status = pollData.data?.status || pollData.status;
+      if (status === 'completed') { resultUrl = pollData.data?.outputs?.[0] || pollData.outputs?.[0]; break; }
+      if (status === 'failed') throw new Error(pollData.data?.error || 'Upscale failed');
+    }
+
+    removeTyping(typingId);
+    if (!resultUrl) throw new Error('Upscale timed out');
+
+    const modelLabels = { standard: 'Upscaled (Standard)', precision: 'Upscaled (Precision)', premium: 'Upscaled (Premium)' };
+    const label = modelLabels[modelChoice];
+
+    lastImageUrl = resultUrl;
+    activeEditTarget = resultUrl;
+    showEditButton();
+    addMessageToThread({ role: 'assistant', type: 'image', src: resultUrl, hostedUrl: resultUrl, alt: `Upscaled ${resChoice}`, modelLabel: label });
+    renderImage(resultUrl, `Upscaled ${resChoice}`, true, resultUrl, label);
+
+  } catch(e) {
+    removeTyping(typingId);
     appendError(e.message);
   }
 }
@@ -2481,6 +2705,32 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
     });
   }
 
+  // Set as edit target button
+  const setTargetBtn = document.createElement('button');
+  setTargetBtn.className = 'set-target-btn';
+  setTargetBtn.textContent = '🎯 Edit Target';
+  // Mark if already the current target
+  if ((hostedUrl || src) === (activeEditTarget || lastImageUrl)) {
+    setTargetBtn.classList.add('is-target');
+    setTargetBtn.textContent = '🎯 Target Set';
+  }
+  setTargetBtn.addEventListener('click', () => {
+    // Clear all other target buttons
+    document.querySelectorAll('.set-target-btn').forEach(b => {
+      b.classList.remove('is-target');
+      b.textContent = '🎯 Edit Target';
+    });
+    document.querySelectorAll('.img-wrapper.edit-target').forEach(w => w.classList.remove('edit-target'));
+    // Set this one
+    wrapper.classList.add('edit-target');
+    lastImageUrl = hostedUrl || src;
+    activeEditTarget = hostedUrl || src;
+    setTargetBtn.classList.add('is-target');
+    setTargetBtn.textContent = '🎯 Target Set';
+    showEditButton();
+    if (!editMode && !enhanceMode) setEditMode(true);
+  });
+
   // Retry button
   const retryImgBtn = document.createElement('button');
   retryImgBtn.className = 'retry-btn';
@@ -2501,6 +2751,7 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
 
   btnBar.appendChild(saveBtn);
   btnBar.appendChild(copyPromptBtn);
+  btnBar.appendChild(setTargetBtn);
   btnBar.appendChild(retryImgBtn);
   btnBar.appendChild(animBtn);
 
@@ -2740,9 +2991,16 @@ function updateCostEstimate() {
     el.textContent = cost;
     modeText.textContent = 'Image mode';
 
+  } else if (enhanceMode) {
+    const upModel = document.getElementById('upscale-model-select')?.value || 'standard';
+    const costs = { standard: '$0.01+', precision: '$0.03+', premium: '$0.06+' };
+    el.textContent = `Clean $0.02 / Up ${costs[upModel]}`;
+    modeText.textContent = 'Enhance mode';
+    el.style.display = 'inline-block';
   } else {
     el.textContent = '';
     modeText.textContent = 'Chat mode';
+    el.style.display = 'none';
   }
 }
 
