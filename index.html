@@ -843,10 +843,15 @@
 
     <div id="input-area">
       <div id="mode-indicator"><span id="mode-label-text">Chat mode</span><span id="cost-estimate"></span></div>
-      <div id="upload-edit-row" style="display:flex;gap:6px;margin-bottom:6px;padding:0 4px;">
+      <div id="upload-edit-row" style="display:flex;gap:6px;margin-bottom:6px;padding:0 4px;flex-wrap:wrap;align-items:center;">
         <button id="upload-img-btn" class="edit-img-btn visible" title="Upload an image to edit or animate">🖼 Upload Image</button>
-        <div id="edit-btn-row" style="display:none;">
-          <button id="edit-img-btn" class="edit-img-btn visible" title="Edit last image">✏️ Edit Last Image</button>
+        <div id="edit-btn-row" style="display:none;display:flex;gap:6px;align-items:center;">
+          <button id="edit-img-btn" class="edit-img-btn visible" title="Edit last image">✏️ Edit</button>
+          <select id="edit-model-select" class="img-control-select" title="Edit model">
+            <option value="aurora">Aurora — ~$0.04</option>
+            <option value="wan27" selected>Wan 2.7 — $0.03</option>
+            <option value="wan27pro">Wan 2.7 Pro — $0.06</option>
+          </select>
         </div>
       </div>
       <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/webp" style="display:none;" />
@@ -1426,7 +1431,7 @@ document.getElementById('vid-toggle').addEventListener('click', () => {
 
 // Update cost estimate when any selector changes
 ['vid-engine-select','vid-duration-select','vid-res-select',
- 'img-model-select','img-res-select','img-ratio-select'].forEach(id => {
+ 'img-model-select','img-res-select','img-ratio-select','edit-model-select'].forEach(id => {
   document.getElementById(id)?.addEventListener('change', updateCostEstimate);
 });
 
@@ -1483,50 +1488,81 @@ async function handleSend() {
 // ═══════════════════════════════════════════════════════
 async function editImage(prompt, imageUrl) {
   const typingId = appendTyping();
-  const imgModel = document.getElementById('img-model-select').value;
-  const aspectRatio = document.getElementById('img-ratio-select').value;
-  const resolution = document.getElementById('img-res-select').value;
-
-  // Use the edit variant of whatever model is selected
-  const editModel = imgModel === 'grok-imagine-image'
-    ? 'grok-imagine-image/edit'
-    : 'grok-imagine-image-quality/edit';
-
-  const fullPrompt = prompt;
+  const editModel = document.getElementById('edit-model-select')?.value || 'wan27';
 
   try {
-    const body = {
-      model: imgModel === 'grok-imagine-image' ? 'grok-imagine-image' : 'grok-imagine-image-quality',
-      prompt: fullPrompt,
-      image: { url: imageUrl, type: 'image_url' },
-      response_format: 'url'
-      // Note: aspect_ratio ignored for single-image edits per xAI docs
-    };
+    let src, hostedUrl, modelLabel;
 
-    const res = await fetch('https://api.x.ai/v1/images/edits', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify(body)
-    });
+    if (editModel === 'aurora') {
+      // ── Aurora edit via xAI ──
+      const imgModel = document.getElementById('img-model-select').value;
+      const body = {
+        model: imgModel === 'grok-imagine-image' ? 'grok-imagine-image' : 'grok-imagine-image-quality',
+        prompt,
+        image: { url: imageUrl, type: 'image_url' },
+        response_format: 'url'
+      };
+      const res = await fetch('https://api.x.ai/v1/images/edits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify(body)
+      });
+      removeTyping(typingId);
+      if (!res.ok) {
+        const e = await res.json().catch(()=>({}));
+        throw new Error(`Aurora edit error ${res.status}: ${e.error?.message || JSON.stringify(e)}`);
+      }
+      const data = await res.json();
+      const url = data.data?.[0]?.url;
+      if (!url) throw new Error('No image returned from Aurora edit');
+      src = url; hostedUrl = url; modelLabel = 'Aurora Edit';
 
-    removeTyping(typingId);
+    } else {
+      // ── Wan 2.7 edit via WaveSpeed ──
+      if (!wavespeedKey) throw new Error('WaveSpeed API key required for Wan edit. Tap "Set API Key" to add it.');
+      const modelPath = editModel === 'wan27pro'
+        ? 'alibaba/wan-2.7/image-edit-pro'
+        : 'alibaba/wan-2.7/image-edit';
 
-    if (!res.ok) {
-      const errData = await res.json().catch(()=>({}));
-      const errMsg = errData.error?.message || errData.error || errData.message || JSON.stringify(errData);
-      throw new Error(`Edit error ${res.status}: ${errMsg}`);
+      const submitRes = await fetch(`https://api.wavespeed.ai/api/v3/${modelPath}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${wavespeedKey}` },
+        body: JSON.stringify({ prompt, images: [imageUrl], seed: -1, enable_safety_checker: false })
+      });
+      if (!submitRes.ok) {
+        const e = await submitRes.json().catch(()=>({}));
+        throw new Error(`Wan edit error ${submitRes.status}: ${e.message || JSON.stringify(e)}`);
+      }
+      const submitData = await submitRes.json();
+      const taskId = submitData.data?.id || submitData.id;
+      if (!taskId) throw new Error('No task ID from WaveSpeed');
+
+      // Poll
+      let resultUrl = null;
+      let elapsed = 0;
+      while (elapsed < 120000) {
+        await new Promise(r => setTimeout(r, 3000));
+        elapsed += 3000;
+        const pollRes = await fetch(`https://api.wavespeed.ai/api/v3/predictions/${taskId}/result`, {
+          headers: { 'Authorization': `Bearer ${wavespeedKey}` }
+        });
+        if (!pollRes.ok) continue;
+        const pollData = await pollRes.json();
+        const status = pollData.data?.status || pollData.status;
+        if (status === 'completed') { resultUrl = pollData.data?.outputs?.[0] || pollData.outputs?.[0]; break; }
+        if (status === 'failed') throw new Error(pollData.data?.error || 'Wan edit failed');
+      }
+
+      removeTyping(typingId);
+      if (!resultUrl) throw new Error('Wan edit timed out');
+      src = resultUrl; hostedUrl = resultUrl;
+      modelLabel = editModel === 'wan27pro' ? 'Wan 2.7 Pro Edit' : 'Wan 2.7 Edit';
     }
 
-    const data = await res.json();
-    const newUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json;
-    if (!newUrl) throw new Error('No image returned from edit');
-
-    const src = newUrl.startsWith('data:') ? newUrl : newUrl;
-    const hostedUrl = newUrl.startsWith('http') ? newUrl : null;
-
     lastImageUrl = hostedUrl || src;
-    addMessageToThread({ role: 'assistant', type: 'image', src, hostedUrl, alt: prompt });
-    renderImage(src, prompt, true, hostedUrl);
+    showEditButton();
+    addMessageToThread({ role: 'assistant', type: 'image', src, hostedUrl, alt: prompt, modelLabel });
+    renderImage(src, prompt, true, hostedUrl, modelLabel);
 
   } catch(e) {
     removeTyping(typingId);
@@ -2392,7 +2428,9 @@ function updateCostEstimate() {
 
   } else if (editMode) {
     // Edit = input image + output image at xAI pricing
-    el.textContent = '~$0.04+';
+    const editMod = document.getElementById('edit-model-select')?.value || 'wan27';
+    const editCost = editMod === 'aurora' ? '~$0.04' : editMod === 'wan27pro' ? '$0.06' : '$0.03';
+    el.textContent = editCost;
     modeText.textContent = 'Edit image mode';
 
   } else if (imageMode) {
