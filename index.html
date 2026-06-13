@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.14" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.15" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.14</title>
+  <title>Zaor Studio 0.15</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1041,7 +1041,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.14</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.15</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1922,7 +1922,7 @@ async function editImage(prompt, imageUrl, skipStyleLock = false, modelOverride 
         wan27pro:    { path: 'alibaba/wan-2.7/image-edit-pro',          body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
         wan27:       { path: 'alibaba/wan-2.7/image-edit',              body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
         fluxkontext: { path: 'wavespeed-ai/flux-kontext-dev-ultra-fast', body: { prompt: fullPrompt, image: imageUrl, seed: -1, enable_safety_checker: false } },
-        qwen2:       { path: 'wavespeed-ai/qwen-image-2.0/edit',        body: { prompt: fullPrompt, image: imageUrl, seed: -1, enable_safety_checker: false } },
+        qwen2:       { path: 'wavespeed-ai/qwen-image-2.0/edit',        body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
         qwen:        { path: 'wavespeed-ai/qwen-image/edit',            body: { prompt: fullPrompt, image: imageUrl, seed: -1, enable_safety_checker: false }, timeout: 180000 },
       };
       const wsModel = wsModels[editModel] || wsModels.qwen;
