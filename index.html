@@ -2687,7 +2687,8 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   const applyStyleBtn = document.createElement('button');
   applyStyleBtn.className = 'animate-btn';
   applyStyleBtn.innerHTML = '🔒 Apply Style';
-  applyStyleBtn.style.display = (styleLockActive && lockedStyle.trim()) ? 'inline-flex' : 'none';
+  // Always show Apply Style button — hide/show dynamically based on lock state
+  applyStyleBtn.style.display = 'inline-flex';
 
   const stylePanelOuter = document.createElement('div');
   stylePanelOuter.className = 'animate-panel-outer';
@@ -2898,6 +2899,13 @@ function updateStyleBadge() {
     if (btn) { btn.textContent = '🔒 Lock Style'; btn.classList.remove('lock-active'); }
     if (input && lockedStyle) input.value = lockedStyle;
   }
+  // Update Apply Style button label on all rendered images
+  document.querySelectorAll('.animate-btn').forEach(b => {
+    if (b.innerHTML === '🔒 Apply Style' || b.textContent === '🔒 Apply Style') {
+      b.style.opacity = (styleLockActive && lockedStyle.trim()) ? '1' : '0.35';
+      b.title = (styleLockActive && lockedStyle.trim()) ? 'Apply active style lock' : 'No style lock active — lock a style first';
+    }
+  });
 }
 
 document.getElementById('style-lock-set-btn')?.addEventListener('click', () => {
