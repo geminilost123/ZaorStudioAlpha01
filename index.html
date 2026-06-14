@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.25" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.26" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.25</title>
+  <title>Zaor Studio 0.26</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1041,7 +1041,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.25</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.26</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1486,9 +1486,9 @@ const MODEL_REGISTRY = {
   'atlas-wan22-turbo': { cat:'i2v', label:'Wan 2.2 Turbo Spicy (Atlas)', provider:'atlas', path:'atlascloud/wan-2.2-turbo-spicy/image-to-video', pricePerS:0.02, verified:true,
     durations:[5,8], resolutions:['480p','720p','1080p'],
     buildBody:p=>({ model:'atlascloud/wan-2.2-turbo-spicy/image-to-video', image:p.image, prompt:p.prompt, duration:Math.min(p.duration||5,8), resolution:p.resolution||'720p' }) },
-  'atlas-seedance-fast':{ cat:'i2v', label:'Seedance 1.5 Pro Fast (Atlas)', provider:'atlas', path:'atlascloud/seedance-v1.5-pro-fast/image-to-video', pricePerS:0.018, verified:true,
-    durations:[4,5,6,8,10,12], resolutions:['720p','1080p'],
-    buildBody:p=>({ model:'atlascloud/seedance-v1.5-pro-fast/image-to-video', image:p.image, prompt:p.prompt, duration:Math.min(p.duration||5,12), resolution:p.resolution||'720p' }) },
+  'atlas-seedance-fast':{ cat:'i2v', label:'Seedance 1.5 Pro (Atlas)', provider:'atlas', path:'bytedance/seedance-v1.5-pro/image-to-video', pricePerS:0.049, verified:true,
+    durations:[4,5,6,8,10,12], resolutions:['480p','720p','1080p'],
+    buildBody:p=>({ model:'bytedance/seedance-v1.5-pro/image-to-video', image:p.image, prompt:p.prompt, duration:Math.min(p.duration||5,12), resolution:p.resolution||'720p' }) },
 
   // ─────────── VIDEO EXTEND ───────────
   'aurora-extend':      { cat:'extend', label:'Aurora Extend',       provider:'wavespeed', path:'x-ai/grok-imagine-video/video-extend', price:0.35, verified:true,
@@ -1570,8 +1570,11 @@ async function callModel(modelId, params){
       const pd = await pr.json();
       const st = pd.data?.status || pd.status;
       if(st==='completed'||st==='succeeded'){
-        const out = pd.data?.outputs?.[0] || pd.outputs?.[0] || pd.data?.output || pd.output;
-        if(!out) throw new Error('Atlas completed but no output: '+JSON.stringify(pd).slice(0,200));
+        const raw = pd.data?.outputs?.[0] || pd.outputs?.[0] || pd.data?.output || pd.output;
+        let out = null;
+        if (typeof raw === 'string') out = raw;
+        else if (raw && typeof raw === 'object') out = raw.url || raw.video_url || raw.image_url || raw.video?.url || null;
+        if(!out) throw new Error('Atlas completed but no usable URL: '+JSON.stringify(pd).slice(0,300));
         return out;
       }
       if(st==='failed') throw new Error('Atlas generation failed: '+(pd.data?.error||pd.error||'unknown'));
