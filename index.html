@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.17" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.19" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.17</title>
+  <title>Zaor Studio 0.19</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1041,7 +1041,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.17</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.19</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1075,6 +1075,10 @@
             <option value="qwen">Qwen Edit</option>
             <option value="wan27">Wan 2.7 Edit</option>
             <option value="fluxkontext">Flux Kontext Edit</option>
+          </optgroup>
+          <optgroup label="── Text-to-Video ──">
+            <option value="seedance15t2v">Seedance 1.5 T2V</option>
+            <option value="wan26t2v">Wan 2.6 T2V</option>
           </optgroup>
           <optgroup label="── Animate (I2V) ──">
             <option value="aurora_i2v">Aurora I2V</option>
@@ -1156,8 +1160,8 @@
           <div class="img-control-group">
             <span class="mode-label">Model</span>
             <select id="img-model-select" class="img-control-select">
-              <option value="grok-imagine-image" selected>Aurora Simple — $0.005</option>
-              <option value="grok-imagine-image-quality">Aurora Mega — $0.022</option>
+              <option value="grok-imagine-image" selected>Aurora Simple — $0.022</option>
+              <option value="grok-imagine-image-quality">Aurora Quality — $0.05</option>
             </select>
           </div>
           <div class="img-control-group">
@@ -1198,9 +1202,10 @@
             <span class="mode-label">Engine</span>
             <select id="vid-engine-select" class="img-control-select">
               <option value="aurora" selected>Aurora — $0.05/s</option>
+              <option value="seedance15t2v">Seedance 1.5 T2V — ~$0.05/run</option>
               <option value="wan26t2v">Wan 2.6 — ~$0.34/5s</option>
-              <option value="wan22spicy">Wan 2.2 Spicy — $0.15/run</option>
-              <option value="wan26spicy">Wan 2.7 Spicy — $0.50/run</option>
+              <option value="wan22spicy">Wan 2.2 Spicy I2V — $0.15/run</option>
+              <option value="wan26spicy">Wan 2.7 Spicy I2V — $0.50/run</option>
             </select>
           </div>
           <div class="img-control-group">
@@ -2131,7 +2136,7 @@ async function generateImage(prompt) {
       ? 'x-ai/grok-imagine-image/text-to-image'
       : 'x-ai/grok-imagine-image-quality/text-to-image';
     const fallbackPath = 'x-ai/grok-imagine-image-quality/text-to-image';
-    const body = { prompt: fullPrompt, size: ratioToSize(aspectRatio, resolution), enable_safety_checker: false };
+    const body = { prompt: fullPrompt, aspect_ratio: aspectRatio, resolution: (resolution || '1K').toLowerCase(), enable_safety_checker: false };
     const usedModel = imgModel === 'grok-imagine-image' ? 'Aurora Simple' : 'Aurora Mega';
 
     removeTyping(typingId);
@@ -2217,7 +2222,7 @@ async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progres
     const xaiSubmit = await fetch('https://api.x.ai/v1/videos/generations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: 'grok-imagine-video-t2v', prompt, duration: Math.min(duration, 10), aspect_ratio: ratio, resolution: res })
+      body: JSON.stringify({ model: 'grok-imagine-video', prompt, duration: Math.min(duration, 10), aspect_ratio: ratio, resolution: res })
     });
     if (!xaiSubmit.ok) {
       const e = await xaiSubmit.json().catch(()=>({}));
@@ -2279,13 +2284,17 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
       modelPath = 'wavespeed-ai/wan-2.2-spicy/image-to-video';
       body = { prompt, image: imageDataUrl, resolution: res, duration: Math.min(duration, 5), aspect_ratio: ratio, seed: -1 };
     }
+  } else if (engine === 'seedance15t2v') {
+    // Seedance 1.5 Pro T2V
+    modelPath = 'bytedance/seedance-v1.5-pro/text-to-video';
+    body = { prompt, resolution: res, aspect_ratio: ratio, duration: Math.min(duration, 12), generate_audio: false, seed: -1 };
   } else if (engine === 'wan26t2v') {
-    // Text-to-video
+    // Wan 2.6 T2V
     modelPath = 'alibaba/wan-2.6/text-to-video';
     body = { prompt, resolution: res, duration: Math.min(duration, 15), aspect_ratio: ratio, seed: -1, enable_prompt_expansion: false };
   } else {
-    // Spicy models are I2V only — prompt user to use Animate instead
-    throw new Error('Wan Spicy models require an image. Use the Animate button on a generated image, or switch to Wan 2.6 for text-to-video.');
+    // Wan Spicy I2V only — prompt user to use Animate instead
+    throw new Error('Wan Spicy I2V models require an image. Use the ▶ Animate button on a generated image.');
   }
 
   const submitRes = await fetch(`https://api.wavespeed.ai/api/v3/${modelPath}`, {
@@ -2315,7 +2324,7 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   );
 
   if (videoUrl) {
-    const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', seedance15spicy: 'Seedance 1.5 Spicy', aurora: 'Aurora', 'aurora_extend': 'Aurora Extend' };
+    const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', seedance15spicy: 'Seedance 1.5 Spicy', seedance15t2v: 'Seedance 1.5 T2V', aurora: 'Aurora', 'aurora_extend': 'Aurora Extend' };
     const vidLabel = engineLabels[engine] || engine;
     addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: vidLabel, storedDuration: duration, storedRes: res });
     renderVideo(videoUrl, prompt, true, vidLabel, duration, res);
@@ -2536,7 +2545,7 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
     const engineKeyMap = {
       'aurora t2v': 'aurora', 'aurora': 'aurora',
       'wan 2.2 spicy': 'wan22spicy', 'wan 2.7 spicy': 'wan26spicy',
-      'wan 2.6': 'wan26t2v', 'seedance 1.5 spicy': 'seedance15spicy'
+      'wan 2.6': 'wan26t2v', 'seedance 1.5 spicy': 'seedance15spicy', 'seedance 1.5 t2v': 'seedance15t2v'
     };
     const labelKey = engineLabel.toLowerCase().replace(' video','').trim();
     const engineKey = engineKeyMap[labelKey] || 'aurora';
@@ -3171,6 +3180,7 @@ const MODEL_CONSTRAINTS = {
   // defaultDur and defaultRes = cheapest option
   aurora:     { durations: [4,6,8,10,15], resolutions: ['480p','720p'], hasRatio: true,  maxDur: 15, defaultDur: 4,  defaultRes: '480p' },
   aurora_i2v: { durations: [4,6,8,10],    resolutions: ['480p','720p'], hasRatio: false, maxDur: 10, defaultDur: 4,  defaultRes: '480p' },
+  seedance15t2v: { durations: [4,5,6,8,10,12], resolutions: ['720p','1080p'], hasRatio: true, maxDur: 12, defaultDur: 4, defaultRes: '720p' },
   wan26t2v:   { durations: [5,8,10,15],   resolutions: ['720p','1080p'], hasRatio: true,  maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
   wan22spicy: { durations: [5,8],          resolutions: ['480p','720p'], hasRatio: false, maxDur: 8,  defaultDur: 5,  defaultRes: '480p' },
   wan26spicy:     { durations: [5,10,15],      resolutions: ['720p','1080p'], hasRatio: false, maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
@@ -3278,6 +3288,7 @@ function updateCostEstimate() {
     if (engine === 'aurora') cost = `~$${(duration * 0.07).toFixed(2)}`;
     else if (engine === 'wan26t2v') cost = `~$${(duration * 0.068).toFixed(2)}`;
     else if (engine === 'seedance15spicy') cost = '~$0.05';
+    else if (engine === 'seedance15t2v') cost = '~$0.05';
     else if (engine === 'wan27extend') cost = 'TBC';
     else if (engine === 'wan22spicy') cost = '$0.15';
     else if (engine === 'wan26spicy') cost = '$0.50';
@@ -3334,6 +3345,7 @@ const PE_SYSTEM_PROMPTS = {
 
   // ── Animate / Image-to-Video ──
   aurora_i2v: "You are an expert motion prompt engineer for Aurora Image-to-Video. The user will describe what they want to happen in a video starting from a still image. Respond with ONLY a single motion prompt. Describe camera movement, subject motion, mood, and pacing. Aurora responds well to cinematic language: 'slow push in', 'gentle parallax', 'subject turns to camera'. No explanation, no preamble. Keep it under 80 words.",
+  seedance15t2v: "You are an expert text-to-video prompt engineer for Seedance 1.5 Pro T2V. Seedance produces cinematic, live-action-leaning clips with strong prompt adherence and expressive motion. Respond with ONLY a single generation prompt describing subject, action, environment, lighting, and mood. Use vivid physical language. Keep it under 100 words. No explanation, no preamble.",
   seedance_i2v: "You are an expert motion prompt engineer for Seedance 1.5 Spicy Image-to-Video. Seedance produces expressive, bold motion with cinematic realism. Respond with ONLY a single motion prompt describing the action, camera behavior, emotional tone, and visual style. Use vivid, physical language. Seedance handles complex motion well. No explanation, no preamble. Keep it under 100 words.",
   wan22spicy_i2v: "You are an expert motion prompt engineer for Wan 2.2 Spicy Image-to-Video. Wan 2.2 responds best to clear, direct motion descriptions. Respond with ONLY a single motion prompt. Be explicit about what moves, how it moves, and the camera behavior. Avoid overly complex multi-action descriptions — pick one clear motion. No explanation, no preamble. Keep it under 60 words.",
   wan27spicy_i2v: "You are an expert motion prompt engineer for Wan 2.7 Spicy Image-to-Video. Wan 2.7 supports longer clips and multi-shot dynamics. Respond with ONLY a single motion prompt describing the full scene arc: opening motion, development, and resolution. Include camera work and subject movement. No explanation, no preamble. Keep it under 100 words.",
