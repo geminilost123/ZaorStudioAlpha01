@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.23" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.24" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.23</title>
+  <title>Zaor Studio 0.24</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1041,7 +1041,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.23</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.24</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1287,6 +1287,8 @@
     <input type="password" id="key-input" placeholder="xai-…" autocomplete="off" spellcheck="false" />
     <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">WaveSpeed Key (Wan image + video)</label>
     <input type="password" id="wavespeed-key-input" placeholder="ws-…" autocomplete="off" spellcheck="false" />
+    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Atlas Cloud Key (cheap video — optional)</label>
+    <input type="password" id="atlas-key-input" placeholder="atlas-…" autocomplete="off" spellcheck="false" />
     <div class="modal-btns">
       <button class="btn-secondary" id="modal-cancel">Cancel</button>
       <button class="btn-primary" id="modal-save">Save</button>
@@ -1558,6 +1560,11 @@ async function callModel(modelId, params){
     let elapsed=0;
     while(elapsed<300000){
       await new Promise(r=>setTimeout(r,3000)); elapsed+=3000;
+      if(params.isCancelled && params.isCancelled()) throw new Error('Cancelled');
+      if(params.progressId){
+        const mins=Math.floor(elapsed/60000), secs=Math.floor((elapsed%60000)/1000);
+        try { updateVideoProgress(params.progressId, `Generating (Atlas)… (${mins>0?mins+'m ':''}${secs}s)`); } catch(e){}
+      }
       const pr = await fetch(`https://api.atlascloud.ai/api/v1/model/prediction/${pid}`, { headers:{ 'Authorization':`Bearer ${atlasKey}` } });
       if(!pr.ok) continue;
       const pd = await pr.json();
@@ -2386,6 +2393,31 @@ async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUr
 
   // Determine engine — from override (animate/extend buttons) or UI selector
   const engine = engineOverride || document.getElementById('vid-engine-select')?.value || 'aurora';
+
+  // Atlas Cloud engines route through the universal dispatcher (cheaper video)
+  if (MODEL_REGISTRY[engine] && MODEL_REGISTRY[engine].provider === 'atlas') {
+    try {
+      const m = MODEL_REGISTRY[engine];
+      const _d = durationOverride != null ? parseInt(durationOverride) : parseInt(document.getElementById('vid-duration-select')?.value || '5');
+      const dur = (!isNaN(_d) && _d > 0) ? _d : 5;
+      const res = resOverride || document.getElementById('vid-res-select')?.value || '720p';
+      const ratio = document.getElementById('vid-ratio-select')?.value || '16:9';
+      const url = await callModel(engine, { prompt, image: imageDataUrl, video: extendVideoUrl, duration: dur, resolution: res, aspectRatio: ratio, progressId, isCancelled: () => cancelled });
+      removeVideoProgress(progressId);
+      if (url && !cancelled) {
+        addMessageToThread({ role: 'assistant', type: 'video', src: url, alt: prompt, engineLabel: m.label, storedDuration: dur, storedRes: res });
+        renderVideo(url, prompt, true, m.label, dur, res);
+      }
+    } catch(e) {
+      removeVideoProgress(progressId);
+      if (e.message !== 'Cancelled') {
+        addMessageToThread({ role: 'assistant', type: 'error', content: e.message });
+        appendError(e.message);
+      }
+    }
+    return;
+  }
+
   // Aurora always uses xAI directly; Wan models use WaveSpeed
   const useWaveSpeed = engine !== 'aurora' && engine !== 'aurora_extend';
 
@@ -2828,6 +2860,8 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
       <option value="seedance15spicy">Seedance 1.5 Spicy — ~$0.05/run</option>
       <option value="wan22spicy">Wan 2.2 Spicy — $0.15/run</option>
       <option value="wan26spicy">Wan 2.7 Spicy — $0.50/run</option>
+      <option value="atlas-wan22-turbo">Wan 2.2 Turbo (Atlas) — $0.01/s ⚡</option>
+      <option value="atlas-seedance-fast">Seedance Pro Fast (Atlas) — $0.018/s ⚡</option>
     `;
   }
 
@@ -3283,6 +3317,7 @@ function openModal(type) {
   if (type === 'api') {
     keyInput.value = apiKey;
     document.getElementById('wavespeed-key-input').value = wavespeedKey;
+    document.getElementById('atlas-key-input').value = atlasKey;
     modalOverlay.classList.add('open');
     setTimeout(() => keyInput.focus(), 100);
   }
@@ -3300,6 +3335,11 @@ document.getElementById('modal-save').addEventListener('click', () => {
   if (wsVal) {
     wavespeedKey = wsVal;
     localStorage.setItem('ws_key', wsVal);
+  }
+  const atlasVal = document.getElementById('atlas-key-input').value.trim();
+  if (atlasVal) {
+    atlasKey = atlasVal;
+    localStorage.setItem('atlas_key', atlasVal);
   }
   // Clear clipboard so keys don't linger
   try { navigator.clipboard.writeText(' ').catch(()=>{}); } catch(e) {}
@@ -3411,7 +3451,14 @@ function applyModelConstraints(engine, durEl, resEl, ratioEl, isExtend, useDefau
   } else {
     key = (isI2V && engine === 'aurora') ? 'aurora_i2v' : engine;
   }
-  const c = MODEL_CONSTRAINTS[key] || MODEL_CONSTRAINTS['aurora'];
+  let c = MODEL_CONSTRAINTS[key];
+  // Registry fallback — Atlas (and other registry-only) engines build constraints from their entry
+  if (!c && MODEL_REGISTRY[engine] && MODEL_REGISTRY[engine].durations) {
+    const rm = MODEL_REGISTRY[engine];
+    const rs = rm.resolutions || ['720p'];
+    c = { durations: rm.durations, resolutions: rs, hasRatio: false, maxDur: Math.max.apply(null, rm.durations), defaultDur: rm.durations[0], defaultRes: rs[0] };
+  }
+  c = c || MODEL_CONSTRAINTS['aurora'];
 
   if (durEl) {
     const curDur = useDefaults ? c.defaultDur : parseInt(durEl.value);
