@@ -2142,13 +2142,25 @@ async function generateImage(prompt) {
     removeTyping(typingId);
 
     // Generate all images in parallel
+    const errors = [];
     const results = await Promise.all(
       Array.from({ length: count }, async () => {
-        let url = await callWaveSpeed(modelPath, body).catch(() => null);
-        if (!url && modelPath.includes('grok-imagine-image/')) {
-          url = await callWaveSpeed(fallbackPath, body).catch(() => null);
+        try {
+          let url = await callWaveSpeed(modelPath, body);
+          return url;
+        } catch(e) {
+          // Try fallback model if Simple fails
+          if (modelPath.includes('grok-imagine-image/text-to-image')) {
+            try {
+              return await callWaveSpeed(fallbackPath, body);
+            } catch(e2) {
+              errors.push(e2.message);
+              return null;
+            }
+          }
+          errors.push(e.message);
+          return null;
         }
-        return url;
       })
     );
 
@@ -2163,7 +2175,7 @@ async function generateImage(prompt) {
     });
 
     if (anySuccess) showEditButton();
-    else throw new Error('All image generations failed');
+    else throw new Error(errors[0] || 'All image generations failed');
 
   } catch(e) {
     removeTyping(typingId);
