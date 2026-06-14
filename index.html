@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.15" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.17" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.15</title>
+  <title>Zaor Studio 0.17</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1041,7 +1041,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.15</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.17</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1071,6 +1071,7 @@
           <optgroup label="── Image ──">
             <option value="aurora">Aurora / Flux</option>
             <option value="wan26t2v">Wan 2.6 T2I</option>
+            <option value="qwen2">Qwen 2.0 Edit</option>
             <option value="qwen">Qwen Edit</option>
             <option value="wan27">Wan 2.7 Edit</option>
             <option value="fluxkontext">Flux Kontext Edit</option>
@@ -1083,6 +1084,7 @@
           </optgroup>
           <optgroup label="── Video Extend ──">
             <option value="aurora_extend">Aurora Extend</option>
+            <option value="wan27extend">Wan 2.7 Extend</option>
             <option value="seedance_extend">Seedance Extend</option>
             <option value="wan22spicy_extend">Wan 2.2 Spicy Extend</option>
           </optgroup>
@@ -2237,7 +2239,7 @@ async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progres
 
   // Use callWaveSpeed for submit+poll — same pattern as all other WaveSpeed calls
   if (!wavespeedKey) throw new Error('WaveSpeed API key required for Aurora I2V. Tap "Set API Key" to add it.');
-  const videoUrl = await callWaveSpeed(modelPath, body);
+  const videoUrl = await callWaveSpeed(modelPath, body, 300000, 3000); // 5 min timeout for video
 
   if (videoUrl) {
     addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: 'Aurora', storedDuration: body.duration, storedRes: res });
@@ -2257,9 +2259,14 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   let modelPath, body;
 
   if (extendVideoUrl) {
-    // Wan 2.2 Spicy — dedicated extend endpoint
-    modelPath = 'wavespeed-ai/wan-2.2-spicy/video-extend';
-    body = { prompt, video: extendVideoUrl, resolution: res, duration: 5, seed: -1 }; // 5s fixed
+    if (engine === 'wan27extend') {
+      modelPath = 'alibaba/wan-2.7/video-extend';
+      body = { prompt, video: extendVideoUrl, resolution: res, duration: Math.min(duration, 15), seed: -1 };
+    } else {
+      // Wan 2.2 Spicy — dedicated extend endpoint
+      modelPath = 'wavespeed-ai/wan-2.2-spicy/video-extend';
+      body = { prompt, video: extendVideoUrl, resolution: res, duration: 5, seed: -1 }; // 5s fixed
+    }
   } else if (imageDataUrl) {
     // I2V
     if (engine === 'seedance15spicy') {
@@ -2595,6 +2602,7 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   if (isExtend) {
     engineSel.innerHTML = `
       <option value="aurora" selected>Aurora — $0.05/s</option>
+      <option value="wan27extend">Wan 2.7 Extend — price TBC</option>
       <option value="wan22spicy">Wan 2.2 Spicy — $0.15/run</option>
     `;
   } else {
@@ -3170,14 +3178,16 @@ const MODEL_CONSTRAINTS = {
   // extend variants
   aurora_extend:        { durations: [4,6,8,10],       resolutions: ['480p','720p'],        hasRatio: false, maxDur: 10, defaultDur: 4,  defaultRes: '480p' },
   wan22spicy_extend:    { durations: [5],               resolutions: ['480p','720p'],        hasRatio: false, maxDur: 5,  defaultDur: 5,  defaultRes: '480p' },
+  wan27extend:          { durations: [2,3,4,5,8,10,15],  resolutions: ['720p','1080p'],       hasRatio: false, maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
 };
 
 function applyModelConstraints(engine, durEl, resEl, ratioEl, isExtend, useDefaults = false, isI2V = false) {
   let key;
   if (isExtend) {
     const extendKeyMap = {
-      wan22spicy: 'wan22spicy_extend',
-      aurora:     'aurora_extend',
+      wan22spicy:  'wan22spicy_extend',
+      wan27extend: 'wan27extend',
+      aurora:      'aurora_extend',
     };
     key = extendKeyMap[engine] || 'aurora_extend';
   } else {
@@ -3268,6 +3278,7 @@ function updateCostEstimate() {
     if (engine === 'aurora') cost = `~$${(duration * 0.07).toFixed(2)}`;
     else if (engine === 'wan26t2v') cost = `~$${(duration * 0.068).toFixed(2)}`;
     else if (engine === 'seedance15spicy') cost = '~$0.05';
+    else if (engine === 'wan27extend') cost = 'TBC';
     else if (engine === 'wan22spicy') cost = '$0.15';
     else if (engine === 'wan26spicy') cost = '$0.50';
     el.textContent = cost;
@@ -3330,6 +3341,7 @@ const PE_SYSTEM_PROMPTS = {
   // ── Video Extend ──
   aurora_extend: "You are an expert continuation prompt engineer for Aurora Video Extend. The user has a video clip and wants to extend it. Respond with ONLY a single continuation prompt describing what happens next: how the scene continues, camera movement, and mood. Match the implied style of the original. Use phrases like 'continues into', 'camera pulls back to reveal', 'scene transitions to'. No explanation, no preamble. Keep it under 80 words.",
   seedance_extend: "You are an expert continuation prompt engineer for Seedance video extension via I2V. The model will use the last frame of a video as an image and generate a continuation clip. Respond with ONLY a single prompt describing the next scene: what action follows, the camera behavior, and the emotional arc. Write it as if describing a new shot that naturally follows from the current one. No explanation, no preamble. Keep it under 100 words.",
+  wan27extend: "You are an expert continuation prompt engineer for Wan 2.7 Video Extend. Wan 2.7 has strong prompt-following for video continuation. Respond with ONLY a single continuation prompt describing what happens next — motion, camera, atmosphere, and scene development. Be specific and directional. No explanation, no preamble. Keep it under 80 words.",
   wan22spicy_extend: "You are an expert continuation prompt engineer for Wan 2.2 Spicy Video Extend. Respond with ONLY a single short continuation prompt. Wan 2.2 extend works best with simple, clear continuation instructions. Describe what happens next in one or two clear actions. Keep it direct and under 50 words. No explanation, no preamble."
 };
 
