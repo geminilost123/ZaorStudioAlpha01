@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.22" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.23" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.22</title>
+  <title>Zaor Studio 0.23</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1041,7 +1041,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.22</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.23</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1429,10 +1429,10 @@ let atlasKey = localStorage.getItem('atlas_key') || '';
 // ═══════════════════════════════════════════════════════
 const MODEL_REGISTRY = {
   // ─────────── TEXT-TO-IMAGE ───────────
-  'aurora-simple':  { cat:'t2img', label:'Aurora Simple',  provider:'wavespeed', path:'x-ai/grok-imagine-image/text-to-image',          price:0.022, verified:true,
-    buildBody:p=>({ prompt:p.prompt, aspect_ratio:p.aspectRatio||'1:1', num_images:1, enable_safety_checker:false }) },
-  'aurora-quality': { cat:'t2img', label:'Aurora Quality', provider:'wavespeed', path:'x-ai/grok-imagine-image-quality/text-to-image',  price:0.05,  verified:true,
-    buildBody:p=>({ prompt:p.prompt, aspect_ratio:p.aspectRatio||'1:1', num_images:1, enable_safety_checker:false }) },
+  'aurora-simple':  { cat:'t2img', label:'Aurora Simple (xAI)',  provider:'xai-image', path:'grok-imagine-image',          price:0.02, verified:true,
+    buildBody:p=>({ model:'grok-imagine-image', prompt:p.prompt, n:1, response_format:'url', aspect_ratio:p.aspectRatio||'1:1' }) },
+  'aurora-quality': { cat:'t2img', label:'Aurora Quality (xAI)', provider:'xai-image', path:'grok-imagine-image-quality',  price:0.05, verified:true,
+    buildBody:p=>({ model:'grok-imagine-image-quality', prompt:p.prompt, n:1, response_format:'url', aspect_ratio:p.aspectRatio||'1:1' }) },
   'z-image-turbo':  { cat:'t2img', label:'Z-Image Turbo',  provider:'wavespeed', path:'wavespeed-ai/z-image-turbo/text-to-image',        price:0.01,  verified:false,
     buildBody:p=>({ prompt:p.prompt, aspect_ratio:p.aspectRatio||'1:1', enable_safety_checker:false }) },
 
@@ -1570,6 +1570,21 @@ async function callModel(modelId, params){
       if(st==='failed') throw new Error('Atlas generation failed: '+(pd.data?.error||pd.error||'unknown'));
     }
     throw new Error('Atlas request timed out');
+  }
+
+  // xAI direct image generation (draws from xAI balance, OpenAI-compatible)
+  if(m.provider==='xai-image'){
+    if(!apiKey) throw new Error('xAI API key required. Tap "Set API Key" to add it.');
+    const res = await fetch('https://api.x.ai/v1/images/generations', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${apiKey}` },
+      body: JSON.stringify(body)
+    });
+    if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(`xAI image error ${res.status}: ${e.error?.message || e.error || JSON.stringify(e).slice(0,200)}`); }
+    const d = await res.json();
+    const url = d.data?.[0]?.url || d.data?.[0]?.b64_json;
+    if(!url) throw new Error('xAI returned no image: '+JSON.stringify(d).slice(0,200));
+    return url;
   }
 
   // xAI direct providers are migrated during the video pass
