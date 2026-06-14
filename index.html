@@ -2447,10 +2447,13 @@ async function callWaveSpeed(modelPath, body, timeoutMs = 120000, intervalMs = 2
     const status = pollData.data?.status || pollData.status;
 
     if (status === 'completed') {
-      return pollData.data?.outputs?.[0] || pollData.outputs?.[0] || null;
+      const out = pollData.data?.outputs?.[0] || pollData.outputs?.[0];
+      if (!out) throw new Error(`WaveSpeed completed but no output found. Raw: ${JSON.stringify(pollData).slice(0,300)}`);
+      return out;
     }
     if (status === 'failed') {
-      throw new Error(pollData.data?.error || 'WaveSpeed generation failed');
+      const errMsg = pollData.data?.error || pollData.data?.message || JSON.stringify(pollData).slice(0,200);
+      throw new Error(`WaveSpeed generation failed: ${errMsg}`);
     }
   }
   throw new Error('WaveSpeed request timed out');
