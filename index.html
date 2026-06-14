@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.26" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.28" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.26</title>
+  <title>Zaor Studio 0.28</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1041,7 +1041,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.26</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.28</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1419,6 +1419,7 @@ let isLoading = false;
 let currentThreadId = null;
 let pendingDeleteId = null;
 let atlasKey = localStorage.getItem('atlas_key') || '';
+let lastAtlasRaw = ''; // captured raw Atlas response for on-screen debugging
 
 // ═══════════════════════════════════════════════════════
 // MODEL REGISTRY — single source of truth for every model.
@@ -1570,10 +1571,13 @@ async function callModel(modelId, params){
       const pd = await pr.json();
       const st = pd.data?.status || pd.status;
       if(st==='completed'||st==='succeeded'){
+        lastAtlasRaw = JSON.stringify(pd);
+        console.log('[Atlas raw]', lastAtlasRaw);
         const raw = pd.data?.outputs?.[0] || pd.outputs?.[0] || pd.data?.output || pd.output;
         let out = null;
         if (typeof raw === 'string') out = raw;
         else if (raw && typeof raw === 'object') out = raw.url || raw.video_url || raw.image_url || raw.video?.url || null;
+        console.log('[Atlas extracted url]', out, '| type of raw:', typeof raw);
         if(!out) throw new Error('Atlas completed but no usable URL: '+JSON.stringify(pd).slice(0,300));
         return out;
       }
@@ -2390,6 +2394,16 @@ async function generateImage(prompt) {
 // ═══════════════════════════════════════════════════════
 // VIDEO GENERATION
 // ═══════════════════════════════════════════════════════
+// Appends a copyable on-screen debug box (for diagnosing without a console)
+function showDebug(label, text) {
+  if (!messagesEl) return;
+  const div = document.createElement('div');
+  div.style.cssText = 'margin:8px 14px;padding:10px 12px;background:#2e2e48;border:1px solid #c9b8e8;border-radius:10px;font-size:11px;line-height:1.5;color:#c9b8e8;word-break:break-all;white-space:pre-wrap;user-select:all;-webkit-user-select:all;';
+  div.textContent = '🔧 ' + label + ':\n' + text;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
 async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUrl, durationOverride = null, resOverride = null) {
   let cancelled = false;
   const progressId = appendVideoProgress('Generating video…', () => { cancelled = true; });
@@ -2410,6 +2424,9 @@ async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUr
       if (url && !cancelled) {
         addMessageToThread({ role: 'assistant', type: 'video', src: url, alt: prompt, engineLabel: m.label, storedDuration: dur, storedRes: res });
         renderVideo(url, prompt, true, m.label, dur, res);
+        // On-screen diagnostics (copyable) — remove once Atlas playback is confirmed
+        showDebug('Extracted video URL', url || '(none)');
+        showDebug('Atlas raw response', lastAtlasRaw || '(none)');
       }
     } catch(e) {
       removeVideoProgress(progressId);
