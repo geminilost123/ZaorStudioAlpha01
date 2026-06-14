@@ -1,5 +1,7 @@
-// ── BUMP THIS VERSION every time you push a new index.html ──
-const CACHE_VERSION = 'zaor-studio-v2';
+// ── Service worker: network-first for the app shell ──
+// Deploys are picked up immediately. Cache is only an offline fallback.
+// Bump CACHE_VERSION on each deploy to purge old caches.
+const CACHE_VERSION = 'zaor-studio-v0-21';
 const CACHE = CACHE_VERSION;
 
 self.addEventListener('install', e => {
@@ -7,27 +9,40 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  // Delete all old caches on activation
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => clients.claim())
+    ).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', e => {
-  // Only cache same-origin requests (the app shell)
-  if (e.request.url.startsWith(self.location.origin)) {
+  // Let cross-origin requests (fonts, APIs) pass straight through
+  if (!e.request.url.startsWith(self.location.origin)) return;
+
+  const isShell =
+    e.request.mode === 'navigate' ||
+    e.request.destination === 'document' ||
+    e.request.url.endsWith('.html') ||
+    e.request.url.endsWith('/');
+
+  if (isShell) {
+    // NETWORK-FIRST: always try fresh, fall back to cache only when offline
     e.respondWith(
-      caches.open(CACHE).then(cache =>
-        cache.match(e.request).then(cached => {
-          // Always fetch fresh from network, update cache in background
-          const networkFetch = fetch(e.request).then(res => {
-            cache.put(e.request, res.clone());
-            return res;
-          });
-          // Return cached version immediately while fetching fresh
-          return cached || networkFetch;
+      fetch(e.request)
+        .then(res => {
+          caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+          return res;
+        })
+        .catch(() => caches.match(e.request))
+    );
+  } else {
+    // CACHE-FIRST for other same-origin assets (fast, rarely change)
+    e.respondWith(
+      caches.match(e.request).then(cached =>
+        cached || fetch(e.request).then(res => {
+          caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+          return res;
         })
       ).catch(() => fetch(e.request))
     );

@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.19" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.21" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.19</title>
+  <title>Zaor Studio 0.21</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1041,7 +1041,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.19</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.21</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1322,6 +1322,20 @@
 <script>
 
 // ═══════════════════════════════════════════════════════
+// ERROR SURFACING — turns the useless cross-origin "Script error"
+// into the real message + location in the console.
+// ═══════════════════════════════════════════════════════
+window.addEventListener('error', (e) => {
+  const where = (e.filename || '?') + ':' + (e.lineno || '?') + ':' + (e.colno || '?');
+  const detail = e.error ? (e.error.stack || e.error.message) : (e.message || 'unknown');
+  console.error('[Zaor error] ' + detail + '  @ ' + where);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const r = e.reason;
+  console.error('[Zaor async error] ' + (r && (r.stack || r.message) ? (r.stack || r.message) : JSON.stringify(r)));
+});
+
+// ═══════════════════════════════════════════════════════
 // PIN LOCK
 // ═══════════════════════════════════════════════════════
 const CORRECT_PIN = '2001';
@@ -1402,6 +1416,165 @@ let pePinnedLabel = '';   // display label for pinned item
 let isLoading = false;
 let currentThreadId = null;
 let pendingDeleteId = null;
+let atlasKey = localStorage.getItem('atlas_key') || '';
+
+// ═══════════════════════════════════════════════════════
+// MODEL REGISTRY — single source of truth for every model.
+// Add a model ONCE here; dropdowns, routing, costs, and
+// constraints all read from this. Ends the scattered-edit bugs.
+//   cat:      't2img'|'t2v'|'edit'|'img2img'|'i2v'|'extend'|'v2v'
+//   provider: 'wavespeed'|'xai-video'|'xai-image'|'atlas'
+//   verified: only verified:true models appear in dropdowns
+//   buildBody(params) → provider-specific request body
+// ═══════════════════════════════════════════════════════
+const MODEL_REGISTRY = {
+  // ─────────── TEXT-TO-IMAGE ───────────
+  'aurora-simple':  { cat:'t2img', label:'Aurora Simple',  provider:'wavespeed', path:'x-ai/grok-imagine-image/text-to-image',          price:0.022, verified:true,
+    buildBody:p=>({ prompt:p.prompt, aspect_ratio:p.aspectRatio||'1:1', num_images:1, enable_safety_checker:false }) },
+  'aurora-quality': { cat:'t2img', label:'Aurora Quality', provider:'wavespeed', path:'x-ai/grok-imagine-image-quality/text-to-image',  price:0.05,  verified:true,
+    buildBody:p=>({ prompt:p.prompt, aspect_ratio:p.aspectRatio||'1:1', num_images:1, enable_safety_checker:false }) },
+  'z-image-turbo':  { cat:'t2img', label:'Z-Image Turbo',  provider:'wavespeed', path:'wavespeed-ai/z-image-turbo/text-to-image',        price:0.01,  verified:false,
+    buildBody:p=>({ prompt:p.prompt, aspect_ratio:p.aspectRatio||'1:1', enable_safety_checker:false }) },
+
+  // ─────────── TEXT-TO-VIDEO ───────────
+  'aurora-t2v':      { cat:'t2v', label:'Aurora T2V',         provider:'xai-video', path:'grok-imagine-video',                      pricePerS:0.05, verified:true,
+    durations:[4,6,8,10], resolutions:['480p','720p'],
+    buildBody:p=>({ prompt:p.prompt, duration:Math.min(p.duration||4,10), aspect_ratio:p.aspectRatio||'16:9', resolution:p.resolution||'480p' }) },
+  'seedance15-t2v':  { cat:'t2v', label:'Seedance 1.5 T2V',   provider:'wavespeed', path:'bytedance/seedance-v1.5-pro/text-to-video', price:0.05, verified:true,
+    durations:[4,5,6,8,10,12], resolutions:['720p','1080p'],
+    buildBody:p=>({ prompt:p.prompt, resolution:p.resolution||'720p', aspect_ratio:p.aspectRatio||'16:9', duration:Math.min(p.duration||4,12), generate_audio:false, seed:-1 }) },
+  'wan26-t2v':       { cat:'t2v', label:'Wan 2.6 T2V',        provider:'wavespeed', path:'alibaba/wan-2.6/text-to-video', pricePerS:0.068, verified:true,
+    durations:[5,8,10,15], resolutions:['720p','1080p'],
+    buildBody:p=>({ prompt:p.prompt, resolution:p.resolution||'720p', aspect_ratio:p.aspectRatio||'16:9', duration:Math.min(p.duration||5,15), seed:-1 }) },
+  'atlas-wan27-t2v': { cat:'t2v', label:'Wan 2.7 T2V (Atlas)', provider:'atlas', path:'wan-2.7/text-to-video', pricePerS:0.02, verified:false,
+    durations:[5,8,10], resolutions:['720p','1080p'],
+    buildBody:p=>({ prompt:p.prompt, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,10) }) },
+
+  // ─────────── IMAGE EDIT (instruction-based) ───────────
+  'qwen2-edit':    { cat:'edit', label:'Qwen 2.0 Edit',    provider:'wavespeed', path:'wavespeed-ai/qwen-image-2.0/edit', price:0.03, verified:true,
+    buildBody:p=>({ prompt:p.prompt, images:[p.image], seed:-1, enable_safety_checker:false }) },
+  'qwen-edit':     { cat:'edit', label:'Qwen Edit',        provider:'wavespeed', path:'wavespeed-ai/qwen-image/edit', price:0.02, verified:true, timeout:180000,
+    buildBody:p=>({ prompt:p.prompt, image:p.image, seed:-1, enable_safety_checker:false }) },
+  'flux-kontext':  { cat:'edit', label:'Flux Kontext',     provider:'wavespeed', path:'wavespeed-ai/flux-kontext-dev-ultra-fast', price:0.02, verified:true,
+    buildBody:p=>({ prompt:p.prompt, image:p.image, seed:-1, enable_safety_checker:false }) },
+  'wan27-edit':    { cat:'edit', label:'Wan 2.7 Edit',     provider:'wavespeed', path:'alibaba/wan-2.7/image-edit', price:0.03, verified:true,
+    buildBody:p=>({ prompt:p.prompt, images:[p.image], seed:-1 }) },
+  'wan27pro-edit': { cat:'edit', label:'Wan 2.7 Pro Edit', provider:'wavespeed', path:'alibaba/wan-2.7/image-edit-pro', price:0.06, verified:true,
+    buildBody:p=>({ prompt:p.prompt, images:[p.image], seed:-1 }) },
+  'aurora-edit':   { cat:'edit', label:'Aurora Edit',      provider:'xai-image', path:'grok-imagine-image', price:0.04, verified:true,
+    buildBody:p=>({ prompt:p.prompt, image:p.image }) },
+
+  // ─────────── IMG2IMG (strength-based) ───  [path pending confirmation] ───
+  'flux-img2img':  { cat:'img2img', label:'Flux img2img',  provider:'wavespeed', path:'wavespeed-ai/flux-dev/image-to-image', price:0.02, verified:false,
+    buildBody:p=>({ prompt:p.prompt, image:p.image, strength:(p.strength!=null?p.strength:0.7), enable_safety_checker:false }) },
+
+  // ─────────── IMAGE-TO-VIDEO (animate) ───────────
+  'aurora-i2v':        { cat:'i2v', label:'Aurora I2V',         provider:'wavespeed', path:'x-ai/grok-imagine-video-v1.5/image-to-video', price:0.05, verified:true,
+    durations:[4,6,8,10], resolutions:['480p','720p'],
+    buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'480p', duration:Math.min(p.duration||4,10) }) },
+  'seedance15-spicy':  { cat:'i2v', label:'Seedance 1.5 Spicy', provider:'wavespeed', path:'bytedance/seedance-v1.5-pro/image-to-video-spicy', price:0.05, verified:true,
+    durations:[4,5,6,8,10,12], resolutions:['480p','720p','1080p'],
+    buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'480p', duration:Math.min(p.duration||4,12), aspect_ratio:p.aspectRatio||'16:9', generate_audio:false, seed:-1 }) },
+  'wan22-spicy':       { cat:'i2v', label:'Wan 2.2 Spicy',     provider:'wavespeed', path:'wavespeed-ai/wan-2.2-spicy/image-to-video', price:0.15, verified:true,
+    durations:[5], resolutions:['480p','720p'],
+    buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'480p', duration:5, aspect_ratio:p.aspectRatio||'16:9', seed:-1 }) },
+  'wan27-spicy':       { cat:'i2v', label:'Wan 2.7 Spicy',     provider:'wavespeed', path:'alibaba/wan-2.7/image-to-video-spicy', price:0.50, verified:true,
+    durations:[5,10,15], resolutions:['720p','1080p'],
+    buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,15), aspect_ratio:p.aspectRatio||'16:9', seed:-1 }) },
+  'atlas-wan22-turbo': { cat:'i2v', label:'Wan 2.2 Turbo Spicy (Atlas)', provider:'atlas', path:'wan-2.2-turbo-spicy-infinite/image-to-video', pricePerS:0.01, verified:false,
+    durations:[5,10,15], resolutions:['720p','1080p'],
+    buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,15) }) },
+  'atlas-seedance-fast':{ cat:'i2v', label:'Seedance 1.5 Pro Fast (Atlas)', provider:'atlas', path:'seedance-v1.5-pro-fast/image-to-video', pricePerS:0.018, verified:false,
+    durations:[4,5,6,8,10,12], resolutions:['720p','1080p','2k'],
+    buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'720p', duration:Math.min(p.duration||4,12) }) },
+
+  // ─────────── VIDEO EXTEND ───────────
+  'aurora-extend':      { cat:'extend', label:'Aurora Extend',       provider:'wavespeed', path:'x-ai/grok-imagine-video/video-extend', price:0.35, verified:true,
+    durations:[4,6,8,10], resolutions:['480p','720p'],
+    buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'480p', duration:Math.min(p.duration||4,10) }) },
+  'wan22spicy-extend':  { cat:'extend', label:'Wan 2.2 Spicy Extend', provider:'wavespeed', path:'wavespeed-ai/wan-2.2-spicy/video-extend', price:0.15, verified:true,
+    durations:[5], resolutions:['480p','720p'],
+    buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'480p', duration:5, seed:-1 }) },
+  'wan27-extend':       { cat:'extend', label:'Wan 2.7 Extend',      provider:'wavespeed', path:'alibaba/wan-2.7/video-extend', price:0.30, verified:true,
+    durations:[2,3,4,5,8,10,15], resolutions:['720p','1080p'],
+    buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,15), seed:-1 }) },
+
+  // ─────────── VIDEO-TO-VIDEO EDIT ───────────
+  'grok-vedit':        { cat:'v2v', label:'Aurora Video Edit',  provider:'wavespeed', path:'x-ai/grok-imagine-video/edit-video', price:0.10, verified:true,
+    buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'720p' }) },
+  'atlas-wan27-vedit': { cat:'v2v', label:'Wan 2.7 Video Edit (Atlas)', provider:'atlas', path:'wan-2.7/video-edit', pricePerS:0.05, verified:false,
+    buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'720p' }) },
+};
+
+// Format a price label for dropdowns
+function priceLabel(m){
+  if(m.price!=null){ let s=m.price.toFixed(3).replace(/0+$/,'').replace(/\.$/,''); return '$'+s; }
+  if(m.pricePerS!=null) return '$'+m.pricePerS+'/s';
+  return 'TBC';
+}
+// Verified models for a category → [ [id, model], ... ]
+function modelsByCat(cat){
+  return Object.entries(MODEL_REGISTRY).filter(([id,m])=>m.cat===cat && m.verified);
+}
+// Generate a <select>'s options from the registry
+function populateModelDropdown(selectId, cat, selectedId){
+  const sel = document.getElementById(selectId);
+  if(!sel) return;
+  const list = modelsByCat(cat);
+  if(!list.length) return;
+  sel.innerHTML = list.map(([id,m],i)=>{
+    const isSel = selectedId ? id===selectedId : i===0;
+    return `<option value="${id}"${isSel?' selected':''}>${m.label} — ${priceLabel(m)}</option>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+// UNIVERSAL MODEL DISPATCHER
+// callModel(modelId, params) → output URL, or throws.
+// Routes to the correct provider backend from the registry.
+// ═══════════════════════════════════════════════════════
+async function callModel(modelId, params){
+  const m = MODEL_REGISTRY[modelId];
+  if(!m) throw new Error('Unknown model: '+modelId);
+  const body = m.buildBody(params);
+
+  if(m.provider==='wavespeed'){
+    return await callWaveSpeed(m.path, body, m.timeout||120000);
+  }
+
+  if(m.provider==='atlas'){
+    if(!atlasKey) throw new Error('Atlas Cloud API key required. Add it in settings.');
+    const isVideo = ['t2v','i2v','extend','v2v'].includes(m.cat);
+    const endpoint = isVideo ? 'generateVideo' : 'generateImage';
+    const sub = await fetch(`https://api.atlascloud.ai/api/v1/model/${endpoint}`, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${atlasKey}` },
+      body: JSON.stringify({ model:m.path, ...body })
+    });
+    if(!sub.ok){ const e=await sub.json().catch(()=>({})); throw new Error(`Atlas error ${sub.status}: ${e.message||JSON.stringify(e).slice(0,200)}`); }
+    const sd = await sub.json();
+    const pid = sd.data?.id || sd.id || sd.prediction_id;
+    if(!pid) throw new Error('Atlas: no prediction id returned');
+    let elapsed=0;
+    while(elapsed<300000){
+      await new Promise(r=>setTimeout(r,3000)); elapsed+=3000;
+      const pr = await fetch(`https://api.atlascloud.ai/api/v1/model/prediction/${pid}`, { headers:{ 'Authorization':`Bearer ${atlasKey}` } });
+      if(!pr.ok) continue;
+      const pd = await pr.json();
+      const st = pd.data?.status || pd.status;
+      if(st==='completed'||st==='succeeded'){
+        const out = pd.data?.outputs?.[0] || pd.outputs?.[0] || pd.data?.output || pd.output;
+        if(!out) throw new Error('Atlas completed but no output: '+JSON.stringify(pd).slice(0,200));
+        return out;
+      }
+      if(st==='failed') throw new Error('Atlas generation failed: '+(pd.data?.error||pd.error||'unknown'));
+    }
+    throw new Error('Atlas request timed out');
+  }
+
+  // xAI direct providers are migrated during the video pass
+  throw new Error('Provider "'+m.provider+'" not yet wired through callModel.');
+}
 
 // Thread schema: { id, name, createdAt, messages: [{role, type, content, src?, alt?}], history: [{role, content}] }
 // type: 'text' | 'image' | 'error'
@@ -1656,6 +1829,10 @@ document.getElementById('new-thread-btn').addEventListener('click', () => {
 // ═══════════════════════════════════════════════════════
 updateKeyBtn();
 
+// Generate model dropdowns from the registry (single source of truth)
+populateModelDropdown('img-model-select', 't2img');
+updateCostEstimate();
+
 // Load most recent thread or create one
 const existing = getThreads();
 if (existing.length > 0) {
@@ -1900,9 +2077,8 @@ async function editImage(prompt, imageUrl, skipStyleLock = false, modelOverride 
 
     if (editModel === 'aurora') {
       // ── Aurora edit via xAI ──
-      const imgModel = document.getElementById('img-model-select').value;
       const body = {
-        model: imgModel === 'grok-imagine-image' ? 'grok-imagine-image' : 'grok-imagine-image-quality',
+        model: 'grok-imagine-image-quality',
         prompt: fullPrompt,
         image: { url: imageUrl, type: 'image_url' },
         response_format: 'url'
@@ -2127,32 +2303,28 @@ function ratioToSize(ratio, resolution) {
 async function generateImage(prompt) {
   const typingId = appendTyping();
   try {
-    const imgModel = document.getElementById('img-model-select').value;
+    const modelId = document.getElementById('img-model-select').value;
+    const m = MODEL_REGISTRY[modelId] || MODEL_REGISTRY['aurora-simple'];
     const aspectRatio = document.getElementById('img-ratio-select').value;
-    const resolution = document.getElementById('img-res-select').value;
+    const resolution = (document.getElementById('img-res-select').value || '1K').toLowerCase();
     const count = parseInt(document.getElementById('img-count-select')?.value || '1');
     const fullPrompt = applyStyleLock(prompt);
-    const modelPath = imgModel === 'grok-imagine-image'
-      ? 'x-ai/grok-imagine-image/text-to-image'
-      : 'x-ai/grok-imagine-image-quality/text-to-image';
-    const fallbackPath = 'x-ai/grok-imagine-image-quality/text-to-image';
-    const body = { prompt: fullPrompt, aspect_ratio: aspectRatio, resolution: (resolution || '1K').toLowerCase(), enable_safety_checker: false };
-    const usedModel = imgModel === 'grok-imagine-image' ? 'Aurora Simple' : 'Aurora Mega';
+    const usedModel = m.label;
+    const callParams = { prompt: fullPrompt, aspectRatio, resolution };
 
     removeTyping(typingId);
 
-    // Generate all images in parallel
+    // Generate all images in parallel via the universal dispatcher
     const errors = [];
     const results = await Promise.all(
       Array.from({ length: count }, async () => {
         try {
-          let url = await callWaveSpeed(modelPath, body);
-          return url;
+          return await callModel(modelId, callParams);
         } catch(e) {
-          // Try fallback model if Simple fails
-          if (modelPath.includes('grok-imagine-image/text-to-image')) {
+          // Fallback to Aurora Quality if a different model failed
+          if (modelId !== 'aurora-quality') {
             try {
-              return await callWaveSpeed(fallbackPath, body);
+              return await callModel('aurora-quality', callParams);
             } catch(e2) {
               errors.push(e2.message);
               return null;
@@ -3283,16 +3455,11 @@ function updateCostEstimate() {
     modeText.textContent = 'Edit image mode';
 
   } else if (imageMode) {
-    const model = document.getElementById('img-model-select')?.value || 'grok-imagine-image-quality';
-    const res = document.getElementById('img-res-select')?.value || '1K';
+    const modelId = document.getElementById('img-model-select')?.value || 'aurora-simple';
+    const m = MODEL_REGISTRY[modelId];
     const count = parseInt(document.getElementById('img-count-select')?.value || '1');
-    let unitCost;
-    if (model === 'grok-imagine-image') {
-      unitCost = res === '2K' ? 0.008 : 0.005;
-    } else {
-      unitCost = res === '2K' ? 0.035 : 0.022;
-    }
-    const totalCost = (unitCost * count).toFixed(count > 1 ? 3 : 3);
+    const unitCost = (m && m.price != null) ? m.price : 0.022;
+    const totalCost = (unitCost * count).toFixed(3);
     el.textContent = count > 1 ? `${count}× $${totalCost}` : `$${totalCost}`;
     modeText.textContent = 'Image mode';
 
