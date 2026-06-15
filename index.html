@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.39" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.40" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.39</title>
+  <title>Zaor Studio 0.40</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1041,7 +1041,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.39</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.40</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -2381,7 +2381,6 @@ async function generateImage(prompt) {
     results.forEach((imageUrl, i) => {
       if (!imageUrl) return;
       anySuccess = true;
-      if (i === 0) showDebug('Image src (first 120 chars)', String(imageUrl).slice(0, 120)); // temp diagnostic
       const label = count > 1 ? `${usedModel} (${i + 1}/${count})` : usedModel;
       lastImageUrl = imageUrl;
       addMessageToThread({ role: 'assistant', type: 'image', src: imageUrl, hostedUrl: imageUrl, alt: prompt, modelLabel: label });
@@ -3080,6 +3079,7 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   const wrapper = document.createElement('div');
   wrapper.className = 'img-wrapper';
   const img = document.createElement('img');
+  img.referrerPolicy = 'no-referrer'; // lets referer-locked hosts (e.g. Atlas/Aliyun OSS) serve the image
   img.src = src;
   img.alt = altText;
   img.className = 'gen-image';
