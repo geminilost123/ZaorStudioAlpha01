@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.48" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.52" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.48</title>
+  <title>Zaor Studio 0.52</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -543,6 +543,27 @@
     }
     .modal input:focus, .modal textarea:focus { border-color: var(--lavender); }
 
+    /* Prompt Library */
+    #library-search { margin-bottom: 8px; }
+    .lib-filter {
+      background: var(--bg); color: var(--text-dim);
+      border: 1px solid rgba(255,255,255,0.14); border-radius: 14px;
+      padding: 5px 12px; font-family: 'Inter', sans-serif; font-size: 12px; cursor: pointer;
+    }
+    .lib-filter.active { background: var(--lavender); color: #1a1a2e; border-color: var(--lavender); }
+    .lib-item {
+      background: var(--bg); border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .lib-item:active { border-color: var(--lavender); }
+    .lib-item-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+    .lib-item-cat { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--lavender); }
+    .lib-del { float: right; color: var(--text-dim); cursor: pointer; font-size: 13px; padding: 0 4px; }
+    .lib-del:active { color: #ff6b6b; }
+    .lib-item-text { font-size: 11px; color: var(--text-dim); margin-top: 5px; line-height: 1.45; white-space: pre-wrap; }
+    .lib-empty { text-align: center; color: var(--text-dim); font-size: 13px; padding: 24px 0; }
+
     .modal-btns { display: flex; gap: 10px; }
     .modal-btns button {
       flex: 1; padding: 11px;
@@ -1041,7 +1062,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.48</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.52</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1059,6 +1080,7 @@
           <option value="grok-4.3" selected>Zaor</option>
         </select>
         <button id="pe-btn" title="Prompt Engineer mode">✦ PE</button>
+        <button id="library-btn" title="Prompt library">📚</button>
         <button id="refresh-btn" title="Force update from GitHub">↻</button>
         <button id="api-key-btn">Set API Key</button>
       </div>
@@ -1296,8 +1318,28 @@
   </div>
 </div>
 
-<!-- Rename Game Modal -->
-<div class="modal-overlay" id="rename-overlay">
+<!-- Prompt Library Modal -->
+<div class="modal-overlay" id="library-overlay">
+  <div class="modal" style="max-width:560px;width:92%;max-height:82vh;display:flex;flex-direction:column;">
+    <h2 style="margin-bottom:4px;">📚 Prompt Library</h2>
+    <p style="margin-bottom:10px;">Tap a template to drop it into your prompt box, then fill in the [brackets].</p>
+    <input type="text" id="library-search" placeholder="Search templates… (portrait, motion, edit, lighting…)" autocomplete="off" spellcheck="false" style="margin-bottom:8px;" />
+    <div id="library-filters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+      <button class="lib-filter active" data-filter="all">All</button>
+      <button class="lib-filter" data-filter="image">Image</button>
+      <button class="lib-filter" data-filter="video">Video</button>
+      <button class="lib-filter" data-filter="edit">Edit</button>
+      <button class="lib-filter" data-filter="modifier">Modifiers</button>
+      <button class="lib-filter" data-filter="mine">★ Mine</button>
+    </div>
+    <div id="library-list" style="overflow-y:auto;flex:1;margin:-4px -4px 0;padding:0 4px;"></div>
+    <div class="modal-btns" style="margin-top:10px;">
+      <button class="btn-secondary" id="library-close">Close</button>
+      <button class="btn-primary" id="library-save">★ Save current prompt</button>
+    </div>
+  </div>
+</div>
+
   <div class="modal">
     <h2>Rename Game</h2>
     <p>Give this game a name.</p>
@@ -1452,7 +1494,10 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
 
   // ─────────── TEXT-TO-VIDEO ───────────
-  'aurora-t2v':      { cat:'t2v', label:'Aurora T2V',         provider:'xai-video', path:'grok-imagine-video',                      pricePerS:0.05, verified:true,
+  // NOTE: Aurora video (T2V/I2V/extend/edit) is handled by generateVideoAurora via xAI DIRECT,
+  // never through callModel/WaveSpeed. The four 'aurora-*'/'grok-vedit' entries below are legacy
+  // and kept inert (verified:false) for reference only — do not wire them into dropdowns.
+  'aurora-t2v':      { cat:'t2v', label:'Aurora T2V',         provider:'xai-video', path:'grok-imagine-video',                      pricePerS:0.05, verified:false,
     durations:[4,6,8,10], resolutions:['480p','720p'],
     buildBody:p=>({ prompt:p.prompt, duration:Math.min(p.duration||4,10), aspect_ratio:p.aspectRatio||'16:9', resolution:p.resolution||'480p' }) },
   'seedance15-t2v':  { cat:'t2v', label:'Seedance 1.5 T2V',   provider:'wavespeed', path:'bytedance/seedance-v1.5-pro/text-to-video', price:0.05, verified:true,
@@ -1484,7 +1529,7 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ prompt:p.prompt, image:p.image, strength:(p.strength!=null?p.strength:0.7), enable_safety_checker:false }) },
 
   // ─────────── IMAGE-TO-VIDEO (animate) ───────────
-  'aurora-i2v':        { cat:'i2v', label:'Aurora I2V',         provider:'wavespeed', path:'x-ai/grok-imagine-video-v1.5/image-to-video', price:0.05, verified:true,
+  'aurora-i2v':        { cat:'i2v', label:'Aurora I2V',         provider:'wavespeed', path:'x-ai/grok-imagine-video-v1.5/image-to-video', price:0.05, verified:false,
     durations:[4,6,8,10], resolutions:['480p','720p'],
     buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'480p', duration:Math.min(p.duration||4,10) }) },
   'seedance15-spicy':  { cat:'i2v', label:'Seedance 1.5 Spicy', provider:'wavespeed', path:'bytedance/seedance-v1.5-pro/image-to-video-spicy', price:0.05, verified:true,
@@ -1498,7 +1543,7 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,15), aspect_ratio:p.aspectRatio||'16:9', seed:-1 }) },
 
   // ─────────── VIDEO EXTEND ───────────
-  'aurora-extend':      { cat:'extend', label:'Aurora Extend',       provider:'wavespeed', path:'x-ai/grok-imagine-video/video-extend', price:0.35, verified:true,
+  'aurora-extend':      { cat:'extend', label:'Aurora Extend',       provider:'wavespeed', path:'x-ai/grok-imagine-video/video-extend', price:0.35, verified:false,
     durations:[4,6,8,10], resolutions:['480p','720p'],
     buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'480p', duration:Math.min(p.duration||4,10) }) },
   'wan22spicy-extend':  { cat:'extend', label:'Wan 2.2 Spicy Extend', provider:'wavespeed', path:'wavespeed-ai/wan-2.2-spicy/video-extend', price:0.15, verified:true,
@@ -1509,7 +1554,7 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,15), seed:-1 }) },
 
   // ─────────── VIDEO-TO-VIDEO EDIT ───────────
-  'grok-vedit':        { cat:'v2v', label:'Aurora Video Edit',  provider:'wavespeed', path:'x-ai/grok-imagine-video/edit-video', price:0.10, verified:true,
+  'grok-vedit':        { cat:'v2v', label:'Aurora Video Edit',  provider:'wavespeed', path:'x-ai/grok-imagine-video/edit-video', price:0.10, verified:false,
     buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'720p' }) },
   'atlas-wan27-vedit': { cat:'v2v', label:'Wan 2.7 Video Edit (Atlas)', provider:'atlas', path:'wan-2.7/video-edit', pricePerS:0.05, verified:false,
     buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'720p' }) },
@@ -2425,29 +2470,8 @@ async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUr
   // Determine engine — from override (animate/extend buttons) or UI selector
   const engine = engineOverride || document.getElementById('vid-engine-select')?.value || 'aurora';
 
-  // Atlas Cloud engines route through the universal dispatcher (cheaper video)
-  if (MODEL_REGISTRY[engine] && MODEL_REGISTRY[engine].provider === 'atlas') {
-    try {
-      const m = MODEL_REGISTRY[engine];
-      const _d = durationOverride != null ? parseInt(durationOverride) : parseInt(document.getElementById('vid-duration-select')?.value || '5');
-      const dur = (!isNaN(_d) && _d > 0) ? _d : 5;
-      const res = resOverride || document.getElementById('vid-res-select')?.value || '720p';
-      const ratio = document.getElementById('vid-ratio-select')?.value || '16:9';
-      const url = await callModel(engine, { prompt, image: imageDataUrl, video: extendVideoUrl, duration: dur, resolution: res, aspectRatio: ratio, progressId, isCancelled: () => cancelled });
-      removeVideoProgress(progressId);
-      if (url && !cancelled) {
-        addMessageToThread({ role: 'assistant', type: 'video', src: url, alt: prompt, engineLabel: m.label, storedDuration: dur, storedRes: res });
-        renderVideo(url, prompt, true, m.label, dur, res);
-      }
-    } catch(e) {
-      removeVideoProgress(progressId);
-      if (e.message !== 'Cancelled') {
-        addMessageToThread({ role: 'assistant', type: 'error', content: e.message });
-        appendError(e.message);
-      }
-    }
-    return;
-  }
+  // Atlas video was abandoned (referer-locked output, unembeddable on iOS). All video routes
+  // through Aurora (xAI direct) or WaveSpeed below — no Atlas video path exists.
 
   // Aurora always uses xAI directly; Wan models use WaveSpeed
   const useWaveSpeed = engine !== 'aurora' && engine !== 'aurora_extend';
@@ -3410,6 +3434,135 @@ const keyInput     = document.getElementById('key-input');
 
 apiKeyBtn.addEventListener('click', () => openModal('api'));
 
+// ═══════════════════════════════════════════════════════
+// PROMPT LIBRARY (offline, searchable, model-aware templates)
+// ═══════════════════════════════════════════════════════
+const PROMPT_LIBRARY = [
+  // ── Image (FLUX/Aurora: natural-language prose, subject→action→setting→lighting→camera) ──
+  { type:'image', cat:'Portrait', title:'Realistic close-up portrait', text:'A close-up portrait of [subject] with [hair] and [expression], wearing [wardrobe], in [setting], soft directional light from the [left/right], shot on an 85mm f/1.4 lens, shallow depth of field, photorealistic with natural skin texture and visible pores' },
+  { type:'image', cat:'Portrait', title:'Full-body / fashion', text:'A full-body photograph of [subject] wearing [outfit], [pose], standing in [setting] during [time of day], soft natural light, editorial fashion photography, sharp focus, natural proportions' },
+  { type:'image', cat:'Scene', title:'Cinematic scene', text:'[subject] [action] in [environment] at [time of day], moody [color] lighting with volumetric light beams, cinematic color grade, shot on a 35mm lens, shallow depth of field, subtle film grain' },
+  { type:'image', cat:'Scene', title:'Establishing / landscape', text:'A wide photograph of [location] at [time of day], with [key feature] in the foreground, atmospheric haze, dramatic natural light, deep focus, landscape photography, richly detailed' },
+  { type:'image', cat:'Stylized', title:'Concept / fantasy', text:'[subject] reimagined as [concept], set in [environment], dramatic rim lighting, intricate detail, [art style] concept art, [color] palette, epic atmosphere' },
+  { type:'image', cat:'Consistency', title:'Same-character anchor', text:'The same character as before — keep these identity anchors consistent: [face shape], [hair], [eye color], [distinguishing feature]. New scene: [setting], [action]. Photorealistic, consistent face.' },
+  // ── Video (Wan/Seedance/Aurora: subject → motion → camera → scene, lead with subject+motion) ──
+  { type:'video', cat:'Motion (I2V)', title:'Subtle natural motion', text:'[subject] [one small natural motion], camera slowly pushes in, [ambient detail] drifts gently, soft natural lighting, calm and steady pacing' },
+  { type:'video', cat:'Motion (T2V)', title:'Single clear action', text:'[subject] [one clear action in present tense], camera [tracks alongside / orbits slowly], [environment], [lighting], smooth cinematic motion' },
+  { type:'video', cat:'Motion', title:'Establishing move', text:'[location]: camera does a slow [dolly / drone] push revealing [focal point], [time of day], atmospheric, cinematic pacing, gentle movement' },
+  { type:'video', cat:'Extend', title:'Scene continuation', text:'The scene continues: [what happens next in one clear action], camera [movement], keeping the same lighting, subject, and mood as the previous shot' },
+  // ── Edit (instruction-style: state what to keep, then what to change) ──
+  { type:'edit', cat:'Edit', title:'Wardrobe change', text:'Keep the face, pose, and background unchanged. Change [current clothing] to [new clothing]. Match the original lighting and shadows.' },
+  { type:'edit', cat:'Edit', title:'Background swap', text:'Keep the subject exactly as-is. Replace the background with [new background]. Blend the lighting, color temperature, and shadows naturally.' },
+  { type:'edit', cat:'Edit', title:'Style restyle', text:'Keep the composition and subject recognizable. Restyle the image as [art style], preserving key facial features and proportions.' },
+  { type:'edit', cat:'Edit', title:'Targeted retouch', text:'Keep everything unchanged except: adjust [one specific change — lighting / color / a single detail]. Keep it subtle and natural.' },
+  // ── Modifiers (drop into any prompt as natural phrases) ──
+  { type:'modifier', cat:'Lighting', title:'Golden hour', text:'golden hour, warm directional sunlight, long soft shadows, gentle glow' },
+  { type:'modifier', cat:'Lighting', title:'Studio softbox', text:'studio softbox lighting, even and diffused, clean background, catchlights in the eyes' },
+  { type:'modifier', cat:'Lighting', title:'Neon / moody', text:'neon accent lighting, colored rim light, moody high contrast, cinematic shadows' },
+  { type:'modifier', cat:'Lighting', title:'Low-key / candlelit', text:'low-key candlelit lighting, warm pools of light, deep soft shadows, intimate mood' },
+  { type:'modifier', cat:'Camera', title:'Portrait lens', text:'shot on an 85mm f/1.4 lens, shallow depth of field, creamy bokeh background' },
+  { type:'modifier', cat:'Camera', title:'Wide / deep focus', text:'wide-angle lens, deep focus, everything sharp from front to back' },
+  { type:'modifier', cat:'Camera', title:'Low / heroic angle', text:'low camera angle looking up, heroic framing, subject filling the frame' },
+  { type:'modifier', cat:'Quality', title:'Lifelike skin (anti-waxy)', text:'shot on a 100mm macro lens, visible skin pores, vellus hair, true-to-life color, sharp focus' },
+  { type:'modifier', cat:'Motion', title:'Motion intensity dial', text:'[choose one: subtle camera drift and gentle movement / smooth camera track and flowing motion / dynamic sweeping motion]' },
+];
+
+// User-saved templates (persisted locally)
+let userPrompts = [];
+try { userPrompts = JSON.parse(localStorage.getItem('zaor_user_prompts') || '[]'); } catch(e) { userPrompts = []; }
+function saveUserPrompts() { try { localStorage.setItem('zaor_user_prompts', JSON.stringify(userPrompts)); } catch(e) {} }
+
+let libFilter = 'all';
+const libOverlay = document.getElementById('library-overlay');
+const libList = document.getElementById('library-list');
+const libSearch = document.getElementById('library-search');
+
+function libraryAll() {
+  return PROMPT_LIBRARY.concat(userPrompts.map(p => ({ ...p, type: 'mine', cat: p.cat || 'Mine', isUser: true })));
+}
+
+function renderLibrary() {
+  if (!libList) return;
+  const q = (libSearch?.value || '').toLowerCase().trim();
+  const all = libraryAll();
+  const items = all.filter(t => {
+    const matchFilter = libFilter === 'all' ? !t.isUser : (libFilter === 'mine' ? t.isUser : t.type === libFilter);
+    const matchSearch = !q || (t.title + ' ' + t.cat + ' ' + t.text + ' ' + t.type).toLowerCase().includes(q);
+    return matchFilter && matchSearch;
+  });
+  if (!items.length) {
+    libList.innerHTML = '<div class="lib-empty">' + (libFilter === 'mine' ? 'No saved prompts yet. Type a prompt, then tap \u201cSave current prompt\u201d.' : 'No templates match. Try another word.') + '</div>';
+    return;
+  }
+  libList.innerHTML = items.map(t => {
+    const idx = all.indexOf(t);
+    const del = t.isUser ? `<span class="lib-del" data-del="${t.id}" title="Delete">\u2715</span>` : '';
+    return `<div class="lib-item" data-idx="${idx}">
+      <div class="lib-item-cat">${t.cat}${del}</div>
+      <div class="lib-item-title">${(t.title||'').replace(/</g,'&lt;')}</div>
+      <div class="lib-item-text">${t.text.replace(/</g,'&lt;')}</div>
+    </div>`;
+  }).join('');
+}
+
+function insertLibraryTemplate(text) {
+  const input = document.getElementById('prompt');
+  if (!input) return;
+  const existing = input.value.trim();
+  input.value = existing ? (existing + (existing.endsWith(',') ? ' ' : ', ') + text) : text;
+  input.dispatchEvent(new Event('input', { bubbles: true })); // trigger auto-resize
+  libOverlay.classList.remove('open');
+  input.focus();
+}
+
+document.getElementById('library-btn')?.addEventListener('click', () => {
+  libFilter = 'all';
+  if (libSearch) libSearch.value = '';
+  document.querySelectorAll('.lib-filter').forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
+  renderLibrary();
+  libOverlay.classList.add('open');
+});
+document.getElementById('library-close')?.addEventListener('click', () => libOverlay.classList.remove('open'));
+libOverlay?.addEventListener('click', (e) => { if (e.target === libOverlay) libOverlay.classList.remove('open'); });
+libSearch?.addEventListener('input', renderLibrary);
+document.querySelectorAll('.lib-filter').forEach(btn => {
+  btn.addEventListener('click', () => {
+    libFilter = btn.dataset.filter;
+    document.querySelectorAll('.lib-filter').forEach(b => b.classList.toggle('active', b === btn));
+    renderLibrary();
+  });
+});
+libList?.addEventListener('click', (e) => {
+  const delEl = e.target.closest('.lib-del');
+  if (delEl) {
+    e.stopPropagation();
+    const id = delEl.dataset.del;
+    userPrompts = userPrompts.filter(p => String(p.id) !== String(id));
+    saveUserPrompts();
+    renderLibrary();
+    return;
+  }
+  const item = e.target.closest('.lib-item');
+  if (!item) return;
+  const idx = parseInt(item.dataset.idx);
+  const all = libraryAll();
+  if (!isNaN(idx) && all[idx]) insertLibraryTemplate(all[idx].text);
+});
+
+document.getElementById('library-save')?.addEventListener('click', () => {
+  const input = document.getElementById('prompt');
+  const text = (input?.value || '').trim();
+  if (!text) { alert('Type a prompt in the box first, then save it.'); return; }
+  const suggested = text.slice(0, 40) + (text.length > 40 ? '…' : '');
+  const title = (window.prompt('Name this template:', suggested) || '').trim();
+  if (!title) return;
+  userPrompts.unshift({ id: Date.now(), title, text, cat: 'Mine' });
+  saveUserPrompts();
+  libFilter = 'mine';
+  document.querySelectorAll('.lib-filter').forEach(b => b.classList.toggle('active', b.dataset.filter === 'mine'));
+  renderLibrary();
+});
+
 function openModal(type) {
   if (type === 'api') {
     keyInput.value = apiKey;
@@ -3681,27 +3834,31 @@ document.getElementById('refresh-btn')?.addEventListener('click', async () => {
 });
 
 // ── Prompt Engineer Mode ──
+// Shared conversational behaviour for the Prompt Engineer. Composed with per-model guidance below.
+const PE_CONVO = "You are an expert prompt engineer collaborating with the user to craft the best possible prompt for a specific generation model. How you work: 1) If the user's idea is vague or missing important details (subject specifics, setting, mood, or style), ask 1-2 SHORT clarifying questions first and stop — do not write a prompt yet. 2) Once you have enough, you may give one short sentence of guidance, then output the final prompts clearly labelled, each on its own line, in EXACTLY this format:\nPROMPT: <the optimized prompt>\nVARIATION A: <a meaningfully different take>\nVARIATION B: <another different take>\n3) If the user asks to adjust anything ('moodier', 'wider shot', 'add rain'), revise and re-output in the same labelled format. 4) Keep commentary minimal — the prompts are the product. Never wrap prompts in quotes or markdown. ";
+const peSys = g => PE_CONVO + g;
+
 const PE_SYSTEM_PROMPTS = {
   // ── Image generation ──
-  aurora: "You are an expert image prompt engineer for Aurora/Flux diffusion models. When the user describes what they want, respond with ONLY a single optimized image generation prompt. No explanation, no preamble, no quotes, no markdown. Just the raw prompt text. Include quality tags, lighting descriptors, style keywords, and technical details that Aurora responds well to. Keep it under 200 words.",
-  wan26t2v: "You are an expert image prompt engineer for Wan 2.6 text-to-image model. When the user describes what they want, respond with ONLY a single structured prompt. No explanation, no preamble. Format: [subject description], [scene/environment], [style], [lighting], [technical quality]. Keep it concise and direct.",
-  qwen2: "You are an expert image prompt engineer for Qwen Image 2.0 editing. Qwen 2.0 is a unified 7B model with strong instruction-following and native 2K output. When the user describes a transformation or edit, respond with ONLY a single clear edit instruction prompt. Be specific about what to change, what to preserve, and any style or quality notes. No explanation, no preamble.",
-  qwen: "You are an expert image prompt engineer for Qwen image editing. When the user describes a transformation or edit, respond with ONLY a single clear edit instruction prompt. No explanation. Be specific about what changes to make, what to preserve, and the desired style outcome.",
-  wan27: "You are an expert image prompt engineer for Wan 2.7 image editing. When the user describes what they want, respond with ONLY a single optimized prompt describing the transformation. No explanation, no preamble. Be explicit about the subject, the change, and the visual style.",
-  fluxkontext: "You are an expert image prompt engineer for Flux Kontext image editing. Flux Kontext excels at precise instruction-following while preserving character identity. When the user describes what they want, respond with ONLY a single edit instruction. Use the format: Keep [what must stay unchanged]. Change [what to edit]. Ensure [style/lighting constraints]. No explanation, no preamble.",
+  aurora: peSys("MODEL: FLUX / Aurora (image). Write each prompt as a single flowing natural-language description, NOT a comma-separated tag list. Order it: subject → action/pose → setting → lighting → camera. For photorealism, name a lens and/or film stock (e.g. 'shot on 85mm f/1.4', 'Fujifilm X-T5') and add 'visible skin pores, vellus hair' to avoid waxy AI skin. Aim for 30-80 words. Avoid contradictory directions like 'wide-angle close-up'."),
+  wan26t2v: peSys("MODEL: Wan (image). Natural-language description, specific and concrete (avoid bare tag dumps). Cover: subject, scene/environment, style, lighting, and quality. Be vivid but coherent."),
+  qwen2: peSys("MODEL: Qwen Image 2.0 (EDIT). Write an instruction, not a description. State clearly: what to KEEP unchanged, what to CHANGE, and constraints (match lighting, preserve identity). Be surgical and specific."),
+  qwen: peSys("MODEL: Qwen (EDIT). Write an edit instruction: what to change, what to preserve, desired outcome. Specific and direct."),
+  wan27: peSys("MODEL: Wan 2.7 (EDIT). Instruction style: state the subject, the precise change, what to preserve, and the visual style. Be explicit."),
+  fluxkontext: peSys("MODEL: Flux Kontext (EDIT). Use the form 'Keep [what stays unchanged]. Change [what to edit]. Ensure [style/lighting constraints].' Flux Kontext excels at preserving identity while making targeted edits."),
 
   // ── Animate / Image-to-Video ──
-  aurora_i2v: "You are an expert motion prompt engineer for Aurora Image-to-Video. The user will describe what they want to happen in a video starting from a still image. Respond with ONLY a single motion prompt. Describe camera movement, subject motion, mood, and pacing. Aurora responds well to cinematic language: 'slow push in', 'gentle parallax', 'subject turns to camera'. No explanation, no preamble. Keep it under 80 words.",
-  seedance15t2v: "You are an expert text-to-video prompt engineer for Seedance 1.5 Pro T2V. Seedance produces cinematic, live-action-leaning clips with strong prompt adherence and expressive motion. Respond with ONLY a single generation prompt describing subject, action, environment, lighting, and mood. Use vivid physical language. Keep it under 100 words. No explanation, no preamble.",
-  seedance_i2v: "You are an expert motion prompt engineer for Seedance 1.5 Spicy Image-to-Video. Seedance produces expressive, bold motion with cinematic realism. Respond with ONLY a single motion prompt describing the action, camera behavior, emotional tone, and visual style. Use vivid, physical language. Seedance handles complex motion well. No explanation, no preamble. Keep it under 100 words.",
-  wan22spicy_i2v: "You are an expert motion prompt engineer for Wan 2.2 Spicy Image-to-Video. Wan 2.2 responds best to clear, direct motion descriptions. Respond with ONLY a single motion prompt. Be explicit about what moves, how it moves, and the camera behavior. Avoid overly complex multi-action descriptions — pick one clear motion. No explanation, no preamble. Keep it under 60 words.",
-  wan27spicy_i2v: "You are an expert motion prompt engineer for Wan 2.7 Spicy Image-to-Video. Wan 2.7 supports longer clips and multi-shot dynamics. Respond with ONLY a single motion prompt describing the full scene arc: opening motion, development, and resolution. Include camera work and subject movement. No explanation, no preamble. Keep it under 100 words.",
+  aurora_i2v: peSys("MODEL: Aurora image-to-video. Describe MOTION, not appearance (the still already defines looks). Order: subject motion → camera move → mood/pacing. Use cinematic camera verbs ('slow push in', 'gentle parallax', 'subject turns to camera'). Keep under ~80 words."),
+  seedance15t2v: peSys("MODEL: Seedance text-to-video. Order: subject → one clear action (present tense) → camera → style. One main movement per shot. Vivid, physical language. Under ~100 words."),
+  seedance_i2v: peSys("MODEL: Seedance image-to-video. Describe the motion, camera behaviour, emotional tone and visual style. Seedance handles bold, expressive motion well. Describe motion not appearance. Under ~100 words."),
+  wan22spicy_i2v: peSys("MODEL: Wan 2.2 image-to-video. Lead with subject + motion, then camera. Pick ONE clear motion — avoid complex multi-action. Use motion-intensity words (subtle/gentle, smooth/flowing, dynamic/sweeping). Under ~60 words."),
+  wan27spicy_i2v: peSys("MODEL: Wan 2.7 image-to-video. Supports a short arc: opening motion → development → resolution. Order subject → motion → camera → scene. Include camera work and clear motion-intensity. Under ~100 words."),
 
   // ── Video Extend ──
-  aurora_extend: "You are an expert continuation prompt engineer for Aurora Video Extend. The user has a video clip and wants to extend it. Respond with ONLY a single continuation prompt describing what happens next: how the scene continues, camera movement, and mood. Match the implied style of the original. Use phrases like 'continues into', 'camera pulls back to reveal', 'scene transitions to'. No explanation, no preamble. Keep it under 80 words.",
-  seedance_extend: "You are an expert continuation prompt engineer for Seedance video extension via I2V. The model will use the last frame of a video as an image and generate a continuation clip. Respond with ONLY a single prompt describing the next scene: what action follows, the camera behavior, and the emotional arc. Write it as if describing a new shot that naturally follows from the current one. No explanation, no preamble. Keep it under 100 words.",
-  wan27extend: "You are an expert continuation prompt engineer for Wan 2.7 Video Extend. Wan 2.7 has strong prompt-following for video continuation. Respond with ONLY a single continuation prompt describing what happens next — motion, camera, atmosphere, and scene development. Be specific and directional. No explanation, no preamble. Keep it under 80 words.",
-  wan22spicy_extend: "You are an expert continuation prompt engineer for Wan 2.2 Spicy Video Extend. Respond with ONLY a single short continuation prompt. Wan 2.2 extend works best with simple, clear continuation instructions. Describe what happens next in one or two clear actions. Keep it direct and under 50 words. No explanation, no preamble."
+  aurora_extend: peSys("MODEL: Aurora video EXTEND. Describe what happens NEXT as a natural continuation: follow-on action, camera movement, mood. Match the original's style. Phrases like 'continues into', 'camera pulls back to reveal'. Under ~80 words."),
+  seedance_extend: peSys("MODEL: Seedance EXTEND (continues from the last frame). Describe the next shot: the action that follows, camera behaviour, and emotional arc, as a natural continuation. Under ~100 words."),
+  wan27extend: peSys("MODEL: Wan 2.7 video EXTEND. Describe what happens next: motion, camera, atmosphere, scene development. Specific and directional, continuing the prior mood. Under ~80 words."),
+  wan22spicy_extend: peSys("MODEL: Wan 2.2 video EXTEND. Keep it simple — one or two clear continuation actions, matching the prior shot's mood. Direct, under ~50 words.")
 };
 
 document.getElementById('pe-btn')?.addEventListener('click', () => {
