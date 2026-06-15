@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.35" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.36" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.35</title>
+  <title>Zaor Studio 0.36</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1041,7 +1041,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.35</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.36</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1438,6 +1438,10 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ model:'grok-imagine-image-quality', prompt:p.prompt, n:1, response_format:'url', aspect_ratio:p.aspectRatio||'1:1' }) },
   'z-image-turbo':  { cat:'t2img', label:'Z-Image Turbo',  provider:'wavespeed', path:'wavespeed-ai/z-image-turbo/text-to-image',        price:0.01,  verified:false,
     buildBody:p=>({ prompt:p.prompt, aspect_ratio:p.aspectRatio||'1:1', enable_safety_checker:false }) },
+  'atlas-flux':     { cat:'t2img', label:'Flux (Atlas)',    provider:'atlas', path:'black-forest-labs/flux-kontext-dev', price:0.01, verified:true,
+    buildBody:p=>({ input:{ prompt:p.prompt, enable_safety_checker:false }, enable_base64_output:true }) },
+  'atlas-seedream': { cat:'t2img', label:'Seedream v5 (Atlas)', provider:'atlas', path:'bytedance/seedream-v5-lite', price:0.01, verified:true,
+    buildBody:p=>({ input:{ prompt:p.prompt, enable_safety_checker:false }, enable_base64_output:true }) },
 
   // ─────────── TEXT-TO-VIDEO ───────────
   'aurora-t2v':      { cat:'t2v', label:'Aurora T2V',         provider:'xai-video', path:'grok-imagine-video',                      pricePerS:0.05, verified:true,
@@ -1484,12 +1488,6 @@ const MODEL_REGISTRY = {
   'wan27-spicy':       { cat:'i2v', label:'Wan 2.7 Spicy',     provider:'wavespeed', path:'alibaba/wan-2.7/image-to-video-spicy', price:0.50, verified:true,
     durations:[5,10,15], resolutions:['720p','1080p'],
     buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,15), aspect_ratio:p.aspectRatio||'16:9', seed:-1 }) },
-  'atlas-wan22-turbo': { cat:'i2v', label:'Wan 2.2 Turbo Spicy (Atlas)', provider:'atlas', path:'atlascloud/wan-2.2-turbo-spicy/image-to-video', pricePerS:0.02, verified:true,
-    durations:[5,8], resolutions:['480p','720p','1080p'],
-    buildBody:p=>({ model:'atlascloud/wan-2.2-turbo-spicy/image-to-video', image:p.image, prompt:p.prompt, duration:Math.min(p.duration||5,8), resolution:p.resolution||'720p', enable_base64_output:true }) },
-  'atlas-seedance-fast':{ cat:'i2v', label:'Seedance 1.5 Pro (Atlas)', provider:'atlas', path:'bytedance/seedance-v1.5-pro/image-to-video', pricePerS:0.049, verified:true,
-    durations:[4,5,6,8,10,12], resolutions:['480p','720p','1080p'],
-    buildBody:p=>({ model:'bytedance/seedance-v1.5-pro/image-to-video', image:p.image, prompt:p.prompt, duration:Math.min(p.duration||5,12), resolution:p.resolution||'720p', enable_base64_output:true }) },
 
   // ─────────── VIDEO EXTEND ───────────
   'aurora-extend':      { cat:'extend', label:'Aurora Extend',       provider:'wavespeed', path:'x-ai/grok-imagine-video/video-extend', price:0.35, verified:true,
@@ -2916,8 +2914,6 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
       <option value="seedance15spicy">Seedance 1.5 Spicy — ~$0.05/run</option>
       <option value="wan22spicy">Wan 2.2 Spicy — $0.15/run</option>
       <option value="wan26spicy">Wan 2.7 Spicy — $0.50/run</option>
-      <option value="atlas-wan22-turbo">Wan 2.2 Turbo (Atlas) — $0.01/s ⚡</option>
-      <option value="atlas-seedance-fast">Seedance Pro Fast (Atlas) — $0.018/s ⚡</option>
     `;
   }
 
