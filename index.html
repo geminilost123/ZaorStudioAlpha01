@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.45" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.47" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.45</title>
+  <title>Zaor Studio 0.47</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1041,7 +1041,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.45</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.47</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -2481,9 +2481,38 @@ async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progres
   const duration = Math.min(isNaN(durRaw) ? 4 : durRaw, 15);
   const xaiBody = { model: 'grok-imagine-video', prompt, duration, resolution: res };
   let label = 'Aurora T2V';
-  if (extendVideoUrl)      { xaiBody.video = { url: extendVideoUrl }; label = 'Aurora Extend'; }
-  else if (imageDataUrl)   { xaiBody.image = { url: imageDataUrl };   label = 'Aurora I2V'; }
-  else                     { xaiBody.aspect_ratio = ratio; } // T2V only; I2V/extend take ratio from the source
+  if (extendVideoUrl) {
+    xaiBody.video = { url: extendVideoUrl };
+    label = 'Aurora Extend';
+  } else if (imageDataUrl) {
+    let imageForXai = imageDataUrl;
+    // Atlas/Aliyun OSS URLs are referer-locked — xAI can't fetch them directly.
+    // Fetch locally with no-referrer and convert to base64 so xAI can use the image.
+    if (imageDataUrl.startsWith('https://') && imageDataUrl.includes('aliyuncs.com')) {
+      try {
+        const r = await fetch(imageDataUrl, { referrerPolicy: 'no-referrer' });
+        const blob = await r.blob();
+        imageForXai = await new Promise((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result);
+          reader.onerror = rej;
+          reader.readAsDataURL(blob);
+        });
+      } catch(e) {
+        throw new Error('Could not fetch Atlas image for Aurora I2V: ' + e.message);
+      }
+    }
+    // xAI accepts { url } for hosted images and { b64 } for base64 data URLs
+    if (imageForXai.startsWith('data:')) {
+      const b64 = imageForXai.split(',')[1];
+      xaiBody.image = { b64 };
+    } else {
+      xaiBody.image = { url: imageForXai };
+    }
+    label = 'Aurora I2V';
+  } else {
+    xaiBody.aspect_ratio = ratio;
+  }
 
   const submit = await fetch('https://api.x.ai/v1/videos/generations', {
     method: 'POST',
@@ -2610,11 +2639,21 @@ async function pollForVideo(fetchFn, extractFn, progressId, isCancelled) {
       const res = await fetchFn();
       if (!res.ok) continue;
       const data = await res.json();
+      // Show live status in the progress indicator
+      if (data.status && progressId) {
+        const mins = Math.floor(elapsed / 60000);
+        const secs = Math.floor((elapsed % 60000) / 1000);
+        updateVideoProgress(progressId, `Video: ${data.status}… (${mins > 0 ? mins + 'm ' : ''}${secs}s)`);
+      }
       const result = extractFn(data);
       if (result === 'FAILED') throw new Error('Video generation failed');
+      // Catch done-but-no-url so we don't hang — surface the raw shape
+      if (result === null && (data.status === 'done' || data.status === 'completed')) {
+        throw new Error('Video finished but no URL found. Response: ' + JSON.stringify(data).slice(0, 300));
+      }
       if (result) { removeVideoProgress(progressId); return result; }
     } catch(e) {
-      if (e.message.includes('failed')) throw e;
+      if (e.message.includes('failed') || e.message.includes('finished but')) throw e;
     }
   }
 

@@ -1,7 +1,7 @@
 // ── Service worker: network-first for the app shell ──
 // Deploys are picked up immediately. Cache is only an offline fallback.
 // Bump CACHE_VERSION on each deploy to purge old caches.
-const CACHE_VERSION = 'zaor-studio-v0-45';
+const CACHE_VERSION = 'zaor-studio-v0-47';
 const CACHE = CACHE_VERSION;
 
 self.addEventListener('install', e => {
