@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.36" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.37" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.36</title>
+  <title>Zaor Studio 0.37</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1041,7 +1041,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.36</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.37</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -2355,13 +2355,15 @@ async function generateImage(prompt) {
 
     // Generate all images in parallel via the universal dispatcher
     const errors = [];
+    const selectedProvider = m.provider;
     const results = await Promise.all(
       Array.from({ length: count }, async () => {
         try {
           return await callModel(modelId, callParams);
         } catch(e) {
-          // Fallback to Aurora Quality if a different model failed
-          if (modelId !== 'aurora-quality') {
+          // Only fall back to Aurora Quality for xAI models. Never silently swap an
+          // intentionally-uncensored Atlas pick for censored xAI — surface the real error instead.
+          if (selectedProvider === 'xai-image' && modelId !== 'aurora-quality') {
             try {
               return await callModel('aurora-quality', callParams);
             } catch(e2) {
