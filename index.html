@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.41" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.42" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.41</title>
+  <title>Zaor Studio 0.42</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1041,7 +1041,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.41</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.42</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -2449,7 +2449,7 @@ async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUr
       if (!wavespeedKey) throw new Error('WaveSpeed API key required for Wan models. Tap "Set API Key" to add it.');
       await generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engine, progressId, () => cancelled, durationOverride, resOverride);
     } else {
-      await generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progressId, () => cancelled);
+      await generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progressId, () => cancelled, durationOverride, resOverride);
     }
   } catch(e) {
     removeVideoProgress(progressId);
@@ -2461,54 +2461,43 @@ async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUr
 }
 
 // ═══════════════════════════════════════════════════════
-// AURORA VIDEO (via WaveSpeed — cheaper + T2V support)
+// AURORA VIDEO (all modes via xAI directly — never WaveSpeed)
 // ═══════════════════════════════════════════════════════
-async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progressId, isCancelled) {
-  const duration = parseInt(document.getElementById('vid-duration-select').value);
-  const ratio    = document.getElementById('vid-ratio-select').value;
-  const res      = document.getElementById('vid-res-select').value;
+async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progressId, isCancelled, durationOverride = null, resOverride = null) {
+  const durRaw = durationOverride != null ? parseInt(durationOverride) : parseInt(document.getElementById('vid-duration-select')?.value || '4');
+  const res    = resOverride || document.getElementById('vid-res-select')?.value || '480p';
+  const ratio  = document.getElementById('vid-ratio-select')?.value || '16:9';
+  if (!apiKey) throw new Error('xAI API key required for Aurora. Tap "Set API Key" to add it.');
 
-  let modelPath, body;
+  // Mode is determined by which input field is set. xAI grok-imagine-video supports 1–15s.
+  const duration = Math.min(isNaN(durRaw) ? 4 : durRaw, 15);
+  const xaiBody = { model: 'grok-imagine-video', prompt, duration, resolution: res };
+  let label = 'Aurora T2V';
+  if (extendVideoUrl)      { xaiBody.video = { url: extendVideoUrl }; label = 'Aurora Extend'; }
+  else if (imageDataUrl)   { xaiBody.image = { url: imageDataUrl };   label = 'Aurora I2V'; }
+  else                     { xaiBody.aspect_ratio = ratio; } // T2V only; I2V/extend take ratio from the source
 
-  if (extendVideoUrl) {
-    modelPath = 'x-ai/grok-imagine-video/video-extend';
-    body = { prompt, video: extendVideoUrl, duration: Math.min(duration, 10) };
-  } else if (imageDataUrl) {
-    modelPath = 'x-ai/grok-imagine-video-v1.5/image-to-video';
-    body = { prompt, image: imageDataUrl, duration: Math.min(duration, 10) }; // I2V max 10s
-  } else {
-    // Text-to-video
-    // T2V not supported via WaveSpeed — route directly through xAI
-    const xaiSubmit = await fetch('https://api.x.ai/v1/videos/generations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: 'grok-imagine-video', prompt, duration: Math.min(duration, 10), aspect_ratio: ratio, resolution: res })
-    });
-    if (!xaiSubmit.ok) {
-      const e = await xaiSubmit.json().catch(()=>({}));
-      throw new Error(`T2V error ${xaiSubmit.status}: ${e.error?.message || JSON.stringify(e)}`);
-    }
-    const { request_id } = await xaiSubmit.json();
-    if (!request_id) throw new Error('No request ID returned');
-    const t2vUrl = await pollForVideo(
-      () => fetch(`https://api.x.ai/v1/videos/${request_id}`, { headers: { 'Authorization': `Bearer ${apiKey}` } }),
-      data => data.status === 'done' ? (data.video?.url || null) : (data.status === 'failed' || data.status === 'expired') ? 'FAILED' : null,
-      progressId, isCancelled
-    );
-    if (t2vUrl) {
-      addMessageToThread({ role: 'assistant', type: 'video', src: t2vUrl, alt: prompt, engineLabel: 'Aurora T2V', storedDuration: Math.min(duration, 10), storedRes: res });
-      renderVideo(t2vUrl, prompt, true, 'Aurora T2V', Math.min(duration, 10), res);
-    }
-    return;
+  const submit = await fetch('https://api.x.ai/v1/videos/generations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify(xaiBody)
+  });
+  if (!submit.ok) {
+    const e = await submit.json().catch(() => ({}));
+    throw new Error(`${label} error ${submit.status}: ${e.error?.message || JSON.stringify(e).slice(0, 200)}`);
   }
+  const { request_id } = await submit.json();
+  if (!request_id) throw new Error('Aurora: no request ID returned');
 
-  // Use callWaveSpeed for submit+poll — same pattern as all other WaveSpeed calls
-  if (!wavespeedKey) throw new Error('WaveSpeed API key required for Aurora I2V. Tap "Set API Key" to add it.');
-  const videoUrl = await callWaveSpeed(modelPath, body, 300000, 3000); // 5 min timeout for video
+  const videoUrl = await pollForVideo(
+    () => fetch(`https://api.x.ai/v1/videos/${request_id}`, { headers: { 'Authorization': `Bearer ${apiKey}` } }),
+    data => data.status === 'done' ? (data.video?.url || null) : (['failed','expired','error'].includes(data.status) ? 'FAILED' : null),
+    progressId, isCancelled
+  );
 
   if (videoUrl) {
-    addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: 'Aurora', storedDuration: body.duration, storedRes: res });
-    renderVideo(videoUrl, prompt, true, 'Aurora', body.duration, res);
+    addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: label, storedDuration: duration, storedRes: res });
+    renderVideo(videoUrl, prompt, true, label, duration, res);
   }
 }
 
@@ -3488,10 +3477,10 @@ document.getElementById('style-lock-input')?.addEventListener('input', function(
 const MODEL_CONSTRAINTS = {
   // defaultDur and defaultRes = cheapest option
   aurora:     { durations: [4,6,8,10,15], resolutions: ['480p','720p'], hasRatio: true,  maxDur: 15, defaultDur: 4,  defaultRes: '480p' },
-  aurora_i2v: { durations: [4,6,8,10],    resolutions: ['480p','720p'], hasRatio: false, maxDur: 10, defaultDur: 4,  defaultRes: '480p' },
+  aurora_i2v: { durations: [4,6,8,10,15], resolutions: ['480p','720p'], hasRatio: false, maxDur: 15, defaultDur: 4,  defaultRes: '480p' },
   seedance15t2v: { durations: [4,5,6,8,10,12], resolutions: ['720p','1080p'], hasRatio: true, maxDur: 12, defaultDur: 4, defaultRes: '720p' },
   wan26t2v:   { durations: [5,8,10,15],   resolutions: ['720p','1080p'], hasRatio: true,  maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
-  wan22spicy: { durations: [5,8],          resolutions: ['480p','720p'], hasRatio: false, maxDur: 8,  defaultDur: 5,  defaultRes: '480p' },
+  wan22spicy: { durations: [5],            resolutions: ['480p','720p'], hasRatio: false, maxDur: 5,  defaultDur: 5,  defaultRes: '480p' },
   wan26spicy:     { durations: [5,10,15],      resolutions: ['720p','1080p'], hasRatio: false, maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
   seedance15spicy: { durations: [4,5,6,8,10,12], resolutions: ['480p','720p','1080p'], hasRatio: true, maxDur: 12, defaultDur: 4,  defaultRes: '480p' },
   // extend variants
