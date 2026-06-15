@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.53" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.54" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.53</title>
+  <title>Zaor Studio 0.54</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1062,7 +1062,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.53</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.54</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1092,6 +1092,7 @@
         <select id="pe-model-select" class="img-control-select" style="flex:1;min-width:140px;">
           <optgroup label="── Image ──">
             <option value="aurora">Aurora / Flux</option>
+            <option value="zimage">Z-Image Turbo</option>
             <option value="wan26t2v">Wan 2.6 T2I</option>
             <option value="qwen2">Qwen 2.0 Edit</option>
             <option value="qwen">Qwen Edit</option>
@@ -3445,6 +3446,11 @@ const PROMPT_LIBRARY = [
   { type:'image', cat:'Scene', title:'Establishing / landscape', text:'A wide photograph of [location] at [time of day], with [key feature] in the foreground, atmospheric haze, dramatic natural light, deep focus, landscape photography, richly detailed' },
   { type:'image', cat:'Stylized', title:'Concept / fantasy', text:'[subject] reimagined as [concept], set in [environment], dramatic rim lighting, intricate detail, [art style] concept art, [color] palette, epic atmosphere' },
   { type:'image', cat:'Consistency', title:'Same-character anchor', text:'The same character as before — keep these identity anchors consistent: [face shape], [hair], [eye color], [distinguishing feature]. New scene: [setting], [action]. Photorealistic, consistent face.' },
+  // ── Z-Image Turbo (positive-only constraints, name the medium, lighting + texture) ──
+  { type:'image', cat:'Z-Image', title:'Z-Image photoreal portrait', text:'Ultra-realistic photograph, shot on [camera/lens, e.g. Hasselblad X2D 100C, 80mm], of [subject] with [expression], wearing [wardrobe], in [setting], [lighting, e.g. soft golden-hour rim light], visible skin pores and fabric detail, sharp focus. (Z-Image ignores negatives — phrase everything as what you WANT.)' },
+  { type:'image', cat:'Z-Image', title:'Z-Image scene', text:'[Medium, e.g. cinematic editorial photograph] of [subject] [action] in [setting], [time of day and lighting], [2-3 key details], rich micro-texture, sharp focus, photorealistic. Front-load the subject; keep to 3-5 strong concepts in one style.' },
+  { type:'image', cat:'Z-Image', title:'Z-Image text/poster', text:'[Medium] poster, [scene/subject], with the title text "[YOUR TEXT]" in [font/style and placement], [color palette], [lighting]. Z-Image renders quoted text accurately — keep it short and in quotes.' },
+  { type:'modifier', cat:'Z-Image', title:'Z-Image rules (read me)', text:'Z-Image tips: POSITIVE phrasing only — no "no/avoid" (it ignores negatives) · name a camera/lens/film · always specify lighting · add "skin pores, fabric detail, film grain" for realism · front-load the subject and any text · 3-5 strong concepts, one style family, no contradictions.' },
   // ── Video (Wan/Seedance/Aurora: subject → motion → camera → scene, lead with subject+motion) ──
   { type:'video', cat:'Motion (I2V)', title:'Subtle natural motion', text:'[subject] [one small natural motion], camera slowly pushes in, [ambient detail] drifts gently, soft natural lighting, calm and steady pacing' },
   { type:'video', cat:'Motion (T2V)', title:'Single clear action', text:'[subject] [one clear action in present tense], camera [tracks alongside / orbits slowly], [environment], [lighting], smooth cinematic motion' },
@@ -3841,6 +3847,7 @@ const peSys = g => PE_CONVO + g;
 const PE_SYSTEM_PROMPTS = {
   // ── Image generation ──
   aurora: peSys("MODEL: FLUX / Aurora (image). Write each prompt as a single flowing natural-language description, NOT a comma-separated tag list. Order it: subject → action/pose → setting → lighting → camera. For photorealism, name a lens and/or film stock (e.g. 'shot on 85mm f/1.4', 'Fujifilm X-T5') and add 'visible skin pores, vellus hair' to avoid waxy AI skin. Aim for 30-80 words. Avoid contradictory directions like 'wide-angle close-up'."),
+  zimage: peSys("MODEL: Z-Image Turbo (image, Tongyi). Write a detailed natural-language description and front-load the subject (and any on-image text) at the very start. CRITICAL: Z-Image ignores negative prompts — phrase EVERY constraint positively (write 'clean seamless backdrop, sharp focus' NOT 'no clutter, not blurry'). Name the medium explicitly (camera/lens or film stock, e.g. 'shot on Hasselblad X2D, 80mm' or 'Kodak Portra 400 film grain'). Always specify lighting — it's Z-Image's biggest strength (volumetric, rim light, golden hour, chiaroscuro). Add texture words ('skin pores, fabric detail, film grain') to avoid a plastic look. Keep to 3-5 strong visual concepts in one style family; never mix contradictory styles. Z-Image renders text accurately, so put any sign/poster text in quotes."),
   wan26t2v: peSys("MODEL: Wan (image). Natural-language description, specific and concrete (avoid bare tag dumps). Cover: subject, scene/environment, style, lighting, and quality. Be vivid but coherent."),
   qwen2: peSys("MODEL: Qwen Image 2.0 (EDIT). Write an instruction, not a description. State clearly: what to KEEP unchanged, what to CHANGE, and constraints (match lighting, preserve identity). Be surgical and specific."),
   qwen: peSys("MODEL: Qwen (EDIT). Write an edit instruction: what to change, what to preserve, desired outcome. Specific and direct."),
