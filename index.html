@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.40" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.41" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.40</title>
+  <title>Zaor Studio 0.41</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1041,7 +1041,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.40</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.41</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1439,9 +1439,9 @@ const MODEL_REGISTRY = {
   'z-image-turbo':  { cat:'t2img', label:'Z-Image Turbo',  provider:'wavespeed', path:'wavespeed-ai/z-image-turbo/text-to-image',        price:0.01,  verified:false,
     buildBody:p=>({ prompt:p.prompt, aspect_ratio:p.aspectRatio||'1:1', enable_safety_checker:false }) },
   'atlas-flux-dev': { cat:'t2img', label:'Flux Dev (Atlas)', provider:'atlas', path:'black-forest-labs/flux-dev', price:0.01, verified:true,
-    buildBody:p=>({ input:{ prompt:p.prompt, num_images:1, enable_base64_output:true, enable_safety_checker:false } }) },
+    buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
   'atlas-flux-schnell': { cat:'t2img', label:'Flux Schnell (Atlas, cheap)', provider:'atlas', path:'black-forest-labs/flux-schnell', price:0.003, verified:true,
-    buildBody:p=>({ input:{ prompt:p.prompt, num_images:1, enable_base64_output:true, enable_safety_checker:false } }) },
+    buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
 
   // ─────────── TEXT-TO-VIDEO ───────────
   'aurora-t2v':      { cat:'t2v', label:'Aurora T2V',         provider:'xai-video', path:'grok-imagine-video',                      pricePerS:0.05, verified:true,
