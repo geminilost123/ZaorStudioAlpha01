@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.56" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.59" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.56</title>
+  <title>Zaor Studio 0.59</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -564,6 +564,10 @@
     .lib-item-text { font-size: 11px; color: var(--text-dim); margin-top: 5px; line-height: 1.45; white-space: pre-wrap; }
     .lib-empty { text-align: center; color: var(--text-dim); font-size: 13px; padding: 24px 0; }
 
+    /* LoRA manager */
+    .lora-item { background: var(--bg); border: 1px solid rgba(255,255,255,0.10); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+    .lora-meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; word-break: break-word; }
+
     /* PE final prompt cards */
     .pe-final-cards { margin: 10px 0; display: flex; flex-direction: column; gap: 8px; }
     .pe-final-head { font-size: 11px; color: var(--lavender); text-transform: uppercase; letter-spacing: 0.04em; padding-left: 2px; }
@@ -1073,7 +1077,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.56</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.59</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1092,6 +1096,7 @@
         </select>
         <button id="pe-btn" title="Prompt Engineer mode">✦ PE</button>
         <button id="library-btn" title="Prompt library">📚</button>
+        <button id="lora-btn" title="LoRA manager">🧬</button>
         <button id="refresh-btn" title="Force update from GitHub">↻</button>
         <button id="api-key-btn">Set API Key</button>
       </div>
@@ -1113,6 +1118,7 @@
           <optgroup label="── Text-to-Video ──">
             <option value="seedance15t2v">Seedance 1.5 T2V</option>
             <option value="wan26t2v">Wan 2.6 T2V</option>
+            <option value="ltx23">LTX 2.3 (audio)</option>
           </optgroup>
           <optgroup label="── Animate (I2V) ──">
             <option value="aurora_i2v">Aurora I2V</option>
@@ -1356,6 +1362,28 @@
   </div>
 </div>
 
+<!-- LoRA Manager Modal -->
+<div class="modal-overlay" id="lora-overlay">
+  <div class="modal" style="max-width:560px;width:92%;max-height:85vh;display:flex;flex-direction:column;">
+    <h2 style="margin-bottom:4px;">🧬 LoRA Manager</h2>
+    <p style="margin-bottom:10px;">Save a LoRA once (link + trigger word), then tick up to 3 to apply. Used by the <b>Z-Image Turbo + LoRA</b> image model. Trigger words are added to your prompt automatically.</p>
+    <div id="lora-list" style="overflow-y:auto;flex:1;margin-bottom:10px;"></div>
+    <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;">
+      <div style="font-size:12px;color:var(--lavender);margin-bottom:6px;">Add a LoRA</div>
+      <input type="text" id="lora-name" placeholder="Name (e.g. My comic style)" autocomplete="off" style="margin-bottom:6px;" />
+      <input type="text" id="lora-url" placeholder="LoRA file link (Hugging Face / Civitai)" autocomplete="off" spellcheck="false" style="margin-bottom:6px;" />
+      <div style="display:flex;gap:6px;">
+        <input type="text" id="lora-trigger" placeholder="Trigger word" autocomplete="off" spellcheck="false" style="flex:1;margin-bottom:6px;" />
+        <input type="number" id="lora-scale" value="1" min="0" max="2" step="0.05" title="Strength 0.5–1.0" style="width:84px;margin-bottom:6px;" />
+      </div>
+    </div>
+    <div class="modal-btns" style="margin-top:4px;">
+      <button class="btn-secondary" id="lora-close">Close</button>
+      <button class="btn-primary" id="lora-add">+ Add LoRA</button>
+    </div>
+  </div>
+</div>
+
   <div class="modal">
     <h2>Rename Game</h2>
     <p>Give this game a name.</p>
@@ -1500,6 +1528,13 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
   'z-image-turbo':  { cat:'t2img', label:'Z-Image Turbo (Atlas)', provider:'atlas', path:'z-image/turbo',  price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
+  'z-image-lora':   { cat:'t2img', label:'Z-Image Turbo + LoRA', provider:'wavespeed', path:'wavespeed-ai/z-image/turbo-lora', price:0.01, verified:true,
+    buildBody:p=>{
+      const sizeMap = { '1:1':'1024*1024','16:9':'1344*768','9:16':'768*1344','4:3':'1152*896','3:4':'896*1152','3:2':'1216*832','2:3':'832*1216' };
+      const b = { prompt:p.prompt, size:(sizeMap[p.aspectRatio]||'1024*1024'), seed:-1, enable_base64_output:false };
+      if (p.loras && p.loras.length) b.loras = p.loras.slice(0,3).map(l=>({ path:l.path, scale:Number(l.scale)||1 }));
+      return b;
+    } },
   'atlas-flux-dev': { cat:'t2img', label:'Flux Dev (Atlas)', provider:'atlas', path:'black-forest-labs/flux-dev', price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
   'atlas-flux-schnell': { cat:'t2img', label:'Flux Schnell (Atlas) — $0.003', provider:'atlas', path:'black-forest-labs/flux-schnell', price:0.003, verified:true,
@@ -2419,6 +2454,17 @@ async function generateImage(prompt) {
     const fullPrompt = applyStyleLock(prompt);
     const usedModel = m.label;
     const callParams = { prompt: fullPrompt, aspectRatio, resolution };
+
+    // LoRA support: apply active LoRAs + auto-add their trigger words (Z-Image Turbo + LoRA)
+    if (modelId === 'z-image-lora') {
+      const act = activeLoras();
+      callParams.loras = act.map(l => ({ path: l.url, scale: Number(l.scale) || 1 }));
+      const triggers = act.map(l => l.trigger).filter(Boolean);
+      let p2 = callParams.prompt;
+      triggers.forEach(t => { if (!p2.toLowerCase().includes(t.toLowerCase())) p2 = t + ', ' + p2; });
+      callParams.prompt = p2;
+      if (!act.length) appendError('Tip: no LoRAs are active — tap 🧬 and tick one, or this generates as plain Z-Image.');
+    }
 
     removeTyping(typingId);
 
@@ -3466,6 +3512,11 @@ const PROMPT_LIBRARY = [
   { type:'image', cat:'Z-Image', title:'Z-Image scene', text:'[Medium, e.g. cinematic editorial photograph] of [subject] [action] in [setting], [time of day and lighting], [2-3 key details], rich micro-texture, sharp focus, photorealistic. Front-load the subject; keep to 3-5 strong concepts in one style.' },
   { type:'image', cat:'Z-Image', title:'Z-Image text/poster', text:'[Medium] poster, [scene/subject], with the title text "[YOUR TEXT]" in [font/style and placement], [color palette], [lighting]. Z-Image renders quoted text accurately — keep it short and in quotes.' },
   { type:'modifier', cat:'Z-Image', title:'Z-Image rules (read me)', text:'Z-Image tips: POSITIVE phrasing only — no "no/avoid" (it ignores negatives) · name a camera/lens/film · always specify lighting · add "skin pores, fabric detail, film grain" for realism · front-load the subject and any text · 3-5 strong concepts, one style family, no contradictions.' },
+  // ── LTX 2.3 (flowing prose, structure-first, native audio — describe sound explicitly) ──
+  { type:'video', cat:'LTX 2.3', title:'LTX cinematic shot (T2V)', text:'[Subject] [specific action with a concrete motion verb] in [setting]. [Lighting and atmosphere]. The camera [plain-language move, e.g. slowly dollies from behind the subject to the front]. Sound: [ambient room/outdoor tone], [specific sound effects], [music or dialogue]. Authentic textures, natural directional light.' },
+  { type:'video', cat:'LTX 2.3', title:'LTX animate (I2V)', text:'[One specific motion of the subject], [secondary motion — hair, fabric, light shifting]. The camera [plain-language move]. Sound: [ambient tone], [specific effects], [any music]. Describe only the motion, light changes and sound — not the static scene that is already in the frame.' },
+  { type:'modifier', cat:'LTX 2.3', title:'LTX sound design', text:'Sound: [room tone / outdoor ambience], [specific effects — e.g. footsteps on gravel, a door creak], [music: genre + how it plays softly/loudly], [dialogue if any]. Keep audio cues concrete — LTX generates them natively.' },
+  { type:'modifier', cat:'LTX 2.3', title:'LTX rules (read me)', text:'LTX 2.3 tips: write flowing prose, never "Subject:/Camera:" fields · structure first (clear subject + one specific action + setting), style words last · use concrete motion verbs ("hands moving with practiced precision") · ALWAYS describe the audio (LTX makes sound) · for image-to-video describe only motion/light/sound, not the static frame.' },
   // ── Video (Wan/Seedance/Aurora: subject → motion → camera → scene, lead with subject+motion) ──
   { type:'video', cat:'Motion (I2V)', title:'Subtle natural motion', text:'[subject] [one small natural motion], camera slowly pushes in, [ambient detail] drifts gently, soft natural lighting, calm and steady pacing' },
   { type:'video', cat:'Motion (T2V)', title:'Single clear action', text:'[subject] [one clear action in present tense], camera [tracks alongside / orbits slowly], [environment], [lighting], smooth cinematic motion' },
@@ -3700,6 +3751,67 @@ async function finalizePromptPE() {
 }
 
 document.getElementById('pe-finalize-btn')?.addEventListener('click', finalizePromptPE);
+
+// ═══════════════════════════════════════════════════════
+// LoRA MANAGER — save LoRAs (link + trigger word), apply up to 3
+// on the "Z-Image Turbo + LoRA" model. Trigger words auto-added to prompt.
+// ═══════════════════════════════════════════════════════
+let zaorLoras = [];
+try { zaorLoras = JSON.parse(localStorage.getItem('zaor_loras') || '[]'); } catch(e) { zaorLoras = []; }
+function saveZaorLoras() { try { localStorage.setItem('zaor_loras', JSON.stringify(zaorLoras)); } catch(e) {} }
+function activeLoras() { return zaorLoras.filter(l => l.active).slice(0, 3); }
+
+const loraOverlay = document.getElementById('lora-overlay');
+const loraList = document.getElementById('lora-list');
+
+function renderLoras() {
+  if (!loraList) return;
+  if (!zaorLoras.length) {
+    loraList.innerHTML = '<div class="lib-empty">No LoRAs yet. Add one below — paste a Hugging Face or Civitai file link plus its trigger word.</div>';
+    return;
+  }
+  const count = activeLoras().length;
+  loraList.innerHTML = zaorLoras.map(l =>
+    '<div class="lora-item"><div style="display:flex;align-items:center;gap:8px;">' +
+      '<input type="checkbox" class="lora-active" data-id="' + l.id + '"' + (l.active ? ' checked' : '') + ' style="width:18px;height:18px;flex-shrink:0;" />' +
+      '<div style="flex:1;min-width:0;"><div class="lib-item-title">' + (l.name || 'Untitled').replace(/</g,'&lt;') + '</div>' +
+      '<div class="lora-meta">trigger: <b>' + (l.trigger || '—').replace(/</g,'&lt;') + '</b> · scale ' + l.scale + '</div></div>' +
+      '<span class="lib-del" data-del="' + l.id + '" title="Delete">\u2715</span>' +
+    '</div></div>'
+  ).join('') + '<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">' + count + '/3 active</div>';
+}
+
+document.getElementById('lora-btn')?.addEventListener('click', () => { renderLoras(); loraOverlay.classList.add('open'); });
+document.getElementById('lora-close')?.addEventListener('click', () => loraOverlay.classList.remove('open'));
+loraOverlay?.addEventListener('click', (e) => { if (e.target === loraOverlay) loraOverlay.classList.remove('open'); });
+
+document.getElementById('lora-add')?.addEventListener('click', () => {
+  const url = document.getElementById('lora-url').value.trim();
+  if (!url) { alert('Paste the LoRA file link first (from Hugging Face or Civitai).'); return; }
+  const name = document.getElementById('lora-name').value.trim();
+  const trigger = document.getElementById('lora-trigger').value.trim();
+  const scale = parseFloat(document.getElementById('lora-scale').value) || 1;
+  zaorLoras.unshift({ id: Date.now(), name: name || 'Untitled', url, trigger, scale, active: activeLoras().length < 3 });
+  saveZaorLoras();
+  ['lora-name','lora-url','lora-trigger'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('lora-scale').value = '1';
+  renderLoras();
+});
+
+loraList?.addEventListener('click', (e) => {
+  const del = e.target.closest('.lib-del');
+  if (del) { zaorLoras = zaorLoras.filter(l => String(l.id) !== String(del.dataset.del)); saveZaorLoras(); renderLoras(); }
+});
+loraList?.addEventListener('change', (e) => {
+  const cb = e.target.closest('.lora-active');
+  if (!cb) return;
+  const l = zaorLoras.find(x => String(x.id) === String(cb.dataset.id));
+  if (!l) return;
+  if (cb.checked && activeLoras().length >= 3) { cb.checked = false; alert('You can apply up to 3 LoRAs at once. Untick one first.'); return; }
+  l.active = cb.checked;
+  saveZaorLoras();
+  renderLoras();
+});
 
 function openModal(type) {
   if (type === 'api') {
@@ -3989,6 +4101,7 @@ const PE_SYSTEM_PROMPTS = {
   // ── Animate / Image-to-Video ──
   aurora_i2v: peSys("MODEL: Aurora image-to-video. Describe MOTION, not appearance (the still already defines looks). Order: subject motion → camera move → mood/pacing. Use cinematic camera verbs ('slow push in', 'gentle parallax', 'subject turns to camera'). Keep under ~80 words."),
   seedance15t2v: peSys("MODEL: Seedance text-to-video. Order: subject → one clear action (present tense) → camera → style. One main movement per shot. Vivid, physical language. Under ~100 words."),
+  ltx23: peSys("MODEL: LTX 2.3 (Lightricks video — T2V/I2V/extend with NATIVE AUDIO). Write the prompt as a flowing cinematic NARRATIVE in prose — never labelled fields like 'Subject:/Camera:'. Structure first, style second: give a clear subject, ONE specific action with concrete motion verbs ('hands moving with practiced precision', not 'cooking'), and the setting; then layer lighting and style words last. Describe the camera move in plain language, usually near the end ('the camera slowly dollies from behind the subject to in front'). CRUCIAL: LTX generates sound natively — explicitly describe the audio: ambient room tone, specific sound effects, and any music or dialogue (e.g. 'the strong thud of the hammer, soft country blues from an old gramophone'). Add realism cues (natural directional light, authentic skin texture). If animating from an image (I2V), describe ONLY the motion, light changes and audio — do NOT redescribe what is already in the frame. Keep to one coherent beat."),
   seedance_i2v: peSys("MODEL: Seedance image-to-video. Describe the motion, camera behaviour, emotional tone and visual style. Seedance handles bold, expressive motion well. Describe motion not appearance. Under ~100 words."),
   wan22spicy_i2v: peSys("MODEL: Wan 2.2 image-to-video. Lead with subject + motion, then camera. Pick ONE clear motion — avoid complex multi-action. Use motion-intensity words (subtle/gentle, smooth/flowing, dynamic/sweeping). Under ~60 words."),
   wan27spicy_i2v: peSys("MODEL: Wan 2.7 image-to-video. Supports a short arc: opening motion → development → resolution. Order subject → motion → camera → scene. Include camera work and clear motion-intensity. Under ~100 words."),
