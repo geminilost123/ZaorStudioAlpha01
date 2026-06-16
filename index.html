@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.67" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.69" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.67</title>
+  <title>Zaor Studio 0.69</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1085,7 +1085,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.67</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.69</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1190,10 +1190,13 @@
             <option value="fluxkontext">Flux Kontext · WaveSpeed — $0.02</option>
             <option value="wan27" selected>Wan 2.7 Edit · WaveSpeed — $0.03</option>
             <option value="wan27pro">Wan 2.7 Pro Edit · WaveSpeed — $0.06</option>
+            <option value="atlas-flux-kontext">Flux Kontext · Atlas · uncensored — $0.025</option>
+            <option value="atlas-qwen-edit">Qwen Edit · Atlas — $0.02</option>
             <option value="aurora">Aurora Edit · xAI — ~$0.04</option>
           </select>
         </div>
       </div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:-4px;margin-bottom:8px;line-height:1.4;">These are the edit models. Chroma and the other text-to-image models are generate-only — find them in the Image tab.</div>
       <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/webp" style="display:none;" />
       <div class="input-row">
         <textarea id="prompt" rows="1" placeholder="Say something…"></textarea>
@@ -1595,6 +1598,10 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
   'atlas-wan27-img': { cat:'t2img', label:'Wan 2.7 Image · Atlas', provider:'atlas', path:'alibaba/wan-2.7/text-to-image', price:0.03, verified:true,
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
+  'atlas-flux-kontext': { cat:'edit', label:'Flux Kontext · Atlas', provider:'atlas', path:'black-forest-labs/flux-kontext-dev', price:0.025, verified:true,
+    buildBody:p=>({ prompt:p.prompt, image:p.image, guidance_scale:2.5, num_inference_steps:28, enable_base64_output:false, enable_safety_checker:false }) },
+  'atlas-qwen-edit':   { cat:'edit', label:'Qwen Edit · Atlas', provider:'atlas', path:'atlascloud/qwen-image/edit', price:0.02, verified:true,
+    buildBody:p=>({ prompt:p.prompt, image:p.image, enable_base64_output:false, enable_safety_checker:false }) },
 
   // ─────────── TEXT-TO-VIDEO ───────────
   // NOTE: Aurora video (T2V/I2V/extend/edit) is handled by generateVideoAurora via xAI DIRECT,
@@ -2305,6 +2312,28 @@ async function handleSend() {
 // ═══════════════════════════════════════════════════════
 // IMAGE EDITING
 // ═══════════════════════════════════════════════════════
+// Atlas edits need an image URL Atlas can fetch. Upload the source (data URL or remote)
+// to Atlas's uploadMedia and return the hosted URL; fall back to the raw src if upload fails.
+async function atlasPrepareImage(src) {
+  try {
+    const resp = await fetch(src);
+    const blob = await resp.blob();
+    const fd = new FormData();
+    fd.append('file', blob, 'source.png');
+    const up = await fetch('https://api.atlascloud.ai/api/v1/model/uploadMedia', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${atlasKey}` },
+      body: fd
+    });
+    if (up.ok) {
+      const j = await up.json().catch(() => ({}));
+      const u = j.url || j.data?.url || j.data?.media_url || j.media_url;
+      if (u) return u;
+    }
+  } catch (e) { /* fall through to raw src */ }
+  return src;
+}
+
 async function editImage(prompt, imageUrl, skipStyleLock = false, modelOverride = null) {
   const typingId = appendTyping();
   const editModel = modelOverride || document.getElementById('edit-model-select')?.value || 'wan27';
@@ -2335,6 +2364,16 @@ async function editImage(prompt, imageUrl, skipStyleLock = false, modelOverride 
       const url = data.data?.[0]?.url;
       if (!url) throw new Error('No image returned from Aurora edit');
       src = url; hostedUrl = url; modelLabel = 'Aurora Edit';
+
+    } else if (editModel === 'atlas-flux-kontext' || editModel === 'atlas-qwen-edit') {
+      // ── Atlas uncensored edit (routes through the proven callModel 'atlas' path) ──
+      if (!atlasKey) throw new Error('Atlas Cloud API key required. Tap "Set API Key" to add it.');
+      const atlasImg = await atlasPrepareImage(imageUrl);
+      const resultUrl = await callModel(editModel, { prompt: fullPrompt, image: atlasImg, isCancelled: () => false });
+      removeTyping(typingId);
+      if (!resultUrl) throw new Error('Atlas edit timed out');
+      src = resultUrl; hostedUrl = resultUrl;
+      modelLabel = (editModel === 'atlas-flux-kontext') ? 'Flux Kontext Edit · Atlas' : 'Qwen Edit · Atlas';
 
     } else {
       // ── Wan 2.7 edit via WaveSpeed ──
@@ -4205,7 +4244,7 @@ function updateCostEstimate() {
   } else if (editMode) {
     // Edit = input image + output image
     const editMod = document.getElementById('edit-model-select')?.value || 'wan27';
-    const editCostMap = { aurora: '~$0.04', wan27pro: '$0.06', wan27: '$0.03', fluxkontext: '$0.02', qwen2: '$0.03', qwen: '$0.02' };
+    const editCostMap = { aurora: '~$0.04', wan27pro: '$0.06', wan27: '$0.03', fluxkontext: '$0.02', qwen2: '$0.03', qwen: '$0.02', 'atlas-flux-kontext': '$0.025', 'atlas-qwen-edit': '$0.02' };
     el.textContent = editCostMap[editMod] || '$0.02';
     modeText.textContent = 'Edit image mode';
 
