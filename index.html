@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.62" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.64" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.62</title>
+  <title>Zaor Studio 0.64</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1077,7 +1077,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.62</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.64</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1387,7 +1387,7 @@
       <input type="text" id="lora-name" placeholder="Name (e.g. My comic style)" autocomplete="off" style="margin-bottom:6px;" />
       <input type="text" id="lora-url" placeholder="LoRA link or Hugging Face owner/repo" autocomplete="off" spellcheck="false" style="margin-bottom:6px;" />
       <div style="display:flex;gap:6px;">
-        <input type="text" id="lora-trigger" placeholder="Trigger word" autocomplete="off" spellcheck="false" style="flex:1;margin-bottom:6px;" />
+        <input type="text" id="lora-trigger" placeholder="Always-on trigger word(s), comma-separated" autocomplete="off" spellcheck="false" style="flex:1;margin-bottom:6px;" />
         <select id="lora-base" class="img-control-select" style="width:110px;margin-bottom:6px;" title="Which base model this LoRA is for">
           <option value="Flux" selected>For: Flux</option>
           <option value="Z-Image">For: Z-Image</option>
@@ -1395,6 +1395,7 @@
         </select>
         <input type="number" id="lora-scale" value="1" min="0" max="2" step="0.05" title="Strength 0.5–1.0" style="width:74px;margin-bottom:6px;" />
       </div>
+      <input type="text" id="lora-notes" placeholder="Notes (optional) — e.g. other trigger words & what each does" autocomplete="off" style="margin-bottom:6px;" />
     </div>
     <div class="modal-btns" style="margin-top:4px;">
       <button class="btn-secondary" id="lora-close">Close</button>
@@ -2514,19 +2515,25 @@ async function generateImage(prompt) {
     const usedModel = m.label;
     const callParams = { prompt: fullPrompt, aspectRatio, resolution };
 
-    // LoRA support: apply active LoRAs + auto-add trigger words (any LoRA-capable model)
+    // LoRA support: apply only LoRAs whose base matches the selected model (any LoRA-capable model)
     if (m.lora) {
       const act = activeLoras();
-      callParams.loras = act.map(l => ({ path: l.url, scale: Number(l.scale) || 1 }));
-      const triggers = act.map(l => l.trigger).filter(Boolean);
+      // Wrong-base LoRAs are NOT applied — only matching-base (or untagged/"Other") ones.
+      const matching = act.filter(l => !l.base || l.base === 'Other' || l.base === m.loraBase);
+      const skipped = act.filter(l => matching.indexOf(l) === -1);
+      callParams.loras = matching.map(l => ({ path: l.url, scale: Number(l.scale) || 1 }));
       let p2 = callParams.prompt;
-      triggers.forEach(t => { if (!p2.toLowerCase().includes(t.toLowerCase())) p2 = t + ', ' + p2; });
+      matching.forEach(l => {
+        (l.trigger || '').split(',').map(t => t.trim()).filter(Boolean).forEach(t => {
+          if (!p2.toLowerCase().includes(t.toLowerCase())) p2 = t + ', ' + p2;
+        });
+      });
       callParams.prompt = p2;
-      if (!act.length) {
-        appendError('Tip: no LoRAs are active — tap 🧬 and tick one, or this generates as plain ' + (m.loraBase || 'base') + '.');
-      } else {
-        const mismatch = act.find(l => l.base && m.loraBase && l.base !== 'Other' && l.base !== m.loraBase);
-        if (mismatch) appendError('Heads up: "' + (mismatch.name || 'a LoRA') + '" is tagged for ' + mismatch.base + ', but you picked the ' + m.loraBase + ' model. LoRAs only work on their matching base model.');
+      if (skipped.length) {
+        appendError('Skipped ' + skipped.length + ' LoRA(s) not made for the ' + m.loraBase + ' model: ' + skipped.map(l => l.name || 'Untitled').join(', ') + '. Only matching-base LoRAs are applied.');
+      }
+      if (!matching.length) {
+        appendError('Tip: no ' + (m.loraBase || 'matching') + ' LoRAs are active — tap 🧬 and tick one, or this generates as plain ' + (m.loraBase || 'base') + '.');
       }
     }
 
@@ -3856,6 +3863,7 @@ function renderLoras() {
       '<input type="checkbox" class="lora-active" data-id="' + l.id + '"' + (l.active ? ' checked' : '') + ' style="width:18px;height:18px;flex-shrink:0;" />' +
       '<div style="flex:1;min-width:0;"><div class="lib-item-title">' + (l.name || 'Untitled').replace(/</g,'&lt;') + '</div>' +
       '<div class="lora-meta">' + (l.base ? '<b>' + l.base + '</b> · ' : '') + 'trigger: <b>' + (l.trigger || '—').replace(/</g,'&lt;') + '</b></div>' +
+      (l.notes ? '<div class="lora-meta" style="opacity:0.8;">\uD83D\uDCDD ' + l.notes.replace(/</g,'&lt;') + '</div>' : '') +
       '<div style="display:flex;align-items:center;gap:6px;margin-top:5px;"><span style="font-size:11px;color:var(--text-dim);">weight</span>' +
       '<input type="number" class="lora-scale-edit" data-id="' + l.id + '" value="' + l.scale + '" min="0" max="2" step="0.05" style="width:70px;padding:3px 6px;font-size:12px;" /></div></div>' +
       '<span class="lib-del" data-del="' + l.id + '" title="Delete">\u2715</span>' +
@@ -3874,9 +3882,10 @@ document.getElementById('lora-add')?.addEventListener('click', () => {
   const trigger = document.getElementById('lora-trigger').value.trim();
   const scale = parseFloat(document.getElementById('lora-scale').value) || 1;
   const base = document.getElementById('lora-base')?.value || 'Other';
-  zaorLoras.unshift({ id: Date.now(), name: name || 'Untitled', url, trigger, scale, base, active: activeLoras().length < 3 });
+  const notes = document.getElementById('lora-notes')?.value.trim() || '';
+  zaorLoras.unshift({ id: Date.now(), name: name || 'Untitled', url, trigger, scale, base, notes, active: activeLoras().length < 3 });
   saveZaorLoras();
-  ['lora-name','lora-url','lora-trigger'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['lora-name','lora-url','lora-trigger','lora-notes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('lora-scale').value = '1';
   renderLoras();
 });
@@ -3923,7 +3932,7 @@ document.getElementById('lora-import')?.addEventListener('click', () => {
   let added = 0;
   arr.forEach(l => {
     if (l && l.url && !have.has(l.url)) {
-      zaorLoras.push({ id: l.id || (Date.now() + Math.random()), name: l.name || 'Untitled', url: l.url, trigger: l.trigger || '', scale: l.scale || 1, base: l.base || 'Other', active: false });
+      zaorLoras.push({ id: l.id || (Date.now() + Math.random()), name: l.name || 'Untitled', url: l.url, trigger: l.trigger || '', scale: l.scale || 1, base: l.base || 'Other', notes: l.notes || '', active: false });
       have.add(l.url); added++;
     }
   });
