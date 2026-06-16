@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.59" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.62" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.59</title>
+  <title>Zaor Studio 0.62</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1077,7 +1077,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.59</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.62</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1333,6 +1333,15 @@
     <input type="password" id="wavespeed-key-input" placeholder="ws-…" autocomplete="off" spellcheck="false" />
     <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Atlas Cloud Key (cheap video — optional)</label>
     <input type="password" id="atlas-key-input" placeholder="atlas-…" autocomplete="off" spellcheck="false" />
+    <div style="border-top:1px solid rgba(255,255,255,0.1);margin-top:8px;padding-top:12px;">
+      <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Storage</label>
+      <div id="storage-usage-modal" style="font-size:12px;color:var(--text-dim);margin-bottom:8px;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-secondary" id="clear-media-btn" style="flex:1;">🧹 Clear stored media</button>
+        <button class="btn-secondary" id="clear-chats-btn" style="flex:1;">🗑 Clear all chats</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:6px;">Frees space if the app slows down. Your LoRAs, saved prompts, and keys are kept.</div>
+    </div>
     <div class="modal-btns">
       <button class="btn-secondary" id="modal-cancel">Cancel</button>
       <button class="btn-primary" id="modal-save">Save</button>
@@ -1366,15 +1375,25 @@
 <div class="modal-overlay" id="lora-overlay">
   <div class="modal" style="max-width:560px;width:92%;max-height:85vh;display:flex;flex-direction:column;">
     <h2 style="margin-bottom:4px;">🧬 LoRA Manager</h2>
-    <p style="margin-bottom:10px;">Save a LoRA once (link + trigger word), then tick up to 3 to apply. Used by the <b>Z-Image Turbo + LoRA</b> image model. Trigger words are added to your prompt automatically.</p>
+    <p style="margin-bottom:10px;">Save a LoRA once (link + trigger word), then tick up to 3 to apply. Works with the <b>Flux Dev + LoRA</b> and <b>Z-Image Turbo + LoRA</b> models. A LoRA only works on its matching base model. Trigger words are added to your prompt automatically.</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+      <button class="lib-filter" id="lora-unload-all">Unload all</button>
+      <button class="lib-filter" id="lora-export">⤓ Back up</button>
+      <button class="lib-filter" id="lora-import">⤒ Restore</button>
+    </div>
     <div id="lora-list" style="overflow-y:auto;flex:1;margin-bottom:10px;"></div>
     <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;">
       <div style="font-size:12px;color:var(--lavender);margin-bottom:6px;">Add a LoRA</div>
       <input type="text" id="lora-name" placeholder="Name (e.g. My comic style)" autocomplete="off" style="margin-bottom:6px;" />
-      <input type="text" id="lora-url" placeholder="LoRA file link (Hugging Face / Civitai)" autocomplete="off" spellcheck="false" style="margin-bottom:6px;" />
+      <input type="text" id="lora-url" placeholder="LoRA link or Hugging Face owner/repo" autocomplete="off" spellcheck="false" style="margin-bottom:6px;" />
       <div style="display:flex;gap:6px;">
         <input type="text" id="lora-trigger" placeholder="Trigger word" autocomplete="off" spellcheck="false" style="flex:1;margin-bottom:6px;" />
-        <input type="number" id="lora-scale" value="1" min="0" max="2" step="0.05" title="Strength 0.5–1.0" style="width:84px;margin-bottom:6px;" />
+        <select id="lora-base" class="img-control-select" style="width:110px;margin-bottom:6px;" title="Which base model this LoRA is for">
+          <option value="Flux" selected>For: Flux</option>
+          <option value="Z-Image">For: Z-Image</option>
+          <option value="Other">For: Other</option>
+        </select>
+        <input type="number" id="lora-scale" value="1" min="0" max="2" step="0.05" title="Strength 0.5–1.0" style="width:74px;margin-bottom:6px;" />
       </div>
     </div>
     <div class="modal-btns" style="margin-top:4px;">
@@ -1528,10 +1547,17 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
   'z-image-turbo':  { cat:'t2img', label:'Z-Image Turbo (Atlas)', provider:'atlas', path:'z-image/turbo',  price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
-  'z-image-lora':   { cat:'t2img', label:'Z-Image Turbo + LoRA', provider:'wavespeed', path:'wavespeed-ai/z-image/turbo-lora', price:0.01, verified:true,
+  'z-image-lora':   { cat:'t2img', label:'Z-Image Turbo + LoRA', provider:'wavespeed', path:'wavespeed-ai/z-image/turbo-lora', price:0.01, verified:true, lora:true, loraBase:'Z-Image',
     buildBody:p=>{
       const sizeMap = { '1:1':'1024*1024','16:9':'1344*768','9:16':'768*1344','4:3':'1152*896','3:4':'896*1152','3:2':'1216*832','2:3':'832*1216' };
-      const b = { prompt:p.prompt, size:(sizeMap[p.aspectRatio]||'1024*1024'), seed:-1, enable_base64_output:false };
+      const b = { prompt:p.prompt, size:(sizeMap[p.aspectRatio]||'1024*1024'), seed:-1, enable_base64_output:false, enable_safety_checker:false };
+      if (p.loras && p.loras.length) b.loras = p.loras.slice(0,3).map(l=>({ path:l.path, scale:Number(l.scale)||1 }));
+      return b;
+    } },
+  'flux-lora':      { cat:'t2img', label:'Flux Dev + LoRA', provider:'wavespeed', path:'wavespeed-ai/flux-dev-lora', price:0.015, verified:true, lora:true, loraBase:'Flux',
+    buildBody:p=>{
+      const sizeMap = { '1:1':'1024*1024','16:9':'1344*768','9:16':'768*1344','4:3':'1152*896','3:4':'896*1152','3:2':'1216*832','2:3':'832*1216' };
+      const b = { prompt:p.prompt, size:(sizeMap[p.aspectRatio]||'1024*1024'), num_inference_steps:28, guidance_scale:3.5, num_images:1, seed:-1, output_format:'jpeg', enable_base64_output:false, enable_safety_checker:false };
       if (p.loras && p.loras.length) b.loras = p.loras.slice(0,3).map(l=>({ path:l.path, scale:Number(l.scale)||1 }));
       return b;
     } },
@@ -1775,7 +1801,40 @@ function updateStorageInfo() {
     }
     const mb = (used / 1024 / 1024).toFixed(1);
     storageInfo.textContent = `${mb} MB used locally`;
+    const mEl = document.getElementById('storage-usage-modal');
+    if (mEl) mEl.textContent = `${mb} MB used locally`;
   } catch { storageInfo.textContent = ''; }
+}
+
+// Strip heavy media (image/video messages + base64 vision frames) from saved threads.
+// Keeps text, conversation structure, LoRAs, prompts, and keys intact.
+function clearStoredMedia() {
+  const threads = getThreads();
+  let removed = 0;
+  threads.forEach(t => {
+    if (Array.isArray(t.messages)) {
+      const before = t.messages.length;
+      t.messages = t.messages.filter(m => m.type !== 'image' && m.type !== 'video');
+      removed += before - t.messages.length;
+    }
+    if (Array.isArray(t.history)) {
+      t.history.forEach(h => {
+        if (Array.isArray(h.content)) {
+          h.content = h.content.filter(p => !(p && p.type === 'image_url'));
+          if (h.content.length === 1 && h.content[0] && h.content[0].type === 'text') h.content = h.content[0].text;
+          else if (h.content.length === 0) h.content = '[media removed]';
+        } else if (typeof h.content === 'string' && h.content.startsWith('data:')) {
+          h.content = '[media removed]';
+        }
+      });
+    }
+  });
+  saveThreads(threads);
+  return removed;
+}
+
+function clearAllChats() {
+  try { localStorage.removeItem('gs_threads'); } catch(e) {}
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2455,15 +2514,20 @@ async function generateImage(prompt) {
     const usedModel = m.label;
     const callParams = { prompt: fullPrompt, aspectRatio, resolution };
 
-    // LoRA support: apply active LoRAs + auto-add their trigger words (Z-Image Turbo + LoRA)
-    if (modelId === 'z-image-lora') {
+    // LoRA support: apply active LoRAs + auto-add trigger words (any LoRA-capable model)
+    if (m.lora) {
       const act = activeLoras();
       callParams.loras = act.map(l => ({ path: l.url, scale: Number(l.scale) || 1 }));
       const triggers = act.map(l => l.trigger).filter(Boolean);
       let p2 = callParams.prompt;
       triggers.forEach(t => { if (!p2.toLowerCase().includes(t.toLowerCase())) p2 = t + ', ' + p2; });
       callParams.prompt = p2;
-      if (!act.length) appendError('Tip: no LoRAs are active — tap 🧬 and tick one, or this generates as plain Z-Image.');
+      if (!act.length) {
+        appendError('Tip: no LoRAs are active — tap 🧬 and tick one, or this generates as plain ' + (m.loraBase || 'base') + '.');
+      } else {
+        const mismatch = act.find(l => l.base && m.loraBase && l.base !== 'Other' && l.base !== m.loraBase);
+        if (mismatch) appendError('Heads up: "' + (mismatch.name || 'a LoRA') + '" is tagged for ' + mismatch.base + ', but you picked the ' + m.loraBase + ' model. LoRAs only work on their matching base model.');
+      }
     }
 
     removeTyping(typingId);
@@ -3238,13 +3302,16 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   // Copy prompt button
   const copyPromptBtn = document.createElement('button');
   copyPromptBtn.className = 'save-btn';
-  copyPromptBtn.innerHTML = '⎘ Prompt';
+  copyPromptBtn.innerHTML = '📋 Copy prompt';
   copyPromptBtn.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(altText);
+    let ok = false;
+    try { await navigator.clipboard.writeText(altText); ok = true; } catch(e) {}
+    if (ok) {
       copyPromptBtn.innerHTML = '✓ Copied';
-      setTimeout(() => { copyPromptBtn.innerHTML = '⎘ Prompt'; }, 2000);
-    } catch(e) {}
+      setTimeout(() => { copyPromptBtn.innerHTML = '📋 Copy prompt'; }, 2000);
+    } else {
+      window.prompt('Copy this prompt:', altText); // fallback if clipboard is blocked
+    }
   });
 
   const animBtn = document.createElement('button');
@@ -3495,6 +3562,19 @@ const modalOverlay = document.getElementById('modal-overlay');
 const keyInput     = document.getElementById('key-input');
 
 apiKeyBtn.addEventListener('click', () => openModal('api'));
+
+document.getElementById('clear-media-btn')?.addEventListener('click', () => {
+  if (!confirm('Remove stored images & videos from your saved chats? Text is kept. Your LoRAs, prompts, and keys are not touched.')) return;
+  const n = clearStoredMedia();
+  updateStorageInfo();
+  alert(n + ' media item(s) cleared. Reload the app to see the freed space.');
+});
+document.getElementById('clear-chats-btn')?.addEventListener('click', () => {
+  if (!confirm('Delete ALL conversations? This cannot be undone. Your LoRAs, saved prompts, and keys are kept.')) return;
+  clearAllChats();
+  updateStorageInfo();
+  alert('All conversations cleared. Reload the app.');
+});
 
 // ═══════════════════════════════════════════════════════
 // PROMPT LIBRARY (offline, searchable, model-aware templates)
@@ -3775,7 +3855,9 @@ function renderLoras() {
     '<div class="lora-item"><div style="display:flex;align-items:center;gap:8px;">' +
       '<input type="checkbox" class="lora-active" data-id="' + l.id + '"' + (l.active ? ' checked' : '') + ' style="width:18px;height:18px;flex-shrink:0;" />' +
       '<div style="flex:1;min-width:0;"><div class="lib-item-title">' + (l.name || 'Untitled').replace(/</g,'&lt;') + '</div>' +
-      '<div class="lora-meta">trigger: <b>' + (l.trigger || '—').replace(/</g,'&lt;') + '</b> · scale ' + l.scale + '</div></div>' +
+      '<div class="lora-meta">' + (l.base ? '<b>' + l.base + '</b> · ' : '') + 'trigger: <b>' + (l.trigger || '—').replace(/</g,'&lt;') + '</b></div>' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-top:5px;"><span style="font-size:11px;color:var(--text-dim);">weight</span>' +
+      '<input type="number" class="lora-scale-edit" data-id="' + l.id + '" value="' + l.scale + '" min="0" max="2" step="0.05" style="width:70px;padding:3px 6px;font-size:12px;" /></div></div>' +
       '<span class="lib-del" data-del="' + l.id + '" title="Delete">\u2715</span>' +
     '</div></div>'
   ).join('') + '<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">' + count + '/3 active</div>';
@@ -3791,7 +3873,8 @@ document.getElementById('lora-add')?.addEventListener('click', () => {
   const name = document.getElementById('lora-name').value.trim();
   const trigger = document.getElementById('lora-trigger').value.trim();
   const scale = parseFloat(document.getElementById('lora-scale').value) || 1;
-  zaorLoras.unshift({ id: Date.now(), name: name || 'Untitled', url, trigger, scale, active: activeLoras().length < 3 });
+  const base = document.getElementById('lora-base')?.value || 'Other';
+  zaorLoras.unshift({ id: Date.now(), name: name || 'Untitled', url, trigger, scale, base, active: activeLoras().length < 3 });
   saveZaorLoras();
   ['lora-name','lora-url','lora-trigger'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('lora-scale').value = '1';
@@ -3803,6 +3886,12 @@ loraList?.addEventListener('click', (e) => {
   if (del) { zaorLoras = zaorLoras.filter(l => String(l.id) !== String(del.dataset.del)); saveZaorLoras(); renderLoras(); }
 });
 loraList?.addEventListener('change', (e) => {
+  const sc = e.target.closest('.lora-scale-edit');
+  if (sc) {
+    const l = zaorLoras.find(x => String(x.id) === String(sc.dataset.id));
+    if (l) { l.scale = parseFloat(sc.value) || 1; saveZaorLoras(); }
+    return;
+  }
   const cb = e.target.closest('.lora-active');
   if (!cb) return;
   const l = zaorLoras.find(x => String(x.id) === String(cb.dataset.id));
@@ -3813,12 +3902,43 @@ loraList?.addEventListener('change', (e) => {
   renderLoras();
 });
 
+document.getElementById('lora-unload-all')?.addEventListener('click', () => {
+  zaorLoras.forEach(l => l.active = false);
+  saveZaorLoras();
+  renderLoras();
+});
+document.getElementById('lora-export')?.addEventListener('click', () => {
+  if (!zaorLoras.length) { alert('No LoRAs to back up yet.'); return; }
+  const data = JSON.stringify(zaorLoras);
+  try { if (navigator.clipboard) navigator.clipboard.writeText(data); } catch(e) {}
+  window.prompt('LoRA backup (copied to clipboard). Save this text somewhere safe — paste it into Restore to bring your LoRAs back if they ever disappear:', data);
+});
+document.getElementById('lora-import')?.addEventListener('click', () => {
+  const txt = window.prompt('Paste your LoRA backup text here:');
+  if (!txt) return;
+  let arr;
+  try { arr = JSON.parse(txt); } catch(e) { alert("That doesn't look like valid backup text."); return; }
+  if (!Array.isArray(arr)) { alert('Backup format not recognized.'); return; }
+  const have = new Set(zaorLoras.map(l => l.url));
+  let added = 0;
+  arr.forEach(l => {
+    if (l && l.url && !have.has(l.url)) {
+      zaorLoras.push({ id: l.id || (Date.now() + Math.random()), name: l.name || 'Untitled', url: l.url, trigger: l.trigger || '', scale: l.scale || 1, base: l.base || 'Other', active: false });
+      have.add(l.url); added++;
+    }
+  });
+  saveZaorLoras();
+  renderLoras();
+  alert(added + ' LoRA(s) restored.');
+});
+
 function openModal(type) {
   if (type === 'api') {
     keyInput.value = apiKey;
     document.getElementById('wavespeed-key-input').value = wavespeedKey;
     document.getElementById('atlas-key-input').value = atlasKey;
     modalOverlay.classList.add('open');
+    updateStorageInfo();
     setTimeout(() => keyInput.focus(), 100);
   }
 }
