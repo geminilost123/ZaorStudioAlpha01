@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.65" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.67" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.65</title>
+  <title>Zaor Studio 0.67</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1085,7 +1085,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.65</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.67</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1137,7 +1137,6 @@
           <optgroup label="── Video Extend ──">
             <option value="aurora_extend">Aurora Extend</option>
             <option value="wan27extend">Wan 2.7 Extend</option>
-            <option value="seedance_extend">Seedance Extend</option>
             <option value="wan22spicy_extend">Wan 2.2 Spicy Extend</option>
           </optgroup>
         </select>
@@ -1186,12 +1185,12 @@
         <div id="edit-btn-row" style="display:none;gap:6px;align-items:center;">
           <button id="edit-img-btn" class="edit-img-btn visible" title="Edit last image">✏️ Edit</button>
           <select id="edit-model-select" class="img-control-select" title="Edit model">
-            <option value="qwen2">Qwen 2.0 Edit — $0.03</option>
-            <option value="qwen">Qwen Edit — $0.02</option>
-            <option value="fluxkontext">Flux Kontext — $0.02</option>
-            <option value="wan27" selected>Wan 2.7 — $0.03</option>
-            <option value="wan27pro">Wan 2.7 Pro — $0.06</option>
-            <option value="aurora">Aurora — ~$0.04</option>
+            <option value="qwen2">Qwen 2.0 Edit · WaveSpeed — $0.03</option>
+            <option value="qwen">Qwen Edit · WaveSpeed — $0.02</option>
+            <option value="fluxkontext">Flux Kontext · WaveSpeed — $0.02</option>
+            <option value="wan27" selected>Wan 2.7 Edit · WaveSpeed — $0.03</option>
+            <option value="wan27pro">Wan 2.7 Pro Edit · WaveSpeed — $0.06</option>
+            <option value="aurora">Aurora Edit · xAI — ~$0.04</option>
           </select>
         </div>
       </div>
@@ -1247,6 +1246,19 @@
             </select>
           </div>
         </div>
+        <div class="img-controls-row" id="flux-advanced-row" style="display:none;">
+          <div class="img-control-group">
+            <span class="mode-label" title="How many denoising passes. More = finer detail and better anatomy, but slower and a bit pricier.">Steps</span>
+            <input type="number" id="flux-steps" value="28" min="4" max="50" step="1" class="img-control-select" style="width:70px;" title="Inference steps. 28 = default. Try 36–45 for tricky anatomy (slower). Above ~45 rarely helps." />
+          </div>
+          <div class="img-control-group">
+            <span class="mode-label" title="How strictly Flux follows your prompt.">Guidance</span>
+            <input type="number" id="flux-guidance" value="3.5" min="1" max="7" step="0.5" class="img-control-select" style="width:70px;" title="Guidance scale. 3–4 is the sweet spot. Higher = follows the prompt more literally but can look over-cooked; lower = looser/softer." />
+          </div>
+          <div style="font-size:11px;color:var(--text-dim);flex-basis:100%;line-height:1.45;padding-top:2px;">
+            <b>Steps</b>: 28 default · 36–45 for tricky anatomy (slower). &nbsp;<b>Guidance</b>: 3–4 sweet spot · higher = more literal, can over-cook.
+          </div>
+        </div>
       </div>
       <div id="vid-mode-row">
         <div class="img-controls-row">
@@ -1298,11 +1310,11 @@
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.06);">
           <span class="mode-label" style="color:#a8e6cf;">Clean</span>
           <select id="clean-model-select" class="img-control-select">
-            <option value="qwen2">Qwen 2.0 Edit — $0.03</option>
-            <option value="qwen">Qwen Edit — $0.02</option>
-            <option value="fluxkontext">Flux Kontext — $0.02</option>
+            <option value="qwen2">Qwen 2.0 Edit · WaveSpeed — $0.03</option>
+            <option value="qwen">Qwen Edit · WaveSpeed — $0.02</option>
+            <option value="fluxkontext">Flux Kontext · WaveSpeed — $0.02</option>
             <option value="wan27">Wan 2.7 — $0.03</option>
-            <option value="wan27pro">Wan 2.7 Pro — $0.06</option>
+            <option value="wan27pro">Wan 2.7 Pro Edit · WaveSpeed — $0.06</option>
           </select>
           <button class="enhance-action-btn" id="auto-clean-btn">🧹 Clean via Qwen 2.0 Edit</button>
         </div>
@@ -1546,37 +1558,42 @@ let lastAtlasRaw = ''; // captured raw Atlas response for on-screen debugging
 // ═══════════════════════════════════════════════════════
 const MODEL_REGISTRY = {
   // ─────────── TEXT-TO-IMAGE ───────────
-  'aurora-simple':  { cat:'t2img', label:'Aurora Simple (xAI)',  provider:'xai-image', path:'grok-imagine-image',          price:0.02, verified:true,
+  'aurora-simple':  { cat:'t2img', label:'Aurora Simple · xAI',  provider:'xai-image', path:'grok-imagine-image',          price:0.02, verified:true,
     buildBody:p=>({ model:'grok-imagine-image', prompt:p.prompt, n:1, response_format:'url', aspect_ratio:p.aspectRatio||'1:1' }) },
-  'aurora-quality': { cat:'t2img', label:'Aurora Quality (xAI)', provider:'xai-image', path:'grok-imagine-image-quality',  price:0.05, verified:true,
+  'aurora-quality': { cat:'t2img', label:'Aurora Quality · xAI', provider:'xai-image', path:'grok-imagine-image-quality',  price:0.05, verified:true,
     buildBody:p=>({ model:'grok-imagine-image-quality', prompt:p.prompt, n:1, response_format:'url', aspect_ratio:p.aspectRatio||'1:1' }) },
-  'atlas-grok-quality': { cat:'t2img', label:'Aurora Quality (Atlas)', provider:'atlas', path:'xai/grok-imagine-image-quality/text-to-image', price:0.05, verified:true,
+  'atlas-grok-quality': { cat:'t2img', label:'Aurora Quality · Atlas', provider:'atlas', path:'xai/grok-imagine-image-quality/text-to-image', price:0.05, verified:true,
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
-  'atlas-grok-simple':  { cat:'t2img', label:'Aurora Simple (Atlas)', provider:'atlas', path:'xai/grok-imagine-image/text-to-image', price:0.02, verified:true,
+  'atlas-grok-simple':  { cat:'t2img', label:'Aurora Simple · Atlas', provider:'atlas', path:'xai/grok-imagine-image/text-to-image', price:0.02, verified:true,
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
-  'z-image-turbo':  { cat:'t2img', label:'Z-Image Turbo (Atlas)', provider:'atlas', path:'z-image/turbo',  price:0.01, verified:true,
+  'z-image-turbo':  { cat:'t2img', label:'Z-Image Turbo · Atlas', provider:'atlas', path:'z-image/turbo',  price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
-  'z-image-lora':   { cat:'t2img', label:'Z-Image Turbo + LoRA', provider:'wavespeed', path:'wavespeed-ai/z-image/turbo-lora', price:0.01, verified:true, lora:true, loraBase:'Z-Image',
+  'z-image-lora':   { cat:'t2img', label:'Z-Image Turbo · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/z-image/turbo-lora', price:0.01, verified:true, lora:true, loraBase:'Z-Image',
     buildBody:p=>{
       const sizeMap = { '1:1':'1024*1024','16:9':'1344*768','9:16':'768*1344','4:3':'1152*896','3:4':'896*1152','3:2':'1216*832','2:3':'832*1216' };
       const b = { prompt:p.prompt, size:(sizeMap[p.aspectRatio]||'1024*1024'), seed:-1, enable_base64_output:false, enable_safety_checker:false };
       if (p.loras && p.loras.length) b.loras = p.loras.slice(0,3).map(l=>({ path:l.path, scale:Number(l.scale)||1 }));
       return b;
     } },
-  'flux-lora':      { cat:'t2img', label:'Flux Dev + LoRA', provider:'wavespeed', path:'wavespeed-ai/flux-dev-lora', price:0.015, verified:true, lora:true, loraBase:'Flux',
+  'flux-lora':      { cat:'t2img', label:'Flux Dev · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/flux-dev-lora', price:0.015, verified:true, lora:true, loraBase:'Flux',
     buildBody:p=>{
       const sizeMap = { '1:1':'1024*1024','16:9':'1344*768','9:16':'768*1344','4:3':'1152*896','3:4':'896*1152','3:2':'1216*832','2:3':'832*1216' };
-      const b = { prompt:p.prompt, size:(sizeMap[p.aspectRatio]||'1024*1024'), num_inference_steps:28, guidance_scale:3.5, num_images:1, seed:-1, output_format:'jpeg', enable_base64_output:false, enable_safety_checker:false };
+      const b = { prompt:p.prompt, size:(sizeMap[p.aspectRatio]||'1024*1024'), num_inference_steps:((p.steps && p.steps>0) ? p.steps : 28), guidance_scale:((p.guidance != null) ? p.guidance : 3.5), num_images:1, seed:-1, output_format:'jpeg', enable_base64_output:false, enable_safety_checker:false };
       if (p.loras && p.loras.length) b.loras = p.loras.slice(0,3).map(l=>({ path:l.path, scale:Number(l.scale)||1 }));
       return b;
     } },
-  'atlas-flux-dev': { cat:'t2img', label:'Flux Dev (Atlas)', provider:'atlas', path:'black-forest-labs/flux-dev', price:0.01, verified:true,
+  'chroma':         { cat:'t2img', label:'Chroma uncensored · WaveSpeed', provider:'wavespeed', path:'wavespeed-ai/chroma', price:0.015, verified:true,
+    buildBody:p=>{
+      const sizeMap = { '1:1':'1024*1024','16:9':'1344*768','9:16':'768*1344','4:3':'1152*896','3:4':'896*1152','3:2':'1216*832','2:3':'832*1216' };
+      return { prompt:p.prompt, size:(sizeMap[p.aspectRatio]||'1024*1024'), seed:-1, output_format:'jpeg', enable_base64_output:false, enable_sync_mode:false };
+    } },
+  'atlas-flux-dev': { cat:'t2img', label:'Flux Dev · Atlas', provider:'atlas', path:'black-forest-labs/flux-dev', price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
-  'atlas-flux-schnell': { cat:'t2img', label:'Flux Schnell (Atlas) — $0.003', provider:'atlas', path:'black-forest-labs/flux-schnell', price:0.003, verified:true,
+  'atlas-flux-schnell': { cat:'t2img', label:'Flux Schnell · Atlas', provider:'atlas', path:'black-forest-labs/flux-schnell', price:0.003, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
-  'atlas-flux-2-pro': { cat:'t2img', label:'Flux 2 Pro (Atlas) — $0.04', provider:'atlas', path:'black-forest-labs/flux-2-pro/text-to-image', price:0.04, verified:true,
+  'atlas-flux-2-pro': { cat:'t2img', label:'Flux 2 Pro · Atlas', provider:'atlas', path:'black-forest-labs/flux-2-pro/text-to-image', price:0.04, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
-  'atlas-wan27-img': { cat:'t2img', label:'Wan 2.7 Image (Atlas) — $0.03', provider:'atlas', path:'alibaba/wan-2.7/text-to-image', price:0.03, verified:true,
+  'atlas-wan27-img': { cat:'t2img', label:'Wan 2.7 Image · Atlas', provider:'atlas', path:'alibaba/wan-2.7/text-to-image', price:0.03, verified:true,
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
 
   // ─────────── TEXT-TO-VIDEO ───────────
@@ -2036,6 +2053,16 @@ try { updateKeyBtn(); } catch (e) { console.error('[Zaor INIT updateKeyBtn]', e 
 
 // Generate model dropdowns from the registry (single source of truth)
 try { populateModelDropdown('img-model-select', 't2img'); } catch (e) { console.error('[Zaor INIT populateDropdown]', e && (e.stack || e.message)); }
+
+// Show the steps/guidance controls only when the Flux LoRA model is selected
+function updateFluxAdvancedRow() {
+  const row = document.getElementById('flux-advanced-row');
+  if (!row) return;
+  const modelId = document.getElementById('img-model-select')?.value;
+  row.style.display = (modelId === 'flux-lora') ? 'flex' : 'none';
+}
+document.getElementById('img-model-select')?.addEventListener('change', updateFluxAdvancedRow);
+try { updateFluxAdvancedRow(); } catch(e) {}
 try { updateCostEstimate(); } catch (e) { console.error('[Zaor INIT cost]', e && (e.stack || e.message)); }
 
 // Load most recent thread or create one
@@ -2522,6 +2549,14 @@ async function generateImage(prompt) {
     const fullPrompt = applyStyleLock(prompt);
     const usedModel = m.label;
     const callParams = { prompt: fullPrompt, aspectRatio, resolution };
+
+    // Flux LoRA exposes inference steps + guidance scale (see the advanced row)
+    if (modelId === 'flux-lora') {
+      const st = parseInt(document.getElementById('flux-steps')?.value);
+      const gd = parseFloat(document.getElementById('flux-guidance')?.value);
+      if (!isNaN(st)) callParams.steps = st;
+      if (!isNaN(gd)) callParams.guidance = gd;
+    }
 
     // LoRA support: apply only LoRAs whose base matches the selected model (any LoRA-capable model)
     if (m.lora) {
@@ -3455,10 +3490,10 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
       modelSel.className = 'img-control-select';
       modelSel.innerHTML = `
         <option value="fluxkontext" selected>Flux Kontext — $0.02 ★ Best</option>
-        <option value="qwen">Qwen Edit — $0.02</option>
+        <option value="qwen">Qwen Edit · WaveSpeed — $0.02</option>
         <option value="wan27">Wan 2.7 — $0.03</option>
-        <option value="wan27pro">Wan 2.7 Pro — $0.06</option>
-        <option value="aurora">Aurora — ~$0.04</option>
+        <option value="wan27pro">Wan 2.7 Pro Edit · WaveSpeed — $0.06</option>
+        <option value="aurora">Aurora Edit · xAI — ~$0.04</option>
       `;
 
       const applyBtn = document.createElement('button');
@@ -4227,7 +4262,7 @@ const peSys = g => PE_CONVO + g;
 
 const PE_SYSTEM_PROMPTS = {
   // ── Image generation ──
-  aurora: peSys("MODEL: FLUX / Aurora (image). Write each prompt as a single flowing natural-language description, NOT a comma-separated tag list. Order it: subject → action/pose → setting → lighting → camera. For photorealism, name a lens and/or film stock (e.g. 'shot on 85mm f/1.4', 'Fujifilm X-T5') and add 'visible skin pores, vellus hair' to avoid waxy AI skin. Aim for 30-80 words. Avoid contradictory directions like 'wide-angle close-up'."),
+  aurora: peSys("MODEL: FLUX / Aurora (image). Write each prompt as a single flowing natural-language description, NOT a comma-separated tag list. Order it: subject → action/pose → setting → lighting → camera. For photorealism, name a lens and/or film stock (e.g. 'shot on 85mm f/1.4', 'Fujifilm X-T5') and add 'visible skin pores, vellus hair' to avoid waxy AI skin. Aim for 30-80 words. Avoid contradictory directions like 'wide-angle close-up'. If the user is generating on Flux (especially with a LoRA) and fine detail or anatomy matters, you may also suggest generation settings: raise inference steps to ~36-45 (slower but sharper) and keep guidance scale around 3-4. Note that Flux's base model is weak on explicit anatomy, so a single close subject works better than multiple interacting figures."),
   zimage: peSys("MODEL: Z-Image Turbo (image, Tongyi). Write a detailed natural-language description and front-load the subject (and any on-image text) at the very start. CRITICAL: Z-Image ignores negative prompts — phrase EVERY constraint positively (write 'clean seamless backdrop, sharp focus' NOT 'no clutter, not blurry'). Name the medium explicitly (camera/lens or film stock, e.g. 'shot on Hasselblad X2D, 80mm' or 'Kodak Portra 400 film grain'). Always specify lighting — it's Z-Image's biggest strength (volumetric, rim light, golden hour, chiaroscuro). Add texture words ('skin pores, fabric detail, film grain') to avoid a plastic look. Keep to 3-5 strong visual concepts in one style family; never mix contradictory styles. Z-Image renders text accurately, so put any sign/poster text in quotes."),
   wan26t2v: peSys("MODEL: Wan (image). Natural-language description, specific and concrete (avoid bare tag dumps). Cover: subject, scene/environment, style, lighting, and quality. Be vivid but coherent."),
   qwen2: peSys("MODEL: Qwen Image 2.0 (EDIT). Write an instruction, not a description. State clearly: what to KEEP unchanged, what to CHANGE, and constraints (match lighting, preserve identity). Be surgical and specific."),
@@ -4245,7 +4280,6 @@ const PE_SYSTEM_PROMPTS = {
 
   // ── Video Extend ──
   aurora_extend: peSys("MODEL: Aurora video EXTEND. Describe what happens NEXT as a natural continuation: follow-on action, camera movement, mood. Match the original's style. Phrases like 'continues into', 'camera pulls back to reveal'. Under ~80 words."),
-  seedance_extend: peSys("MODEL: Seedance EXTEND (continues from the last frame). Describe the next shot: the action that follows, camera behaviour, and emotional arc, as a natural continuation. Under ~100 words."),
   wan27extend: peSys("MODEL: Wan 2.7 video EXTEND. Describe what happens next: motion, camera, atmosphere, scene development. Specific and directional, continuing the prior mood. Under ~80 words."),
   wan22spicy_extend: peSys("MODEL: Wan 2.2 video EXTEND. Keep it simple — one or two clear continuation actions, matching the prior shot's mood. Direct, under ~50 words.")
 };
