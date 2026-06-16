@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.54" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.55" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.54</title>
+  <title>Zaor Studio 0.55</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -564,6 +564,17 @@
     .lib-item-text { font-size: 11px; color: var(--text-dim); margin-top: 5px; line-height: 1.45; white-space: pre-wrap; }
     .lib-empty { text-align: center; color: var(--text-dim); font-size: 13px; padding: 24px 0; }
 
+    /* PE final prompt cards */
+    .pe-final-cards { margin: 10px 0; display: flex; flex-direction: column; gap: 8px; }
+    .pe-final-head { font-size: 11px; color: var(--lavender); text-transform: uppercase; letter-spacing: 0.04em; padding-left: 2px; }
+    .pe-final-card { background: rgba(123,104,238,0.08); border: 1px solid rgba(123,104,238,0.30); border-radius: 12px; padding: 10px 12px; }
+    .pe-final-label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: var(--lavender); margin-bottom: 4px; }
+    .pe-final-text { font-size: 13px; color: var(--text); line-height: 1.5; white-space: pre-wrap; }
+    .pe-final-actions { display: flex; gap: 8px; margin-top: 8px; }
+    .pe-final-use, .pe-final-save { background: var(--bg); border: 1px solid rgba(255,255,255,0.16); color: var(--text); font-family: 'Inter', sans-serif; font-size: 12px; padding: 5px 12px; border-radius: 10px; cursor: pointer; }
+    .pe-final-use { background: var(--lavender); color: #1a1a2e; border-color: var(--lavender); font-weight: 600; }
+    .pe-final-use:active, .pe-final-save:active { opacity: 0.7; }
+
     .modal-btns { display: flex; gap: 10px; }
     .modal-btns button {
       flex: 1; padding: 11px;
@@ -1062,7 +1073,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.54</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.55</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1130,6 +1141,10 @@
           color:var(--text-dim);font-size:11px;cursor:pointer;padding:2px 6px;
           font-family:'Inter',sans-serif;
         ">✕</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;padding:8px 14px;border-top:1px solid rgba(255,255,255,0.05);">
+        <button id="pe-finalize-btn" style="background:var(--lavender);border:none;color:#1a1a2e;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;padding:6px 14px;border-radius:12px;cursor:pointer;white-space:nowrap;">✅ Get final prompts</button>
+        <span style="font-size:11px;color:var(--text-dim);flex:1;min-width:0;">Best + runner-up, ready to use or save</span>
       </div>
     </div>
   <div id="messages">
@@ -3568,6 +3583,123 @@ document.getElementById('library-save')?.addEventListener('click', () => {
   document.querySelectorAll('.lib-filter').forEach(b => b.classList.toggle('active', b.dataset.filter === 'mine'));
   renderLibrary();
 });
+
+// ═══════════════════════════════════════════════════════
+// PE FINALIZE — a separate grok call returns BEST + RUNNER-UP
+// prompts. The conversation is never touched; this call's whole
+// job is to emit the two prompts, so parsing is reliable.
+// ═══════════════════════════════════════════════════════
+const PE_MODE_MAP = {
+  aurora: 'image', zimage: 'image', wan26t2v: 'image',
+  qwen2: 'edit', qwen: 'edit', wan27: 'edit', fluxkontext: 'edit',
+  seedance15t2v: 'video'
+  // i2v / extend generate via the ▶ Animate/Extend panel — handled separately
+};
+
+function parseFinalPrompts(text) {
+  const t = (text || '').trim();
+  let best = '', runner = '';
+  const b = t.match(/BEST\s*:\s*([\s\S]*?)(?=\n\s*RUNNER[\s-]?UP\s*:|$)/i);
+  const r = t.match(/RUNNER[\s-]?UP\s*:\s*([\s\S]*)$/i);
+  if (b) best = b[1].trim();
+  if (r) runner = r[1].trim();
+  if (!best && !runner) {
+    // Fallback: no markers — take the first substantial line as best, rest as runner
+    const lines = t.split('\n').map(l => l.trim()).filter(Boolean);
+    best = lines[0] || t;
+    runner = lines.slice(1).join(' ');
+  }
+  const clean = s => (s || '')
+    .replace(/^(BEST|RUNNER[\s-]?UP)\s*:\s*/i, '')
+    .replace(/^["'`\u201c\u201d]+|["'`\u201c\u201d]+$/g, '')
+    .trim();
+  return { best: clean(best), runner: clean(runner) };
+}
+
+function peUsePrompt(text) {
+  const peModel = document.getElementById('pe-model-select')?.value || 'aurora';
+  const input = document.getElementById('prompt');
+  if (input) {
+    input.value = text;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  try { if (navigator.clipboard) navigator.clipboard.writeText(text); } catch(e) {}
+  const targetMode = PE_MODE_MAP[peModel];
+  if (targetMode) {
+    setMode(targetMode); // switches mode + turns PE off (mode !== 'chat'); preserves the box
+  } else {
+    // i2v / extend: exit PE, keep the prompt in the box + clipboard for the Animate/Extend panel
+    promptEngineerMode = false;
+    const peBtn = document.getElementById('pe-btn');
+    if (peBtn) { peBtn.classList.remove('active'); peBtn.textContent = '✦ PE'; }
+    document.getElementById('pe-model-row')?.classList.remove('visible');
+  }
+  input?.focus();
+}
+
+function peSavePrompt(text) {
+  if (!text) return false;
+  const suggested = text.slice(0, 40) + (text.length > 40 ? '…' : '');
+  const title = (window.prompt('Name this template:', suggested) || '').trim();
+  if (!title) return false;
+  userPrompts.unshift({ id: Date.now(), title, text, cat: 'Mine' });
+  saveUserPrompts();
+  return true;
+}
+
+function renderFinalPromptCards(best, runner) {
+  const items = [{ label: 'BEST', txt: best }, { label: 'RUNNER-UP', txt: runner }].filter(x => x.txt);
+  if (!items.length) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'pe-final-cards';
+  wrap.innerHTML = '<div class="pe-final-head">✅ Final prompts — tap ▶ Use to load one</div>' +
+    items.map(it => '<div class="pe-final-card"><div class="pe-final-label">' + it.label +
+      '</div><div class="pe-final-text"></div><div class="pe-final-actions"><button class="pe-final-use">▶ Use</button><button class="pe-final-save">★ Save</button></div></div>').join('');
+  wrap.querySelectorAll('.pe-final-card').forEach((c, i) => {
+    c.querySelector('.pe-final-text').textContent = items[i].txt;
+    c.querySelector('.pe-final-use').addEventListener('click', () => peUsePrompt(items[i].txt));
+    c.querySelector('.pe-final-save').addEventListener('click', (e) => {
+      if (peSavePrompt(items[i].txt)) { e.target.textContent = '✓ Saved'; e.target.disabled = true; }
+    });
+  });
+  messagesEl.appendChild(wrap);
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+async function finalizePromptPE() {
+  if (!apiKey) { openModal('api'); return; }
+  const hist = getHistory();
+  if (!hist || hist.length === 0) { appendError('Chat with the prompt builder first, then finalize.'); return; }
+  const peModel = document.getElementById('pe-model-select')?.value || 'aurora';
+  const guide = (PE_SYSTEM_PROMPTS[peModel] || PE_SYSTEM_PROMPTS.aurora).replace(PE_CONVO, '');
+  const finalizeSys = guide + "\n\nYou are now FINALIZING. From the whole conversation, decide the single strongest prompt and one meaningfully different runner-up. Output ONLY the two prompts — no preamble, no commentary, no quotes, no markdown. Use EXACTLY this format and nothing else:\nBEST: <the prompt with the best chance to succeed>\nRUNNER-UP: <the runner-up most likely to succeed>";
+  const apiMessages = [{ role: 'system', content: finalizeSys }, ...hist, { role: 'user', content: 'Output the BEST and RUNNER-UP final prompts now, in the exact format.' }];
+  const btn = document.getElementById('pe-finalize-btn');
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '… finalizing'; }
+  try {
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: modelSelect.value, messages: apiMessages, max_tokens: 1024 })
+    });
+    if (!res.ok) {
+      const ed = await res.json().catch(() => ({}));
+      throw new Error(`Finalize error ${res.status}: ${ed.error?.message || ed.error || ed.message || ''}`);
+    }
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content || '';
+    const { best, runner } = parseFinalPrompts(text);
+    if (!best && !runner) { appendError('Could not read a final prompt from the reply. Keep refining or try again.'); return; }
+    renderFinalPromptCards(best, runner);
+  } catch(e) {
+    appendError(e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+  }
+}
+
+document.getElementById('pe-finalize-btn')?.addEventListener('click', finalizePromptPE);
 
 function openModal(type) {
   if (type === 'api') {
