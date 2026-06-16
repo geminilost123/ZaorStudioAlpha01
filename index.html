@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.64" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.65" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.64</title>
+  <title>Zaor Studio 0.65</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -528,6 +528,14 @@
       font-size: 22px; color: var(--lavender); margin-bottom: 8px;
     }
     .modal p { font-size: 13px; color: var(--text-dim); margin-bottom: 18px; line-height: 1.5; }
+
+    /* Stop iOS Safari auto-zooming when a form field is focused. iOS only zooms fields
+       under 16px, so 16px is the threshold. This does NOT affect pinch-to-zoom, which
+       stays available via the viewport (no maximum-scale set). */
+    input, select, textarea { font-size: 16px !important; }
+    @supports (-webkit-touch-callout: none) {
+      input, select, textarea { font-size: 16px !important; }
+    }
 
     .modal input, .modal textarea {
       width: 100%;
@@ -1077,7 +1085,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.64</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.65</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
