@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.55" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.56" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.55</title>
+  <title>Zaor Studio 0.56</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1073,7 +1073,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.55</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.56</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1198,7 +1198,7 @@
           <div class="img-control-group">
             <span class="mode-label">Model</span>
             <select id="img-model-select" class="img-control-select">
-              <option value="grok-imagine-image" selected>Aurora Simple — $0.022</option>
+              <option value="grok-imagine-image" selected>Aurora Simple — $0.02</option>
               <option value="grok-imagine-image-quality">Aurora Quality — $0.05</option>
             </select>
           </div>
@@ -1240,10 +1240,10 @@
             <span class="mode-label">Engine</span>
             <select id="vid-engine-select" class="img-control-select">
               <option value="aurora" selected>Aurora — $0.05/s</option>
-              <option value="seedance15t2v">Seedance 1.5 T2V — ~$0.05/run</option>
+              <option value="seedance15t2v">Seedance 1.5 T2V — from $0.06</option>
               <option value="wan26t2v">Wan 2.6 — ~$0.34/5s</option>
-              <option value="wan22spicy">Wan 2.2 Spicy I2V — $0.15/run</option>
-              <option value="wan26spicy">Wan 2.7 Spicy I2V — $0.50/run</option>
+              <option value="wan22spicy">Wan 2.2 Spicy I2V — from $0.15</option>
+              <option value="wan26spicy">Wan 2.7 Spicy I2V — from $0.50</option>
             </select>
           </div>
           <div class="img-control-group">
@@ -1516,7 +1516,7 @@ const MODEL_REGISTRY = {
   'aurora-t2v':      { cat:'t2v', label:'Aurora T2V',         provider:'xai-video', path:'grok-imagine-video',                      pricePerS:0.05, verified:false,
     durations:[4,6,8,10], resolutions:['480p','720p'],
     buildBody:p=>({ prompt:p.prompt, duration:Math.min(p.duration||4,10), aspect_ratio:p.aspectRatio||'16:9', resolution:p.resolution||'480p' }) },
-  'seedance15-t2v':  { cat:'t2v', label:'Seedance 1.5 T2V',   provider:'wavespeed', path:'bytedance/seedance-v1.5-pro/text-to-video', price:0.05, verified:true,
+  'seedance15-t2v':  { cat:'t2v', label:'Seedance 1.5 T2V',   provider:'wavespeed', path:'bytedance/seedance-v1.5-pro/text-to-video', price:0.06, verified:true,
     durations:[4,5,6,8,10,12], resolutions:['720p','1080p'],
     buildBody:p=>({ prompt:p.prompt, resolution:p.resolution||'720p', aspect_ratio:p.aspectRatio||'16:9', duration:Math.min(p.duration||4,12), generate_audio:false, seed:-1 }) },
   'wan26-t2v':       { cat:'t2v', label:'Wan 2.6 T2V',        provider:'wavespeed', path:'alibaba/wan-2.6/text-to-video', pricePerS:0.068, verified:true,
@@ -1548,7 +1548,7 @@ const MODEL_REGISTRY = {
   'aurora-i2v':        { cat:'i2v', label:'Aurora I2V',         provider:'wavespeed', path:'x-ai/grok-imagine-video-v1.5/image-to-video', price:0.05, verified:false,
     durations:[4,6,8,10], resolutions:['480p','720p'],
     buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'480p', duration:Math.min(p.duration||4,10) }) },
-  'seedance15-spicy':  { cat:'i2v', label:'Seedance 1.5 Spicy', provider:'wavespeed', path:'bytedance/seedance-v1.5-pro/image-to-video-spicy', price:0.05, verified:true,
+  'seedance15-spicy':  { cat:'i2v', label:'Seedance 1.5 Spicy', provider:'wavespeed', path:'bytedance/seedance-v1.5-pro/image-to-video-spicy', price:0.06, verified:true,
     durations:[4,5,6,8,10,12], resolutions:['480p','720p','1080p'],
     buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'480p', duration:Math.min(p.duration||4,12), aspect_ratio:p.aspectRatio||'16:9', generate_audio:false, seed:-1 }) },
   'wan22-spicy':       { cat:'i2v', label:'Wan 2.2 Spicy',     provider:'wavespeed', path:'wavespeed-ai/wan-2.2-spicy/image-to-video', price:0.15, verified:true,
@@ -2983,15 +2983,15 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   if (isExtend) {
     engineSel.innerHTML = `
       <option value="aurora" selected>Aurora — $0.05/s</option>
-      <option value="wan27extend">Wan 2.7 Extend — price TBC</option>
-      <option value="wan22spicy">Wan 2.2 Spicy — $0.15/run</option>
+      <option value="wan27extend">Wan 2.7 Extend — from ~$0.30</option>
+      <option value="wan22spicy">Wan 2.2 Spicy — from $0.15</option>
     `;
   } else {
     engineSel.innerHTML = `
       <option value="aurora" selected>Aurora — $0.05/s</option>
-      <option value="seedance15spicy">Seedance 1.5 Spicy — ~$0.05/run</option>
-      <option value="wan22spicy">Wan 2.2 Spicy — $0.15/run</option>
-      <option value="wan26spicy">Wan 2.7 Spicy — $0.50/run</option>
+      <option value="seedance15spicy">Seedance 1.5 Spicy — from $0.06</option>
+      <option value="wan22spicy">Wan 2.2 Spicy — from $0.15</option>
+      <option value="wan26spicy">Wan 2.7 Spicy — from $0.50</option>
     `;
   }
 
@@ -3878,6 +3878,33 @@ function applyModelConstraints(engine, durEl, resEl, ratioEl, isExtend, useDefau
   applyModelConstraints('aurora', durEl, resEl, ratioEl, false, true);
 })();
 
+// Estimated video cost. All app video calls send generate_audio:false, so no audio
+// multiplier applies. Per-second rates derived from provider pricing pages (Dec 2025–
+// May 2026); these are ESTIMATES — final charge scales with resolution × duration.
+function estimateVideoCost(engine, duration, res) {
+  const hi = res === '720p' || res === '1080p';
+  const d = (!isNaN(duration) && duration > 0) ? duration : 5;
+  switch (engine) {
+    case 'aurora':                       // xAI grok-imagine-video: $0.05/s
+      return `~$${(0.05 * d).toFixed(2)}`;
+    case 'wan26t2v':                     // Wan 2.6 T2V (approx, unverified base)
+      return `~$${(0.068 * d).toFixed(2)}`;
+    case 'seedance15t2v':
+    case 'seedance15spicy': {            // Seedance 1.5: ~$0.009/s @480p, ~$0.02/s @720p, ~$0.06 floor
+      const rate = hi ? 0.02 : 0.009;
+      return `~$${Math.max(0.06, rate * d).toFixed(2)}`;
+    }
+    case 'wan22spicy':                   // Wan 2.2 Spicy: base $0.15 (5s, 480p)
+      return hi ? '~$0.20+' : '~$0.15';
+    case 'wan26spicy':                   // Wan 2.7 Spicy: ~$0.10/s @720p, scales with duration
+      return `~$${(0.10 * d).toFixed(2)}`;
+    case 'wan27extend':                  // Wan 2.7 extend (approx base)
+      return `~$${(0.10 * d).toFixed(2)}`;
+    default:
+      return '~$?';
+  }
+}
+
 function updateCostEstimate() {
   const el = document.getElementById('cost-estimate');
   const modeText = document.getElementById('mode-label-text') || {};
@@ -3885,54 +3912,27 @@ function updateCostEstimate() {
 
   if (videoMode) {
     const engine = document.getElementById('vid-engine-select')?.value || 'aurora';
-    const duration = parseInt(document.getElementById('vid-duration-select')?.value || 8);
-    let cost, label;
-    if (engine === 'aurora') {
-      // T2V via xAI: ~$0.07/s
-      cost = (duration * 0.07).toFixed(2);
-      label = `~$${cost}`;
-    } else if (engine === 'wan26t2v') {
-      cost = (duration * 0.068).toFixed(2);
-      label = `~$${cost}`;
-    } else if (engine === 'wan22spicy') {
-      label = '~$0.15';
-    } else if (engine === 'wan26spicy') {
-      label = '~$0.50';
-    }
-    el.textContent = label;
+    const duration = parseInt(document.getElementById('vid-duration-select')?.value || '8');
+    const res = document.getElementById('vid-res-select')?.value || '480p';
+    el.textContent = estimateVideoCost(engine, duration, res);
     modeText.textContent = 'Video mode';
+    el.style.display = 'inline-block';
 
   } else if (editMode) {
-    // Edit = input image + output image at xAI pricing
+    // Edit = input image + output image
     const editMod = document.getElementById('edit-model-select')?.value || 'wan27';
     const editCostMap = { aurora: '~$0.04', wan27pro: '$0.06', wan27: '$0.03', fluxkontext: '$0.02', qwen2: '$0.03', qwen: '$0.02' };
-    const editCost = editCostMap[editMod] || '$0.02';
-    el.textContent = editCost;
+    el.textContent = editCostMap[editMod] || '$0.02';
     modeText.textContent = 'Edit image mode';
 
   } else if (imageMode) {
     const modelId = document.getElementById('img-model-select')?.value || 'aurora-simple';
     const m = MODEL_REGISTRY[modelId];
     const count = parseInt(document.getElementById('img-count-select')?.value || '1');
-    const unitCost = (m && m.price != null) ? m.price : 0.022;
+    const unitCost = (m && m.price != null) ? m.price : 0.02;
     const totalCost = (unitCost * count).toFixed(3);
     el.textContent = count > 1 ? `${count}× $${totalCost}` : `$${totalCost}`;
     modeText.textContent = 'Image mode';
-
-  } else if (videoMode) {
-    const engine = document.getElementById('vid-engine-select')?.value || 'aurora';
-    const duration = parseInt(document.getElementById('vid-duration-select')?.value || 4);
-    let cost;
-    if (engine === 'aurora') cost = `~$${(duration * 0.07).toFixed(2)}`;
-    else if (engine === 'wan26t2v') cost = `~$${(duration * 0.068).toFixed(2)}`;
-    else if (engine === 'seedance15spicy') cost = '~$0.05';
-    else if (engine === 'seedance15t2v') cost = '~$0.05';
-    else if (engine === 'wan27extend') cost = 'TBC';
-    else if (engine === 'wan22spicy') cost = '$0.15';
-    else if (engine === 'wan26spicy') cost = '$0.50';
-    el.textContent = cost;
-    modeText.textContent = 'Video mode';
-    el.style.display = 'inline-block';
 
   } else if (enhanceMode) {
     const upModel = document.getElementById('upscale-model-select')?.value || 'standard';
