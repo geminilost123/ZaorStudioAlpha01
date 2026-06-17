@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.80" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.81" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.80</title>
+  <title>Zaor Studio 0.81</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1101,7 +1101,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.80</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.81</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -4270,10 +4270,10 @@ async function runStoryboardDirector(beatText, forceFrame) {
 // Generate the frame image (locked storyboard model + ratio), render it inline, persist it
 async function addStoryboardFrame(imagePrompt, videoPrompt, reason) {
   const card = document.createElement('div');
-  card.className = 'sb-frame';
+  card.className = 'msg assistant';
   card.innerHTML = '<div class="sb-frame-load">🎬 Generating storyboard frame…</div>';
   messagesEl.appendChild(card);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  scrollToBottom();
   try {
     const src = await callModel(storyboardModel, { prompt: imagePrompt, aspectRatio: storyboardRatio, resolution: '1k' });
     if (!src) throw new Error('no image returned');
@@ -4286,10 +4286,14 @@ async function addStoryboardFrame(imagePrompt, videoPrompt, reason) {
 
 function fillStoryboardCard(card, src, videoPrompt, reason) {
   card.innerHTML = '';
+  const label = document.createElement('div');
+  label.className = 'msg-label';
+  label.textContent = '🎬 Storyboard · ' + (reason || 'frame');
+  card.appendChild(label);
   const wrapper = document.createElement('div');
   wrapper.className = 'img-wrapper';
   const img = document.createElement('img');
-  img.className = 'gen-image'; // same proven class the normal image flow uses
+  img.className = 'gen-image'; // same proven class + container the normal image flow uses
   img.referrerPolicy = 'no-referrer';
   img.alt = 'storyboard frame';
   img.src = src;
@@ -4297,10 +4301,6 @@ function fillStoryboardCard(card, src, videoPrompt, reason) {
   card.appendChild(wrapper);
   const bar = document.createElement('div');
   bar.className = 'sb-frame-bar';
-  const reasonSpan = document.createElement('span');
-  reasonSpan.className = 'sb-frame-reason';
-  reasonSpan.textContent = '🎬 ' + (reason || 'frame');
-  bar.appendChild(reasonSpan);
   if (videoPrompt) {
     const btn = document.createElement('button');
     btn.className = 'sb-makevideo';
@@ -4324,7 +4324,7 @@ function fillStoryboardCard(card, src, videoPrompt, reason) {
 // Re-render a persisted storyboard frame (no generation)
 function renderStoryboardFrameCard(src, imagePrompt, videoPrompt, reason) {
   const card = document.createElement('div');
-  card.className = 'sb-frame';
+  card.className = 'msg assistant';
   messagesEl.appendChild(card);
   fillStoryboardCard(card, src, videoPrompt, reason);
 }
