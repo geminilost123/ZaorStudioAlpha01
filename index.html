@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.71" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.73" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.71</title>
+  <title>Zaor Studio 0.73</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1015,6 +1015,20 @@
       border-color: var(--lavender);
       color: var(--lavender);
     }
+    #storyboard-btn.active { background: rgba(201,184,232,0.2); border-color: var(--lavender); }
+
+    /* Storyboard on/off switch */
+    .sb-switch { position: relative; display: inline-block; width: 46px; height: 26px; flex-shrink: 0; }
+    .sb-switch input { opacity: 0; width: 0; height: 0; }
+    .sb-slider { position: absolute; inset: 0; background: rgba(255,255,255,0.15); border-radius: 26px; transition: 0.2s; cursor: pointer; }
+    .sb-slider::before { content: ''; position: absolute; height: 20px; width: 20px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+    .sb-switch input:checked + .sb-slider { background: var(--lavender); }
+    .sb-switch input:checked + .sb-slider::before { transform: translateX(20px); }
+
+    /* Stage-2 director preview (temporary) */
+    .sb-preview { background: rgba(201,184,232,0.06); border: 1px dashed var(--lavender); border-radius: 10px; padding: 10px 12px; margin: 8px 0; font-size: 12px; }
+    .sb-preview-h { color: var(--lavender); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+    .sb-preview-b { color: var(--text-dim); line-height: 1.45; margin-bottom: 4px; word-break: break-word; }
 
     #pe-model-row {
       display: none;
@@ -1085,7 +1099,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.71</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.73</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1105,6 +1119,7 @@
         <button id="pe-btn" title="Prompt Engineer mode">✦ PE</button>
         <button id="library-btn" title="Prompt library">📚</button>
         <button id="lora-btn" title="LoRA manager">🧬</button>
+        <button id="storyboard-btn" title="Storyboard director">🎬</button>
         <button id="refresh-btn" title="Force update from GitHub">↻</button>
         <button id="api-key-btn">Set API Key</button>
       </div>
@@ -1423,6 +1438,37 @@
     <div class="modal-btns" style="margin-top:4px;">
       <button class="btn-secondary" id="lora-close">Close</button>
       <button class="btn-primary" id="lora-add">+ Add LoRA</button>
+    </div>
+  </div>
+</div>
+
+<!-- Storyboard Settings Modal -->
+<div class="modal-overlay" id="storyboard-overlay">
+  <div class="modal" style="max-width:480px;width:92%;">
+    <h2 style="margin-bottom:4px;">🎬 Storyboard director</h2>
+    <p style="margin-bottom:14px;">While you roleplay, this auto-builds an inline storyboard — generating a frame whenever a new character, location, or wardrobe change appears (or when you type "giggity"). Each frame also drafts a Wan 2.2 video prompt you can copy.</p>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+      <div style="min-width:0;">
+        <div style="font-size:14px;color:var(--text);">Storyboard mode</div>
+        <div style="font-size:11px;color:var(--text-dim);">Auto-generate frames as you play</div>
+      </div>
+      <label class="sb-switch"><input type="checkbox" id="sb-on-toggle" /><span class="sb-slider"></span></label>
+    </div>
+    <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Image model (locked per scene)</label>
+    <select id="sb-model-select" class="img-control-select" style="width:100%;margin-bottom:14px;">
+      <option value="chroma">Chroma uncensored · WaveSpeed — $0.015</option>
+      <option value="z-image-turbo">Z-Image Turbo · Atlas — $0.01</option>
+    </select>
+    <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Frame aspect ratio</label>
+    <select id="sb-ratio-select" class="img-control-select" style="width:100%;margin-bottom:6px;">
+      <option value="16:9">16:9 — cinematic</option>
+      <option value="1:1">1:1 — square</option>
+      <option value="9:16">9:16 — vertical</option>
+      <option value="4:3">4:3</option>
+      <option value="3:4">3:4 — portrait</option>
+    </select>
+    <div class="modal-btns" style="margin-top:12px;">
+      <button class="btn-primary" id="sb-close" style="width:100%;">Done</button>
     </div>
   </div>
 </div>
@@ -2282,15 +2328,29 @@ sendBtn.addEventListener('click', handleSend);
 // SEND
 // ═══════════════════════════════════════════════════════
 async function handleSend() {
-  const text = promptEl.value.trim();
-  if (!text || isLoading) return;
+  const rawText = promptEl.value.trim();
+  if (!rawText || isLoading) return;
   if (!apiKey) { openModal('api'); return; }
+
+  // Storyboard "giggity" manual trigger — strip it from the story, remember it forced a frame
+  const giggityHit = storyboardOn && /giggity/i.test(rawText);
+  const text = giggityHit ? rawText.replace(/giggity/ig, '').replace(/\s{2,}/g, ' ').trim() : rawText;
+  sbForceFrame = giggityHit;
 
   // Ensure we have a thread
   if (!currentThreadId) createThread('New Game');
 
   // Clear empty state
   document.getElementById('empty-state')?.remove();
+
+  // "giggity" typed alone → just fire a storyboard frame from the last beat, no story call
+  if (giggityHit && text === '') {
+    promptEl.value = ''; promptEl.style.height = 'auto';
+    setLoading(true);
+    await runStoryboardDirector(lastStoryBeat(), true);
+    setLoading(false);
+    return;
+  }
 
   autoNameThread(text);
   renderMessage('user', text);
@@ -2554,6 +2614,10 @@ async function generateText(userText) {
     addToHistory('assistant', reply);
     addMessageToThread({ role: 'assistant', type: 'text', content: reply });
     renderMessage('assistant', reply);
+    // Storyboard: hidden second pass watches this beat (never touches the story text/history)
+    if (storyboardOn && !promptEngineerMode) {
+      runStoryboardDirector('Director instruction: ' + userText + '\n\nScene played out: ' + reply, sbForceFrame);
+    }
   } catch(e) {
     removeTyping(typingId);
     addMessageToThread({ role: 'assistant', type: 'error', content: e.message });
@@ -4038,6 +4102,129 @@ document.getElementById('lora-import')?.addEventListener('click', () => {
   renderLoras();
   alert(added + ' LoRA(s) restored.');
 });
+
+// ═══════════════════════════════════════════════════════
+// STORYBOARD DIRECTOR — Stage 1: settings (toggle, model, ratio)
+// Later stages add: hidden director call, inline frame cards, cast sheets, cost tracker.
+// ═══════════════════════════════════════════════════════
+let storyboardOn = localStorage.getItem('zaor_sb_on') === '1';
+let storyboardModel = localStorage.getItem('zaor_sb_model') || 'chroma';
+let storyboardRatio = localStorage.getItem('zaor_sb_ratio') || '16:9';
+
+function updateStoryboardBtn() {
+  const b = document.getElementById('storyboard-btn');
+  if (b) b.classList.toggle('active', storyboardOn);
+}
+const storyboardOverlay = document.getElementById('storyboard-overlay');
+document.getElementById('storyboard-btn')?.addEventListener('click', () => {
+  document.getElementById('sb-on-toggle').checked = storyboardOn;
+  document.getElementById('sb-model-select').value = storyboardModel;
+  document.getElementById('sb-ratio-select').value = storyboardRatio;
+  storyboardOverlay.classList.add('open');
+});
+document.getElementById('sb-close')?.addEventListener('click', () => storyboardOverlay.classList.remove('open'));
+storyboardOverlay?.addEventListener('click', e => { if (e.target === storyboardOverlay) storyboardOverlay.classList.remove('open'); });
+document.getElementById('sb-on-toggle')?.addEventListener('change', e => {
+  storyboardOn = e.target.checked;
+  localStorage.setItem('zaor_sb_on', storyboardOn ? '1' : '0');
+  updateStoryboardBtn();
+});
+document.getElementById('sb-model-select')?.addEventListener('change', e => {
+  storyboardModel = e.target.value;
+  localStorage.setItem('zaor_sb_model', storyboardModel);
+});
+document.getElementById('sb-ratio-select')?.addEventListener('change', e => {
+  storyboardRatio = e.target.value;
+  localStorage.setItem('zaor_sb_ratio', storyboardRatio);
+});
+updateStoryboardBtn();
+
+// ── Stage 2: hidden "director's eye" call + parsing (no image yet — preview only) ──
+let sbForceFrame = false;
+
+const DIRECTOR_SYSTEM = `You are a hidden film director's eye watching a roleplay story. You NEVER speak to the user and NEVER write story prose. Your only job: look at the latest story beat and decide whether it warrants a new storyboard frame (a single image), then output prompts.
+
+Set FRAME: yes if ANY of these just appeared in the beat — a NEW character, a NEW setting/location, or a WARDROBE change on any character. If the director forced a frame, FRAME is always yes. Otherwise FRAME: no.
+
+When multiple triggers occur, choose ONE subject by this strict priority: (1) a wardrobe change, (2) a new female character, (3) a new male character, (4) the current action happening.
+
+If FRAME: yes, write:
+- IMAGE_PROMPT: a vivid {MODEL} text-to-image prompt depicting that exact moment, grounded in the story (who is present and what they look like, wardrobe, setting, lighting, mood, camera framing). {MODELGUIDE}
+- VIDEO_PROMPT: a short Wan 2.2 image-to-video prompt describing the MOTION to animate that image (subject motion first, then camera). Describe motion, not appearance.
+- CAST: for any NEW character or wardrobe change, one line each: "Name — sex, approx age, hair, build, distinguishing features | wardrobe: ...". Use "none" if nothing changed.
+
+Output ONLY this exact format and nothing else:
+FRAME: yes
+REASON: wardrobe|new-female|new-male|action|none
+IMAGE_PROMPT: ...
+VIDEO_PROMPT: ...
+CAST: ...`;
+
+function directorModelGuide(modelId) {
+  if (modelId === 'z-image-turbo') return 'Use positive descriptions only (no negatives); name the medium, lighting, and textures.';
+  return 'Front-load photographic language ("a photograph of..."), name a camera/lens and the lighting, add natural skin texture; avoid words like illustration, cartoon, or render.';
+}
+
+function lastStoryBeat() {
+  const h = getHistory();
+  for (let i = h.length - 1; i >= 0; i--) {
+    if (h[i].role === 'assistant' && typeof h[i].content === 'string') return h[i].content;
+  }
+  return '';
+}
+
+function parseDirectorBlock(text) {
+  const markers = 'FRAME|REASON|IMAGE_PROMPT|VIDEO_PROMPT|CAST';
+  const sec = (name) => {
+    const re = new RegExp(name + ':\\s*([\\s\\S]*?)(?=\\n\\s*(?:' + markers + '):|$)', 'i');
+    const m = text.match(re);
+    return m ? m[1].trim() : '';
+  };
+  return {
+    frame: /FRAME:\s*yes/i.test(text),
+    reason: sec('REASON') || 'none',
+    imagePrompt: sec('IMAGE_PROMPT'),
+    videoPrompt: sec('VIDEO_PROMPT'),
+    cast: sec('CAST')
+  };
+}
+
+async function runStoryboardDirector(beatText, forceFrame) {
+  if (!beatText || !apiKey) return;
+  try {
+    const sys = DIRECTOR_SYSTEM
+      .replace('{MODEL}', storyboardModel === 'z-image-turbo' ? 'Z-Image' : 'Chroma')
+      .replace('{MODELGUIDE}', directorModelGuide(storyboardModel));
+    let user = beatText;
+    if (forceFrame) user += '\n\n[The director used the manual trigger — you MUST output FRAME: yes for the most recent vivid visual moment.]';
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: modelSelect.value, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }], max_tokens: 700, temperature: 0.7 })
+    });
+    if (!res.ok) return; // silently skip — never break the story
+    const data = await res.json();
+    const raw = data.choices?.[0]?.message?.content || '';
+    renderDirectorPreview(parseDirectorBlock(raw));
+  } catch (e) { /* silently skip — storyboard never interrupts the story */ }
+}
+
+// Stage-2 temporary readout so we can confirm detection before drawing real frame cards
+function renderDirectorPreview(p) {
+  const esc = s => (s || '').replace(/</g, '&lt;');
+  const el = document.createElement('div');
+  el.className = 'sb-preview';
+  if (!p.frame) {
+    el.innerHTML = '<div class="sb-preview-h">🎬 Director (Stage-2 preview)</div><div class="sb-preview-b">No frame this beat.</div>';
+  } else {
+    el.innerHTML = '<div class="sb-preview-h">🎬 Director (Stage-2 preview) · ' + esc(p.reason) + '</div>'
+      + '<div class="sb-preview-b"><b>Image prompt:</b> ' + esc(p.imagePrompt) + '</div>'
+      + '<div class="sb-preview-b"><b>Video prompt:</b> ' + esc(p.videoPrompt) + '</div>'
+      + (p.cast && p.cast.toLowerCase() !== 'none' ? '<div class="sb-preview-b"><b>Cast:</b> ' + esc(p.cast) + '</div>' : '');
+  }
+  messagesEl.appendChild(el);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
 
 function openModal(type) {
   if (type === 'api') {
