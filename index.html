@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.81" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.82" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.81</title>
+  <title>Zaor Studio 0.82</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1032,6 +1032,13 @@
     .sb-frame-reason { font-size: 11px; color: var(--lavender); text-transform: uppercase; letter-spacing: 0.04em; }
     .sb-makevideo { background: rgba(201,184,232,0.15); border: 1px solid var(--lavender); color: var(--lavender); border-radius: 16px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: 'Inter', sans-serif; white-space: nowrap; }
 
+    /* Cast panel */
+    .cast-item { background: var(--bg); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+    .cast-name { font-weight: 600; color: var(--lavender); margin-bottom: 6px; }
+    .cast-desc { width: 100%; min-height: 64px; background: var(--surface); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); padding: 8px; font-family: inherit; resize: vertical; }
+    .cast-btns { display: flex; gap: 8px; margin-top: 8px; }
+    .cast-btns button { flex: 0 0 auto; font-size: 12px; padding: 5px 10px; }
+
     #pe-model-row {
       display: none;
       flex-direction: column;
@@ -1101,7 +1108,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.81</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.82</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1122,6 +1129,7 @@
         <button id="library-btn" title="Prompt library">📚</button>
         <button id="lora-btn" title="LoRA manager">🧬</button>
         <button id="storyboard-btn" title="Storyboard director">🎬</button>
+        <button id="cast-btn" title="Cast — character sheets">👥</button>
         <button id="refresh-btn" title="Force update from GitHub">↻</button>
         <button id="api-key-btn">Set API Key</button>
       </div>
@@ -1475,6 +1483,24 @@
     </select>
     <div class="modal-btns" style="margin-top:12px;">
       <button class="btn-primary" id="sb-close" style="width:100%;">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cast Panel Modal -->
+<div class="modal-overlay" id="cast-overlay">
+  <div class="modal" style="max-width:520px;width:92%;max-height:85vh;overflow-y:auto;">
+    <h2 style="margin-bottom:4px;">👥 Cast — this story</h2>
+    <p style="margin-bottom:12px;">Character sheets for the current game. New characters are added automatically as the story introduces them; the storyboard director reuses these to keep returning characters looking consistent. Edit any time — your edits stick.</p>
+    <div id="cast-list"></div>
+    <div style="border-top:1px solid rgba(255,255,255,0.1);margin-top:6px;padding-top:12px;">
+      <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Add a character</label>
+      <input type="text" id="cast-add-name" placeholder="Name" autocomplete="off" style="margin-bottom:6px;" />
+      <textarea id="cast-add-desc" placeholder="Physical description (or leave blank and tap ✦ Help write after adding)" style="width:100%;min-height:54px;margin-bottom:8px;"></textarea>
+      <button class="btn-primary" id="cast-add-btn" style="width:100%;">+ Add character</button>
+    </div>
+    <div class="modal-btns" style="margin-top:12px;">
+      <button class="btn-primary" id="cast-close" style="width:100%;">Done</button>
     </div>
   </div>
 </div>
@@ -2052,7 +2078,8 @@ function createThread(firstName) {
     name: firstName || 'New Game',
     createdAt: Date.now(),
     messages: [],
-    history: []
+    history: [],
+    cast: []
   };
   saveThread(thread);
   currentThreadId = id;
@@ -4251,6 +4278,10 @@ async function runStoryboardDirector(beatText, forceFrame) {
       .replace('{MODEL}', storyboardModel === 'z-image-turbo' ? 'Z-Image' : 'Chroma')
       .replace('{MODELGUIDE}', directorModelGuide(storyboardModel));
     let user = beatText;
+    const cast = getCast();
+    if (cast.length) {
+      user += '\n\nKNOWN CAST (reuse these exact looks for any returning character — do not redesign them):\n' + cast.map(c => '- ' + c.name + ': ' + (c.desc || '')).join('\n');
+    }
     if (forceFrame) user += '\n\n[The director used the manual trigger — you MUST output FRAME: yes for the most recent vivid visual moment.]';
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -4261,6 +4292,7 @@ async function runStoryboardDirector(beatText, forceFrame) {
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content || '';
     const parsed = parseDirectorBlock(raw);
+    mergeCastFromDirector(parsed.cast);
     if (parsed.frame && parsed.imagePrompt) {
       await addStoryboardFrame(parsed.imagePrompt, parsed.videoPrompt, parsed.reason);
     }
@@ -4328,6 +4360,121 @@ function renderStoryboardFrameCard(src, imagePrompt, videoPrompt, reason) {
   messagesEl.appendChild(card);
   fillStoryboardCard(card, src, videoPrompt, reason);
 }
+
+// ═══════════════════════════════════════════════════════
+// STAGE 4 — CAST (per-story character sheets for consistency)
+// ═══════════════════════════════════════════════════════
+function getCast() {
+  const t = getCurrentThread();
+  return (t && Array.isArray(t.cast)) ? t.cast : [];
+}
+function saveCast(cast) {
+  const threads = getThreads();
+  const idx = threads.findIndex(t => t.id === currentThreadId);
+  if (idx < 0) return;
+  threads[idx].cast = cast;
+  saveThreads(threads);
+}
+// Add only NEW characters from a director CAST block (identity is the anchor; existing sheets/edits are preserved)
+function mergeCastFromDirector(castText) {
+  if (!castText || /^\s*none\s*$/i.test(castText)) return;
+  const cast = getCast();
+  const seen = new Set(cast.map(c => c.name.toLowerCase()));
+  castText.split('\n').forEach(rawLine => {
+    let line = rawLine.trim().replace(/^[-*•]\s*/, '');
+    if (!line || /^none$/i.test(line)) return;
+    let name, desc;
+    const dash = line.indexOf('—');
+    if (dash > -1) { name = line.slice(0, dash).trim(); desc = line.slice(dash + 1).trim(); }
+    else { const c = line.indexOf(':'); if (c > -1) { name = line.slice(0, c).trim(); desc = line.slice(c + 1).trim(); } else { name = line; desc = ''; } }
+    if (!name) return;
+    if (!seen.has(name.toLowerCase())) { cast.push({ name, desc }); seen.add(name.toLowerCase()); }
+  });
+  saveCast(cast);
+  if (castOverlay && castOverlay.classList.contains('open')) renderCastPanel();
+}
+
+function renderCastPanel() {
+  const list = document.getElementById('cast-list');
+  if (!list) return;
+  const cast = getCast();
+  list.innerHTML = '';
+  if (!cast.length) {
+    list.innerHTML = '<div class="lib-empty">No characters yet. They appear here automatically as your story introduces them — or add one below.</div>';
+    return;
+  }
+  cast.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'cast-item';
+    const nameEl = document.createElement('div');
+    nameEl.className = 'cast-name';
+    nameEl.textContent = c.name;
+    row.appendChild(nameEl);
+    const ta = document.createElement('textarea');
+    ta.className = 'cast-desc';
+    ta.value = c.desc || '';
+    ta.addEventListener('change', () => { const cc = getCast(); if (cc[i]) { cc[i].desc = ta.value.trim(); saveCast(cc); } });
+    row.appendChild(ta);
+    const btns = document.createElement('div');
+    btns.className = 'cast-btns';
+    const helpBtn = document.createElement('button');
+    helpBtn.className = 'btn-secondary';
+    helpBtn.textContent = '✦ Help write';
+    helpBtn.addEventListener('click', () => castHelpWrite(i, ta, helpBtn));
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn-secondary';
+    delBtn.textContent = '🗑';
+    delBtn.addEventListener('click', () => { const cc = getCast(); cc.splice(i, 1); saveCast(cc); renderCastPanel(); });
+    btns.appendChild(helpBtn);
+    btns.appendChild(delBtn);
+    row.appendChild(btns);
+    list.appendChild(row);
+  });
+}
+
+async function castHelpWrite(i, ta, btn) {
+  if (!apiKey) { appendError('xAI key required for Help write. Tap "Set API Key".'); return; }
+  const c = getCast()[i];
+  if (!c) return;
+  const orig = btn.textContent;
+  btn.textContent = '…'; btn.disabled = true;
+  try {
+    const recent = getHistory().slice(-6).map(h => (typeof h.content === 'string' ? h.content : '')).join('\n').slice(-2000);
+    const sys = 'You write concise physical character sheets used for image prompts. Given a character name, any existing notes, and recent story text, output ONLY a vivid one-paragraph physical description (sex, approx age, hair, eyes, build, skin, distinguishing features, typical wardrobe). No narrative, no name prefix, no quotes.';
+    const userMsg = 'Character: ' + c.name + '\nExisting notes: ' + (c.desc || '(none)') + '\n\nRecent story:\n' + recent;
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: modelSelect.value, messages: [{ role: 'system', content: sys }, { role: 'user', content: userMsg }], max_tokens: 300, temperature: 0.7 })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const desc = (data.choices?.[0]?.message?.content || '').trim();
+    if (desc) { ta.value = desc; const cc = getCast(); if (cc[i]) { cc[i].desc = desc; saveCast(cc); } }
+  } catch (e) { appendError('Help write failed: ' + e.message); }
+  finally { btn.textContent = orig; btn.disabled = false; }
+}
+
+const castOverlay = document.getElementById('cast-overlay');
+document.getElementById('cast-btn')?.addEventListener('click', () => {
+  if (!currentThreadId || !getCurrentThread()) createThread('New Game');
+  renderCastPanel();
+  castOverlay.classList.add('open');
+});
+document.getElementById('cast-close')?.addEventListener('click', () => castOverlay.classList.remove('open'));
+castOverlay?.addEventListener('click', e => { if (e.target === castOverlay) castOverlay.classList.remove('open'); });
+document.getElementById('cast-add-btn')?.addEventListener('click', () => {
+  const name = document.getElementById('cast-add-name').value.trim();
+  const desc = document.getElementById('cast-add-desc').value.trim();
+  if (!name) { alert('Enter a character name.'); return; }
+  const cast = getCast();
+  if (cast.some(c => c.name.toLowerCase() === name.toLowerCase())) { alert('That character already exists.'); return; }
+  cast.push({ name, desc });
+  saveCast(cast);
+  document.getElementById('cast-add-name').value = '';
+  document.getElementById('cast-add-desc').value = '';
+  renderCastPanel();
+});
 
 function openModal(type) {
   if (type === 'api') {
