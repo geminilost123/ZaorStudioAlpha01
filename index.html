@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.73" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.74" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.73</title>
+  <title>Zaor Studio 0.74</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1025,10 +1025,13 @@
     .sb-switch input:checked + .sb-slider { background: var(--lavender); }
     .sb-switch input:checked + .sb-slider::before { transform: translateX(20px); }
 
-    /* Stage-2 director preview (temporary) */
-    .sb-preview { background: rgba(201,184,232,0.06); border: 1px dashed var(--lavender); border-radius: 10px; padding: 10px 12px; margin: 8px 0; font-size: 12px; }
-    .sb-preview-h { color: var(--lavender); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
-    .sb-preview-b { color: var(--text-dim); line-height: 1.45; margin-bottom: 4px; word-break: break-word; }
+    /* Storyboard inline frame cards */
+    .sb-frame { margin: 8px 0; border-radius: 12px; overflow: hidden; border: 1px solid rgba(201,184,232,0.28); background: var(--surface); }
+    .sb-frame-load { padding: 18px; text-align: center; color: var(--lavender); font-size: 12px; }
+    .sb-frame-img { width: 100%; display: block; }
+    .sb-frame-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; }
+    .sb-frame-reason { font-size: 11px; color: var(--lavender); text-transform: uppercase; letter-spacing: 0.04em; }
+    .sb-makevideo { background: rgba(201,184,232,0.15); border: 1px solid var(--lavender); color: var(--lavender); border-radius: 16px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: 'Inter', sans-serif; white-space: nowrap; }
 
     #pe-model-row {
       display: none;
@@ -1099,7 +1102,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.73</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.74</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -2022,6 +2025,8 @@ function loadThread(id) {
         renderImage(m.src, m.alt, false, m.hostedUrl || null, m.modelLabel || 'Aurora');
       } else if (m.type === 'video') {
         renderVideo(m.src, m.alt, false, m.engineLabel || 'Aurora', m.storedDuration || null, m.storedRes || null);
+      } else if (m.type === 'storyboard') {
+        renderStoryboardFrameCard(m.src, m.alt, m.videoPrompt || '', m.reason || '');
       } else if (m.type === 'error') {
         const div = document.createElement('div');
         div.className = 'error-bubble';
@@ -4205,25 +4210,65 @@ async function runStoryboardDirector(beatText, forceFrame) {
     if (!res.ok) return; // silently skip — never break the story
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content || '';
-    renderDirectorPreview(parseDirectorBlock(raw));
+    const parsed = parseDirectorBlock(raw);
+    if (parsed.frame && parsed.imagePrompt) {
+      await addStoryboardFrame(parsed.imagePrompt, parsed.videoPrompt, parsed.reason);
+    }
   } catch (e) { /* silently skip — storyboard never interrupts the story */ }
 }
 
-// Stage-2 temporary readout so we can confirm detection before drawing real frame cards
-function renderDirectorPreview(p) {
-  const esc = s => (s || '').replace(/</g, '&lt;');
-  const el = document.createElement('div');
-  el.className = 'sb-preview';
-  if (!p.frame) {
-    el.innerHTML = '<div class="sb-preview-h">🎬 Director (Stage-2 preview)</div><div class="sb-preview-b">No frame this beat.</div>';
-  } else {
-    el.innerHTML = '<div class="sb-preview-h">🎬 Director (Stage-2 preview) · ' + esc(p.reason) + '</div>'
-      + '<div class="sb-preview-b"><b>Image prompt:</b> ' + esc(p.imagePrompt) + '</div>'
-      + '<div class="sb-preview-b"><b>Video prompt:</b> ' + esc(p.videoPrompt) + '</div>'
-      + (p.cast && p.cast.toLowerCase() !== 'none' ? '<div class="sb-preview-b"><b>Cast:</b> ' + esc(p.cast) + '</div>' : '');
-  }
-  messagesEl.appendChild(el);
+// Generate the frame image (locked storyboard model + ratio), render it inline, persist it
+async function addStoryboardFrame(imagePrompt, videoPrompt, reason) {
+  const card = document.createElement('div');
+  card.className = 'sb-frame';
+  card.innerHTML = '<div class="sb-frame-load">🎬 Generating storyboard frame…</div>';
+  messagesEl.appendChild(card);
   messagesEl.scrollTop = messagesEl.scrollHeight;
+  try {
+    const src = await callModel(storyboardModel, { prompt: imagePrompt, aspectRatio: storyboardRatio, resolution: '1k' });
+    if (!src) throw new Error('no image returned');
+    fillStoryboardCard(card, src, videoPrompt, reason);
+    addMessageToThread({ role: 'assistant', type: 'storyboard', src, alt: imagePrompt, videoPrompt: videoPrompt || '', reason: reason || '' });
+  } catch (e) {
+    card.innerHTML = '<div class="sb-frame-load" style="color:var(--text-dim);">🎬 Frame skipped — ' + (e.message || 'error').replace(/</g, '&lt;') + '</div>';
+  }
+}
+
+function fillStoryboardCard(card, src, videoPrompt, reason) {
+  card.innerHTML = '';
+  const img = document.createElement('img');
+  img.className = 'sb-frame-img';
+  img.referrerPolicy = 'no-referrer'; // set before src so Atlas-hosted frames load
+  img.alt = 'storyboard frame';
+  img.src = src;
+  card.appendChild(img);
+  const bar = document.createElement('div');
+  bar.className = 'sb-frame-bar';
+  const reasonSpan = document.createElement('span');
+  reasonSpan.className = 'sb-frame-reason';
+  reasonSpan.textContent = '🎬 ' + (reason || 'frame');
+  bar.appendChild(reasonSpan);
+  if (videoPrompt) {
+    const btn = document.createElement('button');
+    btn.className = 'sb-makevideo';
+    btn.textContent = '▶ Copy video prompt';
+    btn.addEventListener('click', async () => {
+      let ok = false;
+      try { await navigator.clipboard.writeText(videoPrompt); ok = true; } catch (e) {}
+      if (ok) { btn.textContent = '✓ Copied'; setTimeout(() => { btn.textContent = '▶ Copy video prompt'; }, 2000); }
+      else { window.prompt('Wan 2.2 video prompt:', videoPrompt); }
+    });
+    bar.appendChild(btn);
+  }
+  card.appendChild(bar);
+}
+
+// Re-render a persisted storyboard frame (no generation)
+function renderStoryboardFrameCard(src, imagePrompt, videoPrompt, reason) {
+  const card = document.createElement('div');
+  card.className = 'sb-frame';
+  messagesEl.appendChild(card);
+  fillStoryboardCard(card, src, videoPrompt, reason);
 }
 
 function openModal(type) {
