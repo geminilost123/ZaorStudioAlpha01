@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.79" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.80" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.79</title>
+  <title>Zaor Studio 0.80</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1101,7 +1101,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.79</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.80</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -3150,6 +3150,11 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
   saveBtn.innerHTML = '&#8681; Save';
   saveBtn.addEventListener('click', () => saveVideoToFiles(src, altText));
 
+  const vidCloudBtn = document.createElement('button');
+  vidCloudBtn.className = 'vid-save-btn';
+  vidCloudBtn.innerHTML = '☁ Cloud';
+  vidCloudBtn.addEventListener('click', () => uploadToCloudinary(src, altText, vidCloudBtn, 'video'));
+
   // Pin for PE button on videos
   const pinVidPEBtn = document.createElement('button');
   pinVidPEBtn.className = 'pe-pin-btn';
@@ -3208,6 +3213,7 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
 
   wrapper.appendChild(video);
   wrapper.appendChild(saveBtn);
+  wrapper.appendChild(vidCloudBtn);
   wrapper.appendChild(pinVidPEBtn);
   wrapper.appendChild(extendBtn);
   wrapper.appendChild(retryVidBtn);
@@ -3709,7 +3715,7 @@ function setLoading(val) { isLoading = val; sendBtn.disabled = val; }
 // ═══════════════════════════════════════════════════════
 // SAVE TO FILES
 // ═══════════════════════════════════════════════════════
-async function uploadToCloudinary(src, altText, btn) {
+async function uploadToCloudinary(src, altText, btn, mediaType = 'image') {
   if (!cloudinaryCloud || !cloudinaryPreset) {
     appendError('Cloudinary isn\'t set up yet. Tap "Set API Key" and add your Cloudinary cloud name + unsigned upload preset.');
     return;
@@ -3723,9 +3729,10 @@ async function uploadToCloudinary(src, altText, btn) {
       fileVal = await (await fetch(src)).blob();
     }
     const form = new FormData();
-    form.append('file', fileVal); // remote URL or data URI is fetched server-side by Cloudinary
+    form.append('file', fileVal);
     form.append('upload_preset', cloudinaryPreset);
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudinaryCloud}/image/upload`, { method: 'POST', body: form });
+    const endpoint = mediaType === 'video' ? 'video' : 'image';
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudinaryCloud}/${endpoint}/upload`, { method: 'POST', body: form });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.secure_url) {
       throw new Error(data.error?.message || ('upload failed (' + res.status + ')'));
@@ -4306,6 +4313,11 @@ function fillStoryboardCard(card, src, videoPrompt, reason) {
     });
     bar.appendChild(btn);
   }
+  const sbCloudBtn = document.createElement('button');
+  sbCloudBtn.className = 'sb-makevideo';
+  sbCloudBtn.textContent = '☁ Cloud';
+  sbCloudBtn.addEventListener('click', () => uploadToCloudinary(src, '', sbCloudBtn, 'image'));
+  bar.appendChild(sbCloudBtn);
   card.appendChild(bar);
 }
 
