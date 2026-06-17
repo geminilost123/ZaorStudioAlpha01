@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.75" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.76" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.75</title>
+  <title>Zaor Studio 0.76</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1032,6 +1032,7 @@
     .sb-frame-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; }
     .sb-frame-reason { font-size: 11px; color: var(--lavender); text-transform: uppercase; letter-spacing: 0.04em; }
     .sb-makevideo { background: rgba(201,184,232,0.15); border: 1px solid var(--lavender); color: var(--lavender); border-radius: 16px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: 'Inter', sans-serif; white-space: nowrap; }
+    .sb-debug { font-size: 11px; color: #ffb86c; font-family: monospace; padding: 3px 8px; border-left: 2px solid #ffb86c; margin: 4px 0; white-space: pre-wrap; word-break: break-word; background: rgba(255,184,108,0.06); }
 
     #pe-model-row {
       display: none;
@@ -1102,7 +1103,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.75</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.76</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -4196,8 +4197,17 @@ function parseDirectorBlock(text) {
   };
 }
 
+function sbDebug(msg) {
+  const el = document.createElement('div');
+  el.className = 'sb-debug';
+  el.textContent = 'SB-DEBUG: ' + msg;
+  messagesEl.appendChild(el);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
 async function runStoryboardDirector(beatText, forceFrame) {
-  if (!beatText || !apiKey) return;
+  if (!beatText || !apiKey) { sbDebug('skipped — no beat text or no API key'); return; }
+  sbDebug('director call sending (force=' + forceFrame + ')');
   try {
     const sys = DIRECTOR_SYSTEM
       .replace('{MODEL}', storyboardModel === 'z-image-turbo' ? 'Z-Image' : 'Chroma')
@@ -4209,29 +4219,39 @@ async function runStoryboardDirector(beatText, forceFrame) {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify({ model: modelSelect.value, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }], max_tokens: 700, temperature: 0.7 })
     });
-    if (!res.ok) return; // silently skip — never break the story
+    sbDebug('director HTTP ' + res.status);
+    if (!res.ok) { const t = await res.text().catch(() => ''); sbDebug('director error body: ' + t.slice(0, 200)); return; }
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content || '';
+    sbDebug('director raw (first 300): ' + raw.slice(0, 300));
     const parsed = parseDirectorBlock(raw);
+    sbDebug('parsed → frame=' + parsed.frame + ' reason=' + parsed.reason + ' imgPromptLen=' + (parsed.imagePrompt || '').length);
     if (parsed.frame && parsed.imagePrompt) {
       await addStoryboardFrame(parsed.imagePrompt, parsed.videoPrompt, parsed.reason);
+    } else {
+      sbDebug('NO frame drawn (frame=false or empty image prompt)');
     }
-  } catch (e) { /* silently skip — storyboard never interrupts the story */ }
+  } catch (e) { sbDebug('director EXCEPTION: ' + (e && e.message)); }
 }
 
 // Generate the frame image (locked storyboard model + ratio), render it inline, persist it
 async function addStoryboardFrame(imagePrompt, videoPrompt, reason) {
+  sbDebug('addStoryboardFrame: model=' + storyboardModel + ' ratio=' + storyboardRatio);
   const card = document.createElement('div');
   card.className = 'sb-frame';
   card.innerHTML = '<div class="sb-frame-load">🎬 Generating storyboard frame…</div>';
   messagesEl.appendChild(card);
   messagesEl.scrollTop = messagesEl.scrollHeight;
   try {
+    sbDebug('calling callModel…');
     const src = await callModel(storyboardModel, { prompt: imagePrompt, aspectRatio: storyboardRatio, resolution: '1k' });
+    sbDebug('callModel returned: ' + (src ? String(src).slice(0, 80) : 'EMPTY/falsy'));
     if (!src) throw new Error('no image returned');
     fillStoryboardCard(card, src, videoPrompt, reason);
+    sbDebug('frame filled OK');
     addMessageToThread({ role: 'assistant', type: 'storyboard', src, alt: imagePrompt, videoPrompt: videoPrompt || '', reason: reason || '' });
   } catch (e) {
+    sbDebug('addStoryboardFrame ERROR: ' + (e && e.message));
     card.innerHTML = '<div class="sb-frame-load" style="color:var(--text-dim);">🎬 Frame skipped — ' + (e.message || 'error').replace(/</g, '&lt;') + '</div>';
   }
 }
