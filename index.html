@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.77" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.79" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.77</title>
+  <title>Zaor Studio 0.79</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1028,11 +1028,9 @@
     /* Storyboard inline frame cards */
     .sb-frame { margin: 8px 0; border-radius: 12px; overflow: hidden; border: 1px solid rgba(201,184,232,0.28); background: var(--surface); }
     .sb-frame-load { padding: 18px; text-align: center; color: var(--lavender); font-size: 12px; }
-    .sb-frame-img { width: 100%; display: block; }
     .sb-frame-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; }
     .sb-frame-reason { font-size: 11px; color: var(--lavender); text-transform: uppercase; letter-spacing: 0.04em; }
     .sb-makevideo { background: rgba(201,184,232,0.15); border: 1px solid var(--lavender); color: var(--lavender); border-radius: 16px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: 'Inter', sans-serif; white-space: nowrap; }
-    .sb-debug { font-size: 11px; color: #ffb86c; font-family: monospace; padding: 3px 8px; border-left: 2px solid #ffb86c; margin: 4px 0; white-space: pre-wrap; word-break: break-word; background: rgba(255,184,108,0.06); }
 
     #pe-model-row {
       display: none;
@@ -1103,7 +1101,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.77</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.79</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1375,6 +1373,10 @@
     <input type="password" id="wavespeed-key-input" placeholder="ws-…" autocomplete="off" spellcheck="false" />
     <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Atlas Cloud Key (cheap video — optional)</label>
     <input type="password" id="atlas-key-input" placeholder="atlas-…" autocomplete="off" spellcheck="false" />
+    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Cloudinary — cloud name (for ☁ Cloud save)</label>
+    <input type="text" id="cloudinary-cloud-input" placeholder="your-cloud-name" autocomplete="off" spellcheck="false" />
+    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Cloudinary — unsigned upload preset</label>
+    <input type="text" id="cloudinary-preset-input" placeholder="unsigned preset name" autocomplete="off" spellcheck="false" />
     <div style="border-top:1px solid rgba(255,255,255,0.1);margin-top:8px;padding-top:12px;">
       <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Storage</label>
       <div id="storage-usage-modal" style="font-size:12px;color:var(--text-dim);margin-bottom:8px;"></div>
@@ -1598,6 +1600,8 @@ let isLoading = false;
 let currentThreadId = null;
 let pendingDeleteId = null;
 let atlasKey = localStorage.getItem('atlas_key') || '';
+let cloudinaryCloud = localStorage.getItem('cloudinary_cloud') || '';
+let cloudinaryPreset = localStorage.getItem('cloudinary_preset') || '';
 let lastAtlasRaw = ''; // captured raw Atlas response for on-screen debugging
 
 // ═══════════════════════════════════════════════════════
@@ -3465,6 +3469,12 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   saveBtn.innerHTML = '&#8681; Save';
   saveBtn.addEventListener('click', () => saveImageToFiles(src, altText));
 
+  // Cloud (Cloudinary) save button — uploads to the user's Cloudinary instead of the device
+  const cloudBtn = document.createElement('button');
+  cloudBtn.className = 'save-btn';
+  cloudBtn.innerHTML = '☁ Cloud';
+  cloudBtn.addEventListener('click', () => uploadToCloudinary(src, altText, cloudBtn));
+
   // Copy prompt button
   const copyPromptBtn = document.createElement('button');
   copyPromptBtn.className = 'save-btn';
@@ -3654,6 +3664,7 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   });
 
   btnBar.appendChild(saveBtn);
+  btnBar.appendChild(cloudBtn);
   btnBar.appendChild(copyPromptBtn);
   btnBar.appendChild(pinPEBtn);
   btnBar.appendChild(setTargetBtn);
@@ -3698,6 +3709,35 @@ function setLoading(val) { isLoading = val; sendBtn.disabled = val; }
 // ═══════════════════════════════════════════════════════
 // SAVE TO FILES
 // ═══════════════════════════════════════════════════════
+async function uploadToCloudinary(src, altText, btn) {
+  if (!cloudinaryCloud || !cloudinaryPreset) {
+    appendError('Cloudinary isn\'t set up yet. Tap "Set API Key" and add your Cloudinary cloud name + unsigned upload preset.');
+    return;
+  }
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.innerHTML = '☁ Uploading…'; btn.disabled = true; }
+  try {
+    let fileVal = src;
+    // blob: URLs are browser-local — Cloudinary can't fetch them, so send the bytes
+    if (typeof src === 'string' && src.startsWith('blob:')) {
+      fileVal = await (await fetch(src)).blob();
+    }
+    const form = new FormData();
+    form.append('file', fileVal); // remote URL or data URI is fetched server-side by Cloudinary
+    form.append('upload_preset', cloudinaryPreset);
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudinaryCloud}/image/upload`, { method: 'POST', body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.secure_url) {
+      throw new Error(data.error?.message || ('upload failed (' + res.status + ')'));
+    }
+    try { await navigator.clipboard.writeText(data.secure_url); } catch (e) {}
+    if (btn) { btn.innerHTML = '✓ Saved · link copied'; setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 2500); }
+  } catch (e) {
+    if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    appendError('Cloudinary upload failed: ' + e.message);
+  }
+}
+
 async function saveImageToFiles(src, altText) {
   const safeName = (altText || 'image').slice(0, 40).replace(/[^a-z0-9]/gi, '_').toLowerCase();
   const filename = `aurora_${safeName}_${Date.now()}.png`;
@@ -4197,17 +4237,8 @@ function parseDirectorBlock(text) {
   };
 }
 
-function sbDebug(msg) {
-  const el = document.createElement('div');
-  el.className = 'sb-debug';
-  el.textContent = 'SB-DEBUG: ' + msg;
-  messagesEl.appendChild(el);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-}
-
 async function runStoryboardDirector(beatText, forceFrame) {
-  if (!beatText || !apiKey) { sbDebug('skipped — no beat text or no API key'); return; }
-  sbDebug('director call sending (force=' + forceFrame + ')');
+  if (!beatText || !apiKey) return;
   try {
     const sys = DIRECTOR_SYSTEM
       .replace('{MODEL}', storyboardModel === 'z-image-turbo' ? 'Z-Image' : 'Chroma')
@@ -4219,39 +4250,29 @@ async function runStoryboardDirector(beatText, forceFrame) {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify({ model: modelSelect.value, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }], max_tokens: 700, temperature: 0.7 })
     });
-    sbDebug('director HTTP ' + res.status);
-    if (!res.ok) { const t = await res.text().catch(() => ''); sbDebug('director error body: ' + t.slice(0, 200)); return; }
+    if (!res.ok) return; // silently skip — never break the story
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content || '';
-    sbDebug('director raw (first 300): ' + raw.slice(0, 300));
     const parsed = parseDirectorBlock(raw);
-    sbDebug('parsed → frame=' + parsed.frame + ' reason=' + parsed.reason + ' imgPromptLen=' + (parsed.imagePrompt || '').length);
     if (parsed.frame && parsed.imagePrompt) {
       await addStoryboardFrame(parsed.imagePrompt, parsed.videoPrompt, parsed.reason);
-    } else {
-      sbDebug('NO frame drawn (frame=false or empty image prompt)');
     }
-  } catch (e) { sbDebug('director EXCEPTION: ' + (e && e.message)); }
+  } catch (e) { /* silently skip — storyboard never interrupts the story */ }
 }
 
 // Generate the frame image (locked storyboard model + ratio), render it inline, persist it
 async function addStoryboardFrame(imagePrompt, videoPrompt, reason) {
-  sbDebug('addStoryboardFrame: model=' + storyboardModel + ' ratio=' + storyboardRatio);
   const card = document.createElement('div');
   card.className = 'sb-frame';
   card.innerHTML = '<div class="sb-frame-load">🎬 Generating storyboard frame…</div>';
   messagesEl.appendChild(card);
   messagesEl.scrollTop = messagesEl.scrollHeight;
   try {
-    sbDebug('calling callModel…');
     const src = await callModel(storyboardModel, { prompt: imagePrompt, aspectRatio: storyboardRatio, resolution: '1k' });
-    sbDebug('callModel returned: ' + (src ? String(src).slice(0, 80) : 'EMPTY/falsy'));
     if (!src) throw new Error('no image returned');
     fillStoryboardCard(card, src, videoPrompt, reason);
-    sbDebug('frame filled OK');
     addMessageToThread({ role: 'assistant', type: 'storyboard', src, alt: imagePrompt, videoPrompt: videoPrompt || '', reason: reason || '' });
   } catch (e) {
-    sbDebug('addStoryboardFrame ERROR: ' + (e && e.message));
     card.innerHTML = '<div class="sb-frame-load" style="color:var(--text-dim);">🎬 Frame skipped — ' + (e.message || 'error').replace(/</g, '&lt;') + '</div>';
   }
 }
@@ -4264,8 +4285,6 @@ function fillStoryboardCard(card, src, videoPrompt, reason) {
   img.className = 'gen-image'; // same proven class the normal image flow uses
   img.referrerPolicy = 'no-referrer';
   img.alt = 'storyboard frame';
-  img.onload = () => sbDebug('img ONLOAD ok ' + img.naturalWidth + 'x' + img.naturalHeight);
-  img.onerror = () => sbDebug('img ONERROR — failed to load src');
   img.src = src;
   wrapper.appendChild(img);
   card.appendChild(wrapper);
@@ -4303,6 +4322,8 @@ function openModal(type) {
     keyInput.value = apiKey;
     document.getElementById('wavespeed-key-input').value = wavespeedKey;
     document.getElementById('atlas-key-input').value = atlasKey;
+    document.getElementById('cloudinary-cloud-input').value = cloudinaryCloud;
+    document.getElementById('cloudinary-preset-input').value = cloudinaryPreset;
     modalOverlay.classList.add('open');
     updateStorageInfo();
     setTimeout(() => keyInput.focus(), 100);
@@ -4327,6 +4348,11 @@ document.getElementById('modal-save').addEventListener('click', () => {
     atlasKey = atlasVal;
     localStorage.setItem('atlas_key', atlasVal);
   }
+  // Cloudinary (not secret — saved as-is so they can be updated or cleared)
+  cloudinaryCloud = document.getElementById('cloudinary-cloud-input').value.trim();
+  localStorage.setItem('cloudinary_cloud', cloudinaryCloud);
+  cloudinaryPreset = document.getElementById('cloudinary-preset-input').value.trim();
+  localStorage.setItem('cloudinary_preset', cloudinaryPreset);
   // Clear clipboard so keys don't linger
   try { navigator.clipboard.writeText(' ').catch(()=>{}); } catch(e) {}
   modalOverlay.classList.remove('open');
