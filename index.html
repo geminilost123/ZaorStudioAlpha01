@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.74" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.75" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.74</title>
+  <title>Zaor Studio 0.75</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1102,7 +1102,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.74</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.75</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -2342,8 +2342,8 @@ async function handleSend() {
   const text = giggityHit ? rawText.replace(/giggity/ig, '').replace(/\s{2,}/g, ' ').trim() : rawText;
   sbForceFrame = giggityHit;
 
-  // Ensure we have a thread
-  if (!currentThreadId) createThread('New Game');
+  // Ensure we have a VALID thread (recover if the current one was lost/evicted from storage)
+  if (!currentThreadId || !getCurrentThread()) createThread('New Game');
 
   // Clear empty state
   document.getElementById('empty-state')?.remove();
@@ -2515,7 +2515,9 @@ async function generateText(userText) {
   const typingId = appendTyping();
   try {
     // Build messages array from history
-    const messages = getHistory();
+    let messages = getHistory();
+    // Safety: if history was lost (e.g. storage eviction), still send the current turn so chat never 400s on empty messages
+    if (messages.length === 0 && userText) messages = [{ role: 'user', content: userText }];
 
     // Inject PE system prompt if active
     let apiMessages = [...messages];
