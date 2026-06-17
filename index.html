@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.69" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.71" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.69</title>
+  <title>Zaor Studio 0.71</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1085,7 +1085,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.69</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.71</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1573,22 +1573,19 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
   'z-image-lora':   { cat:'t2img', label:'Z-Image Turbo · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/z-image/turbo-lora', price:0.01, verified:true, lora:true, loraBase:'Z-Image',
     buildBody:p=>{
-      const sizeMap = { '1:1':'1024*1024','16:9':'1344*768','9:16':'768*1344','4:3':'1152*896','3:4':'896*1152','3:2':'1216*832','2:3':'832*1216' };
-      const b = { prompt:p.prompt, size:(sizeMap[p.aspectRatio]||'1024*1024'), seed:-1, enable_base64_output:false, enable_safety_checker:false };
+      const b = { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, enable_base64_output:false, enable_safety_checker:false };
       if (p.loras && p.loras.length) b.loras = p.loras.slice(0,3).map(l=>({ path:l.path, scale:Number(l.scale)||1 }));
       return b;
     } },
   'flux-lora':      { cat:'t2img', label:'Flux Dev · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/flux-dev-lora', price:0.015, verified:true, lora:true, loraBase:'Flux',
     buildBody:p=>{
-      const sizeMap = { '1:1':'1024*1024','16:9':'1344*768','9:16':'768*1344','4:3':'1152*896','3:4':'896*1152','3:2':'1216*832','2:3':'832*1216' };
-      const b = { prompt:p.prompt, size:(sizeMap[p.aspectRatio]||'1024*1024'), num_inference_steps:((p.steps && p.steps>0) ? p.steps : 28), guidance_scale:((p.guidance != null) ? p.guidance : 3.5), num_images:1, seed:-1, output_format:'jpeg', enable_base64_output:false, enable_safety_checker:false };
+      const b = { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), num_inference_steps:((p.steps && p.steps>0) ? p.steps : 28), guidance_scale:((p.guidance != null) ? p.guidance : 3.5), num_images:1, seed:-1, output_format:'jpeg', enable_base64_output:false, enable_safety_checker:false };
       if (p.loras && p.loras.length) b.loras = p.loras.slice(0,3).map(l=>({ path:l.path, scale:Number(l.scale)||1 }));
       return b;
     } },
   'chroma':         { cat:'t2img', label:'Chroma uncensored · WaveSpeed', provider:'wavespeed', path:'wavespeed-ai/chroma', price:0.015, verified:true,
     buildBody:p=>{
-      const sizeMap = { '1:1':'1024*1024','16:9':'1344*768','9:16':'768*1344','4:3':'1152*896','3:4':'896*1152','3:2':'1216*832','2:3':'832*1216' };
-      return { prompt:p.prompt, size:(sizeMap[p.aspectRatio]||'1024*1024'), seed:-1, output_format:'jpeg', enable_base64_output:false, enable_sync_mode:false };
+      return { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, output_format:'jpeg', enable_base64_output:false, enable_sync_mode:false };
     } },
   'atlas-flux-dev': { cat:'t2img', label:'Flux Dev · Atlas', provider:'atlas', path:'black-forest-labs/flux-dev', price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
@@ -1671,6 +1668,14 @@ const MODEL_REGISTRY = {
 };
 
 // Format a price label for dropdowns
+function wsSize(ar, res){
+  const base = (String(res).toLowerCase() === '2k') ? 1536 : 1024;
+  const map = { '1:1':[1,1],'16:9':[16,9],'9:16':[9,16],'4:3':[4,3],'3:4':[3,4],'3:2':[3,2],'2:3':[2,3],'2:1':[2,1],'1:2':[1,2] };
+  const r = map[ar] || [1,1];
+  const long = Math.max(r[0], r[1]);
+  const round16 = n => Math.round(n/16)*16;
+  return round16(base*r[0]/long) + '*' + round16(base*r[1]/long);
+}
 function priceLabel(m){
   if(m.price!=null){ let s=m.price.toFixed(3).replace(/0+$/,'').replace(/\.$/,''); return '$'+s; }
   if(m.pricePerS!=null) return '$'+m.pricePerS+'/s';
@@ -3676,6 +3681,17 @@ const PROMPT_LIBRARY = [
   { type:'image', cat:'Scene', title:'Establishing / landscape', text:'A wide photograph of [location] at [time of day], with [key feature] in the foreground, atmospheric haze, dramatic natural light, deep focus, landscape photography, richly detailed' },
   { type:'image', cat:'Stylized', title:'Concept / fantasy', text:'[subject] reimagined as [concept], set in [environment], dramatic rim lighting, intricate detail, [art style] concept art, [color] palette, epic atmosphere' },
   { type:'image', cat:'Consistency', title:'Same-character anchor', text:'The same character as before — keep these identity anchors consistent: [face shape], [hair], [eye color], [distinguishing feature]. New scene: [setting], [action]. Photorealistic, consistent face.' },
+  // ── Photoreal scaffolds (front-load "photograph", real camera/lens/film, no style words; great for Chroma & Flux) ──
+  { type:'image', cat:'Photoreal', title:'Photoreal · natural-light portrait', text:'A photograph of [subject], [expression], in [setting]. Shot on a Sony A7 IV with an 85mm f/1.4 lens, shallow depth of field, soft natural window light. Photorealistic, sharp focus, visible skin pores and fine texture, natural color, candid' },
+  { type:'image', cat:'Photoreal', title:'Photoreal · B&W editorial (Lindbergh)', text:'A black and white photograph of [subject], honest unposed expression, plain backdrop, in the raw editorial portrait style of Peter Lindbergh. Shot on medium format film, soft directional light, natural skin with visible texture and imperfections, wide tonal range, fine grain' },
+  { type:'image', cat:'Photoreal', title:'Photoreal · documentary color (McCurry)', text:'A documentary photograph of [subject] in [environment], in the vivid photojournalistic style of Steve McCurry. Natural daylight, rich saturated color, sharp catchlights in the eyes, true-to-life detail, shot on Kodak Portra 400 with a 35mm lens' },
+  { type:'image', cat:'Photoreal', title:'Photoreal · direct-flash snapshot', text:'A candid snapshot photograph of [subject], [action], at night. Direct on-camera flash, harsh shadows, slightly overexposed skin, authentic amateur point-and-shoot look, unpolished and real, visible skin texture, 35mm film grain' },
+  { type:'image', cat:'Photoreal', title:'Photoreal · golden-hour cinematic', text:'A photograph of [subject], [pose], outdoors during golden hour. Warm low sunlight with soft rim light, shallow depth of field, shot on a Canon EOS R5 with a 50mm f/1.2 lens. Photorealistic, natural skin tones and texture, lifelike, filmic color' },
+  { type:'image', cat:'Photoreal', title:'Photoreal · studio beauty (Leibovitz)', text:'A portrait photograph of [subject], [expression], in the dramatic environmental portrait style of Annie Leibovitz. Soft key light with a subtle rim light, rich realistic detail, natural skin with pores, shot on medium format with a 100mm lens' },
+  { type:'modifier', cat:'Photoreal', title:'Realism booster (append)', text:'photorealistic, sharp focus, natural skin texture with visible pores, true-to-life color, shot on [camera] with [lens] lens, natural [lighting] light' },
+  // ── Artist-style scaffolds (stronger on Chroma than vanilla Flux; test each name, swap if it looks generic) ──
+  { type:'image', cat:'Artist style', title:'Artist style · single', text:'[subject], [scene or action], in the style of [artist full name], [medium or movement such as Art Nouveau, oil painting, ink illustration], [mood and lighting]' },
+  { type:'image', cat:'Artist style', title:'Artist style · blended', text:'[subject], [scene], in the combined style of [artist 1] and [artist 2], [medium such as comic-book ink or watercolor], bold linework, [color] palette, dramatic composition' },
   // ── Z-Image Turbo (positive-only constraints, name the medium, lighting + texture) ──
   { type:'image', cat:'Z-Image', title:'Z-Image photoreal portrait', text:'Ultra-realistic photograph, shot on [camera/lens, e.g. Hasselblad X2D 100C, 80mm], of [subject] with [expression], wearing [wardrobe], in [setting], [lighting, e.g. soft golden-hour rim light], visible skin pores and fabric detail, sharp focus. (Z-Image ignores negatives — phrase everything as what you WANT.)' },
   { type:'image', cat:'Z-Image', title:'Z-Image scene', text:'[Medium, e.g. cinematic editorial photograph] of [subject] [action] in [setting], [time of day and lighting], [2-3 key details], rich micro-texture, sharp focus, photorealistic. Front-load the subject; keep to 3-5 strong concepts in one style.' },
