@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.82" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.84" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.82</title>
+  <title>Zaor Studio 0.84</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1039,6 +1039,12 @@
     .cast-btns { display: flex; gap: 8px; margin-top: 8px; }
     .cast-btns button { flex: 0 0 auto; font-size: 12px; padding: 5px 10px; }
 
+    /* Inline storyboard frame editor */
+    .sb-editor { display: none; flex-direction: column; gap: 8px; padding: 8px 10px 4px; }
+    .sb-editor.open { display: flex; }
+    .sb-edit-input { width: 100%; background: var(--surface); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: var(--text); padding: 8px; font-family: inherit; }
+    .sb-editor-btns { display: flex; gap: 8px; }
+
     #pe-model-row {
       display: none;
       flex-direction: column;
@@ -1108,7 +1114,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.82</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.84</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1217,7 +1223,8 @@
             <option value="wan27pro">Wan 2.7 Pro Edit · WaveSpeed — $0.06</option>
             <option value="atlas-flux-kontext">Flux Kontext · Atlas · uncensored — $0.025</option>
             <option value="atlas-qwen-edit">Qwen Edit · Atlas — $0.02</option>
-            <option value="aurora">Aurora Edit · xAI — ~$0.04</option>
+            <option value="aurora-simple">Aurora Simple Edit · xAI — ~$0.02</option>
+            <option value="aurora">Aurora Quality Edit · xAI — ~$0.04</option>
           </select>
         </div>
       </div>
@@ -2057,7 +2064,7 @@ function loadThread(id) {
       } else if (m.type === 'video') {
         renderVideo(m.src, m.alt, false, m.engineLabel || 'Aurora', m.storedDuration || null, m.storedRes || null);
       } else if (m.type === 'storyboard') {
-        renderStoryboardFrameCard(m.src, m.alt, m.videoPrompt || '', m.reason || '');
+        renderStoryboardFrameCard(m.src, m.alt, m.videoPrompt || '', m.reason || '', m.frameId);
       } else if (m.type === 'error') {
         const div = document.createElement('div');
         div.className = 'error-bubble';
@@ -2440,74 +2447,65 @@ async function editImage(prompt, imageUrl, skipStyleLock = false, modelOverride 
   const typingId = appendTyping();
   const editModel = modelOverride || document.getElementById('edit-model-select')?.value || 'wan27';
   const fullPrompt = skipStyleLock ? prompt : applyStyleLock(prompt);
-
   try {
-    let src, hostedUrl, modelLabel;
-
-    if (editModel === 'aurora') {
-      // ── Aurora edit via xAI ──
-      const body = {
-        model: 'grok-imagine-image-quality',
-        prompt: fullPrompt,
-        image: { url: imageUrl, type: 'image_url' },
-        response_format: 'url'
-      };
-      const res = await fetch('https://api.x.ai/v1/images/edits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-        body: JSON.stringify(body)
-      });
-      removeTyping(typingId);
-      if (!res.ok) {
-        const e = await res.json().catch(()=>({}));
-        throw new Error(`Aurora edit error ${res.status}: ${e.error?.message || JSON.stringify(e)}`);
-      }
-      const data = await res.json();
-      const url = data.data?.[0]?.url;
-      if (!url) throw new Error('No image returned from Aurora edit');
-      src = url; hostedUrl = url; modelLabel = 'Aurora Edit';
-
-    } else if (editModel === 'atlas-flux-kontext' || editModel === 'atlas-qwen-edit') {
-      // ── Atlas uncensored edit (routes through the proven callModel 'atlas' path) ──
-      if (!atlasKey) throw new Error('Atlas Cloud API key required. Tap "Set API Key" to add it.');
-      const atlasImg = await atlasPrepareImage(imageUrl);
-      const resultUrl = await callModel(editModel, { prompt: fullPrompt, image: atlasImg, isCancelled: () => false });
-      removeTyping(typingId);
-      if (!resultUrl) throw new Error('Atlas edit timed out');
-      src = resultUrl; hostedUrl = resultUrl;
-      modelLabel = (editModel === 'atlas-flux-kontext') ? 'Flux Kontext Edit · Atlas' : 'Qwen Edit · Atlas';
-
-    } else {
-      // ── Wan 2.7 edit via WaveSpeed ──
-      if (!wavespeedKey) throw new Error('WaveSpeed API key required for Wan edit. Tap "Set API Key" to add it.');
-      const wsModels = {
-        wan27pro:    { path: 'alibaba/wan-2.7/image-edit-pro',          body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
-        wan27:       { path: 'alibaba/wan-2.7/image-edit',              body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
-        fluxkontext: { path: 'wavespeed-ai/flux-kontext-dev-ultra-fast', body: { prompt: fullPrompt, image: imageUrl, seed: -1, enable_safety_checker: false } },
-        qwen2:       { path: 'wavespeed-ai/qwen-image-2.0/edit',        body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
-        qwen:        { path: 'wavespeed-ai/qwen-image/edit',            body: { prompt: fullPrompt, image: imageUrl, seed: -1, enable_safety_checker: false }, timeout: 180000 },
-      };
-      const wsModel = wsModels[editModel] || wsModels.qwen;
-      const { path: wsPath, body: wsBody, timeout: wsTimeout = 120000 } = wsModel;
-      const resultUrl = await callWaveSpeed(wsPath, wsBody, wsTimeout, 3000);
-
-      removeTyping(typingId);
-      if (!resultUrl) throw new Error('Edit timed out');
-      src = resultUrl; hostedUrl = resultUrl;
-      const editLabels = { wan27pro: 'Wan 2.7 Pro Edit', wan27: 'Wan 2.7 Edit', fluxkontext: 'Flux Kontext Edit', qwen2: 'Qwen 2.0 Edit', qwen: 'Qwen Edit', aurora: 'Aurora Edit' };
-      modelLabel = editLabels[editModel] || 'Qwen Edit';
-    }
-
+    const { src, hostedUrl, modelLabel } = await runEdit(fullPrompt, imageUrl, editModel);
+    removeTyping(typingId);
     lastImageUrl = hostedUrl || src;
     activeEditTarget = hostedUrl || src;
     showEditButton();
     addMessageToThread({ role: 'assistant', type: 'image', src, hostedUrl, alt: prompt, modelLabel });
     renderImage(src, prompt, true, hostedUrl, modelLabel);
-
   } catch(e) {
     removeTyping(typingId);
     addMessageToThread({ role: 'assistant', type: 'error', content: e.message });
     appendError(e.message);
+  }
+}
+
+// Core edit routine — returns { src, hostedUrl, modelLabel } or throws. No UI side effects (reused by storyboard frame editing).
+async function runEdit(fullPrompt, imageUrl, editModel) {
+  if (editModel === 'aurora' || editModel === 'aurora-simple') {
+    // ── Aurora edit via xAI (simple vs quality) ──
+    const model = editModel === 'aurora-simple' ? 'grok-imagine-image' : 'grok-imagine-image-quality';
+    const body = { model, prompt: fullPrompt, image: { url: imageUrl, type: 'image_url' }, response_format: 'url' };
+    const res = await fetch('https://api.x.ai/v1/images/edits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const e = await res.json().catch(()=>({}));
+      throw new Error(`Aurora edit error ${res.status}: ${e.error?.message || JSON.stringify(e)}`);
+    }
+    const data = await res.json();
+    const url = data.data?.[0]?.url;
+    if (!url) throw new Error('No image returned from Aurora edit');
+    return { src: url, hostedUrl: url, modelLabel: editModel === 'aurora-simple' ? 'Aurora Simple Edit' : 'Aurora Quality Edit' };
+
+  } else if (editModel === 'atlas-flux-kontext' || editModel === 'atlas-qwen-edit') {
+    // ── Atlas uncensored edit ──
+    if (!atlasKey) throw new Error('Atlas Cloud API key required. Tap "Set API Key" to add it.');
+    const atlasImg = await atlasPrepareImage(imageUrl);
+    const resultUrl = await callModel(editModel, { prompt: fullPrompt, image: atlasImg, isCancelled: () => false });
+    if (!resultUrl) throw new Error('Atlas edit timed out');
+    return { src: resultUrl, hostedUrl: resultUrl, modelLabel: (editModel === 'atlas-flux-kontext') ? 'Flux Kontext Edit · Atlas' : 'Qwen Edit · Atlas' };
+
+  } else {
+    // ── WaveSpeed edits (Wan / Qwen / Flux Kontext) ──
+    if (!wavespeedKey) throw new Error('WaveSpeed API key required for Wan edit. Tap "Set API Key" to add it.');
+    const wsModels = {
+      wan27pro:    { path: 'alibaba/wan-2.7/image-edit-pro',          body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
+      wan27:       { path: 'alibaba/wan-2.7/image-edit',              body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
+      fluxkontext: { path: 'wavespeed-ai/flux-kontext-dev-ultra-fast', body: { prompt: fullPrompt, image: imageUrl, seed: -1, enable_safety_checker: false } },
+      qwen2:       { path: 'wavespeed-ai/qwen-image-2.0/edit',        body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
+      qwen:        { path: 'wavespeed-ai/qwen-image/edit',            body: { prompt: fullPrompt, image: imageUrl, seed: -1, enable_safety_checker: false }, timeout: 180000 },
+    };
+    const wsModel = wsModels[editModel] || wsModels.qwen;
+    const { path: wsPath, body: wsBody, timeout: wsTimeout = 120000 } = wsModel;
+    const resultUrl = await callWaveSpeed(wsPath, wsBody, wsTimeout, 3000);
+    if (!resultUrl) throw new Error('Edit timed out');
+    const editLabels = { wan27pro: 'Wan 2.7 Pro Edit', wan27: 'Wan 2.7 Edit', fluxkontext: 'Flux Kontext Edit', qwen2: 'Qwen 2.0 Edit', qwen: 'Qwen Edit' };
+    return { src: resultUrl, hostedUrl: resultUrl, modelLabel: editLabels[editModel] || 'Qwen Edit' };
   }
 }
 
@@ -4200,7 +4198,7 @@ function updateStoryboardBtn() {
 const storyboardOverlay = document.getElementById('storyboard-overlay');
 document.getElementById('storyboard-btn')?.addEventListener('click', () => {
   document.getElementById('sb-on-toggle').checked = storyboardOn;
-  document.getElementById('sb-model-select').value = storyboardModel;
+  populateModelDropdown('sb-model-select', 't2img', storyboardModel);
   document.getElementById('sb-ratio-select').value = storyboardRatio;
   storyboardOverlay.classList.add('open');
 });
@@ -4243,8 +4241,13 @@ VIDEO_PROMPT: ...
 CAST: ...`;
 
 function directorModelGuide(modelId) {
-  if (modelId === 'z-image-turbo') return 'Use positive descriptions only (no negatives); name the medium, lighting, and textures.';
-  return 'Front-load photographic language ("a photograph of..."), name a camera/lens and the lighting, add natural skin texture; avoid words like illustration, cartoon, or render.';
+  const id = modelId || '';
+  if (id.includes('z-image')) return 'Positive descriptions only (no negatives); name the medium, lighting, and textures.';
+  if (id.includes('chroma')) return 'Front-load photographic language ("a photograph of..."), name a camera/lens and the lighting, add natural skin texture; avoid words like illustration, cartoon, or render.';
+  if (id.includes('flux')) return 'Write clear, detailed natural-language prose — Flux follows full sentences well. Name lighting, composition, and mood; avoid keyword spam.';
+  if (id.includes('aurora') || id.includes('grok')) return 'Concise, vivid natural-language description of subject, setting, and mood (note: this model is content-moderated, so keep it non-explicit).';
+  if (id.includes('wan')) return 'Describe the scene plainly: clear subject, wardrobe, setting, and lighting.';
+  return 'Write a vivid natural-language scene description: subject, wardrobe, setting, lighting, and mood.';
 }
 
 function lastStoryBeat() {
@@ -4274,8 +4277,10 @@ function parseDirectorBlock(text) {
 async function runStoryboardDirector(beatText, forceFrame) {
   if (!beatText || !apiKey) return;
   try {
+    const mInfo = MODEL_REGISTRY[storyboardModel];
+    const modelName = mInfo ? mInfo.label.split('·')[0].trim() : 'image';
     const sys = DIRECTOR_SYSTEM
-      .replace('{MODEL}', storyboardModel === 'z-image-turbo' ? 'Z-Image' : 'Chroma')
+      .replace('{MODEL}', modelName)
       .replace('{MODELGUIDE}', directorModelGuide(storyboardModel));
     let user = beatText;
     const cast = getCast();
@@ -4300,24 +4305,51 @@ async function runStoryboardDirector(beatText, forceFrame) {
 }
 
 // Generate the frame image (locked storyboard model + ratio), render it inline, persist it
+// Build the image-generation params for a storyboard frame, mirroring the main image flow
+// (so any t2img model works — Aurora/xAI, Atlas, Chroma, Z-Image, and LoRA models apply active LoRAs).
+function buildStoryboardCallParams(imagePrompt) {
+  const m = MODEL_REGISTRY[storyboardModel] || MODEL_REGISTRY['chroma'];
+  const callParams = { prompt: imagePrompt, aspectRatio: storyboardRatio, resolution: '1k' };
+  if (storyboardModel === 'flux-lora') {
+    const st = parseInt(document.getElementById('flux-steps')?.value);
+    const gd = parseFloat(document.getElementById('flux-guidance')?.value);
+    if (!isNaN(st)) callParams.steps = st;
+    if (!isNaN(gd)) callParams.guidance = gd;
+  }
+  if (m.lora) {
+    const matching = activeLoras().filter(l => !l.base || l.base === 'Other' || l.base === m.loraBase);
+    callParams.loras = matching.map(l => ({ path: l.url, scale: Number(l.scale) || 1 }));
+    let p2 = callParams.prompt;
+    matching.forEach(l => {
+      (l.trigger || '').split(',').map(t => t.trim()).filter(Boolean).forEach(t => {
+        if (!p2.toLowerCase().includes(t.toLowerCase())) p2 = t + ', ' + p2;
+      });
+    });
+    callParams.prompt = p2;
+  }
+  return callParams;
+}
+
 async function addStoryboardFrame(imagePrompt, videoPrompt, reason) {
+  const frameId = 'sbf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
   const card = document.createElement('div');
   card.className = 'msg assistant';
   card.innerHTML = '<div class="sb-frame-load">🎬 Generating storyboard frame…</div>';
   messagesEl.appendChild(card);
   scrollToBottom();
   try {
-    const src = await callModel(storyboardModel, { prompt: imagePrompt, aspectRatio: storyboardRatio, resolution: '1k' });
+    const src = await callModel(storyboardModel, buildStoryboardCallParams(imagePrompt));
     if (!src) throw new Error('no image returned');
-    fillStoryboardCard(card, src, videoPrompt, reason);
-    addMessageToThread({ role: 'assistant', type: 'storyboard', src, alt: imagePrompt, videoPrompt: videoPrompt || '', reason: reason || '' });
+    fillStoryboardCard(card, src, videoPrompt, reason, frameId);
+    addMessageToThread({ role: 'assistant', type: 'storyboard', src, alt: imagePrompt, videoPrompt: videoPrompt || '', reason: reason || '', frameId });
   } catch (e) {
     card.innerHTML = '<div class="sb-frame-load" style="color:var(--text-dim);">🎬 Frame skipped — ' + (e.message || 'error').replace(/</g, '&lt;') + '</div>';
   }
 }
 
-function fillStoryboardCard(card, src, videoPrompt, reason) {
+function fillStoryboardCard(card, src, videoPrompt, reason, frameId) {
   card.innerHTML = '';
+  if (frameId) card.dataset.frameId = frameId;
   const label = document.createElement('div');
   label.className = 'msg-label';
   label.textContent = '🎬 Storyboard · ' + (reason || 'frame');
@@ -4325,7 +4357,7 @@ function fillStoryboardCard(card, src, videoPrompt, reason) {
   const wrapper = document.createElement('div');
   wrapper.className = 'img-wrapper';
   const img = document.createElement('img');
-  img.className = 'gen-image'; // same proven class + container the normal image flow uses
+  img.className = 'gen-image';
   img.referrerPolicy = 'no-referrer';
   img.alt = 'storyboard frame';
   img.src = src;
@@ -4350,15 +4382,71 @@ function fillStoryboardCard(card, src, videoPrompt, reason) {
   sbCloudBtn.textContent = '☁ Cloud';
   sbCloudBtn.addEventListener('click', () => uploadToCloudinary(src, '', sbCloudBtn, 'image'));
   bar.appendChild(sbCloudBtn);
+  const editBtn = document.createElement('button');
+  editBtn.className = 'sb-makevideo';
+  editBtn.textContent = '✎ Edit';
+  bar.appendChild(editBtn);
   card.appendChild(bar);
+  // Inline editor (uses the currently-selected edit model; replaces this frame in place)
+  const editor = document.createElement('div');
+  editor.className = 'sb-editor';
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.className = 'sb-edit-input';
+  inp.placeholder = 'Describe the change (e.g. make her dress blue, add rain)';
+  const editorBtns = document.createElement('div');
+  editorBtns.className = 'sb-editor-btns';
+  const applyBtn = document.createElement('button');
+  applyBtn.className = 'sb-makevideo';
+  applyBtn.textContent = 'Apply edit';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'sb-makevideo';
+  cancelBtn.textContent = 'Cancel';
+  editorBtns.appendChild(applyBtn);
+  editorBtns.appendChild(cancelBtn);
+  editor.appendChild(inp);
+  editor.appendChild(editorBtns);
+  card.appendChild(editor);
+  editBtn.addEventListener('click', () => {
+    editor.classList.toggle('open');
+    if (editor.classList.contains('open')) inp.focus();
+  });
+  cancelBtn.addEventListener('click', () => { editor.classList.remove('open'); inp.value = ''; });
+  applyBtn.addEventListener('click', async () => {
+    const p = inp.value.trim();
+    if (!p) return;
+    const editModel = document.getElementById('edit-model-select')?.value || 'wan27';
+    card.innerHTML = '<div class="sb-frame-load">✎ Editing frame…</div>';
+    try {
+      const r = await runEdit(p, src, editModel);
+      updateStoryboardFrameSrc(frameId, r.src);
+      fillStoryboardCard(card, r.src, videoPrompt, reason, frameId);
+    } catch (e) {
+      appendError('Frame edit failed: ' + e.message);
+      fillStoryboardCard(card, src, videoPrompt, reason, frameId); // restore original on failure
+    }
+  });
+}
+
+// Persist an edited frame's new image to the thread (matched by frameId)
+function updateStoryboardFrameSrc(frameId, newSrc) {
+  if (!frameId) return;
+  const threads = getThreads();
+  const idx = threads.findIndex(t => t.id === currentThreadId);
+  if (idx < 0) return;
+  const msgs = threads[idx].messages || [];
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].type === 'storyboard' && msgs[i].frameId === frameId) { msgs[i].src = newSrc; break; }
+  }
+  saveThreads(threads);
 }
 
 // Re-render a persisted storyboard frame (no generation)
-function renderStoryboardFrameCard(src, imagePrompt, videoPrompt, reason) {
+function renderStoryboardFrameCard(src, imagePrompt, videoPrompt, reason, frameId) {
   const card = document.createElement('div');
   card.className = 'msg assistant';
   messagesEl.appendChild(card);
-  fillStoryboardCard(card, src, videoPrompt, reason);
+  fillStoryboardCard(card, src, videoPrompt, reason, frameId);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -4704,7 +4792,7 @@ function updateCostEstimate() {
   } else if (editMode) {
     // Edit = input image + output image
     const editMod = document.getElementById('edit-model-select')?.value || 'wan27';
-    const editCostMap = { aurora: '~$0.04', wan27pro: '$0.06', wan27: '$0.03', fluxkontext: '$0.02', qwen2: '$0.03', qwen: '$0.02', 'atlas-flux-kontext': '$0.025', 'atlas-qwen-edit': '$0.02' };
+    const editCostMap = { aurora: '~$0.04', 'aurora-simple': '~$0.02', wan27pro: '$0.06', wan27: '$0.03', fluxkontext: '$0.02', qwen2: '$0.03', qwen: '$0.02', 'atlas-flux-kontext': '$0.025', 'atlas-qwen-edit': '$0.02' };
     el.textContent = editCostMap[editMod] || '$0.02';
     modeText.textContent = 'Edit image mode';
 
