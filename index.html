@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.92" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.93" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.92</title>
+  <title>Zaor Studio 0.93</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -662,8 +662,6 @@
     }
 
     .vid-save-btn {
-      position: absolute;
-      bottom: 10px; right: 10px;
       background: rgba(26,26,46,0.82);
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
@@ -673,8 +671,15 @@
       font-size: 12px; font-weight: 500;
       padding: 6px 12px; border-radius: 20px;
       cursor: pointer;
-      display: flex; align-items: center; gap: 5px;
+      display: inline-flex; align-items: center; gap: 5px;
       transition: background 0.2s, border-color 0.2s;
+    }
+    .vid-btn-bar {
+      position: absolute;
+      bottom: 10px; right: 10px;
+      display: flex; gap: 6px; flex-wrap: wrap;
+      justify-content: flex-end;
+      max-width: calc(100% - 20px);
     }
     .vid-save-btn:hover { background: rgba(100,180,255,0.18); border-color: #64b4ff; color: #64b4ff; }
 
@@ -1115,7 +1120,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.92</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.93</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -3284,9 +3289,12 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
   });
 
   wrapper.appendChild(video);
-  wrapper.appendChild(saveBtn);
-  wrapper.appendChild(vidCloudBtn);
-  wrapper.appendChild(lastFrameBtn);
+  const vidBtnBar = document.createElement('div');
+  vidBtnBar.className = 'vid-btn-bar';
+  vidBtnBar.appendChild(saveBtn);
+  vidBtnBar.appendChild(vidCloudBtn);
+  vidBtnBar.appendChild(lastFrameBtn);
+  wrapper.appendChild(vidBtnBar);
   wrapper.appendChild(pinVidPEBtn);
   wrapper.appendChild(extendBtn);
   wrapper.appendChild(retryVidBtn);
