@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.91" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.92" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.91</title>
+  <title>Zaor Studio 0.92</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1115,7 +1115,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.91</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.92</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -3457,14 +3457,40 @@ function captureLastFrame(videoSrc) {
   });
 }
 
+// Server-side last-frame extraction via Cloudinary (works even when the video host blocks canvas reads).
+async function cloudinaryVideoFrame(videoSrc) {
+  if (!cloudinaryCloud || !cloudinaryPreset) throw new Error('Cloudinary not set up');
+  const form = new FormData();
+  form.append('file', videoSrc); // Cloudinary fetches the remote video server-side
+  form.append('upload_preset', cloudinaryPreset);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudinaryCloud}/video/upload`, { method: 'POST', body: form });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.public_id) throw new Error('Cloudinary video upload failed: ' + (data.error?.message || res.status));
+  const dur = (typeof data.duration === 'number' && data.duration > 0.2) ? (data.duration - 0.1) : 0;
+  // Cloudinary renders a JPG of the frame at the given second offset, server-side
+  return `https://res.cloudinary.com/${cloudinaryCloud}/video/upload/so_${dur.toFixed(2)}/${data.public_id}.jpg`;
+}
+
 async function grabLastFrame(videoSrc, btn) {
   const orig = btn ? btn.innerHTML : '';
   if (btn) { btn.innerHTML = '◳ Grabbing…'; btn.disabled = true; }
   try {
-    const dataUrl = await captureLastFrame(videoSrc);
-    renderImage(dataUrl, 'Last frame', true, null, 'Last frame');
-    addMessageToThread({ role: 'assistant', type: 'image', src: dataUrl, alt: 'Last frame', modelLabel: 'Last frame' });
-    lastImageUrl = dataUrl;
+    let out, hosted = null;
+    try {
+      // Fast path: in-browser canvas (works only if the video host allows cross-origin reads)
+      out = await captureLastFrame(videoSrc);
+    } catch (e1) {
+      // Fallback: Cloudinary extracts the frame server-side (no CORS needed)
+      if (!cloudinaryCloud || !cloudinaryPreset) {
+        throw new Error(e1.message + '. Set up Cloudinary (Set API Key) for a reliable cloud fallback.');
+      }
+      if (btn) btn.innerHTML = '◳ Via cloud…';
+      out = await cloudinaryVideoFrame(videoSrc);
+      hosted = out; // it's a hosted https URL
+    }
+    renderImage(out, 'Last frame', true, hosted, 'Last frame');
+    addMessageToThread({ role: 'assistant', type: 'image', src: out, hostedUrl: hosted, alt: 'Last frame', modelLabel: 'Last frame' });
+    lastImageUrl = out;
     showEditButton();
     if (btn) { btn.innerHTML = '✓ Grabbed'; setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 2000); }
   } catch (e) {
