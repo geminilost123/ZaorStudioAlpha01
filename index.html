@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.97" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.98" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.97</title>
+  <title>Zaor Studio 0.98</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1173,7 +1173,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.97</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.98</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1798,9 +1798,9 @@ let lastAtlasRaw = ''; // captured raw Atlas response for on-screen debugging
 const MODEL_REGISTRY = {
   // ─────────── TEXT-TO-IMAGE ───────────
   'aurora-simple':  { cat:'t2img', label:'Aurora Simple · xAI',  provider:'xai-image', path:'grok-imagine-image',          price:0.02, verified:true,
-    buildBody:p=>({ model:'grok-imagine-image', prompt:p.prompt, n:1, response_format:'url', aspect_ratio:p.aspectRatio||'1:1' }) },
+    buildBody:p=>({ model:'grok-imagine-image', prompt:p.prompt, n:1, response_format:'b64_json', aspect_ratio:p.aspectRatio||'1:1' }) },
   'aurora-quality': { cat:'t2img', label:'Aurora Quality · xAI', provider:'xai-image', path:'grok-imagine-image-quality',  price:0.05, verified:true,
-    buildBody:p=>({ model:'grok-imagine-image-quality', prompt:p.prompt, n:1, response_format:'url', aspect_ratio:p.aspectRatio||'1:1' }) },
+    buildBody:p=>({ model:'grok-imagine-image-quality', prompt:p.prompt, n:1, response_format:'b64_json', aspect_ratio:p.aspectRatio||'1:1' }) },
   'atlas-grok-quality': { cat:'t2img', label:'Aurora Quality · Atlas', provider:'atlas', path:'xai/grok-imagine-image-quality/text-to-image', price:0.05, verified:true,
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
   'atlas-grok-simple':  { cat:'t2img', label:'Aurora Simple · Atlas', provider:'atlas', path:'xai/grok-imagine-image/text-to-image', price:0.02, verified:true,
@@ -1912,6 +1912,16 @@ function wsSize(ar, res){
   const round16 = n => Math.round(n/16)*16;
   return round16(base*r[0]/long) + '*' + round16(base*r[1]/long);
 }
+// Wrap a bare base64 image string in a data: URL, detecting the mime from its magic prefix.
+function b64ToDataUrl(b64){
+  if(!b64) return null;
+  if(b64.startsWith('data:')) return b64;
+  let mime = 'image/jpeg';
+  if(b64.startsWith('iVBOR')) mime = 'image/png';
+  else if(b64.startsWith('UklGR')) mime = 'image/webp';
+  else if(b64.startsWith('R0lGOD')) mime = 'image/gif';
+  return 'data:' + mime + ';base64,' + b64;
+}
 function priceLabel(m){
   if(m.price!=null){ let s=m.price.toFixed(3).replace(/0+$/,'').replace(/\.$/,''); return '$'+s; }
   if(m.pricePerS!=null) return '$'+m.pricePerS+'/s';
@@ -2004,9 +2014,10 @@ async function callModel(modelId, params){
     });
     if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(`xAI image error ${res.status}: ${e.error?.message || e.error || JSON.stringify(e).slice(0,200)}`); }
     const d = await res.json();
-    const url = d.data?.[0]?.url || d.data?.[0]?.b64_json;
-    if(!url) throw new Error('xAI returned no image: '+JSON.stringify(d).slice(0,200));
-    return url;
+    const item = d.data?.[0] || {};
+    const out = item.url || (item.b64_json ? b64ToDataUrl(item.b64_json) : null);
+    if(!out) throw new Error('xAI returned no image: '+JSON.stringify(d).slice(0,200));
+    return out;
   }
 
   // xAI direct providers are migrated during the video pass
@@ -2617,7 +2628,7 @@ async function runEdit(fullPrompt, imageUrl, editModel) {
   if (editModel === 'aurora' || editModel === 'aurora-simple') {
     // ── Aurora edit via xAI (simple vs quality) ──
     const model = editModel === 'aurora-simple' ? 'grok-imagine-image' : 'grok-imagine-image-quality';
-    const body = { model, prompt: fullPrompt, image: { url: imageUrl, type: 'image_url' }, response_format: 'url' };
+    const body = { model, prompt: fullPrompt, image: { url: imageUrl, type: 'image_url' }, response_format: 'b64_json' };
     const res = await fetch('https://api.x.ai/v1/images/edits', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
@@ -2628,7 +2639,8 @@ async function runEdit(fullPrompt, imageUrl, editModel) {
       throw new Error(`Aurora edit error ${res.status}: ${e.error?.message || JSON.stringify(e)}`);
     }
     const data = await res.json();
-    const url = data.data?.[0]?.url;
+    const item = data.data?.[0] || {};
+    const url = item.url || (item.b64_json ? b64ToDataUrl(item.b64_json) : null);
     if (!url) throw new Error('No image returned from Aurora edit');
     return { src: url, hostedUrl: url, modelLabel: editModel === 'aurora-simple' ? 'Aurora Simple Edit' : 'Aurora Quality Edit' };
 
