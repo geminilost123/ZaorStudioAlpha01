@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.93" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.94" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.93</title>
+  <title>Zaor Studio 0.94</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -599,6 +599,7 @@
     .modal-btns button:hover { opacity: 0.85; }
     .btn-primary { background: var(--lavender); color: #1a1a2e; }
     .btn-secondary { background: var(--surface2); color: var(--text-dim); }
+    .exp-lbl { font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:5px; }
     .btn-danger { background: rgba(196,122,138,0.2); color: var(--rose); border: 1px solid rgba(196,122,138,0.3) !important; }
 
     .error-bubble {
@@ -1023,6 +1024,58 @@
     }
     #storyboard-btn.active { background: rgba(201,184,232,0.2); border-color: var(--lavender); }
 
+    /* Visible header icon buttons + overflow ("More") menu */
+    #storyboard-btn, #menu-btn {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-dim);
+      font-size: 16px;
+      width: 30px; height: 30px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    #storyboard-btn:hover, #menu-btn:hover { border-color: var(--lavender); color: var(--lavender); }
+    #menu-btn.open { border-color: var(--lavender); color: var(--lavender); }
+    .menu-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+    .overflow-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      flex-direction: column;
+      gap: 2px;
+      background: var(--surface);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 6px;
+      min-width: 222px;
+      z-index: 300;
+      box-shadow: 0 10px 32px rgba(0,0,0,0.5);
+    }
+    .overflow-menu.open { display: flex; }
+    .overflow-menu .menu-item,
+    .overflow-menu #api-key-btn,
+    .overflow-menu #refresh-btn {
+      display: flex; align-items: center; gap: 9px;
+      width: 100%; height: auto; box-sizing: border-box;
+      text-align: left; justify-content: flex-start;
+      background: transparent; border: none; border-radius: 8px;
+      color: var(--text); font-family: 'Inter', sans-serif; font-size: 14px;
+      padding: 10px 11px; cursor: pointer; white-space: nowrap;
+      transition: background 0.15s, color 0.15s;
+    }
+    .overflow-menu .menu-item:hover,
+    .overflow-menu #api-key-btn:hover,
+    .overflow-menu #refresh-btn:hover {
+      background: var(--surface2); color: var(--lavender); border-color: transparent;
+    }
+    .overflow-menu .menu-item.active { background: rgba(201,184,232,0.18); color: var(--lavender); }
+    .overflow-menu #api-key-btn.set { color: #7ec87e; }
+    .menu-sep { height: 1px; background: rgba(255,255,255,0.08); margin: 5px 4px; }
+
     /* Storyboard on/off switch */
     .sb-switch { position: relative; display: inline-block; width: 46px; height: 26px; flex-shrink: 0; }
     .sb-switch input { opacity: 0; width: 0; height: 0; }
@@ -1120,7 +1173,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.93</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.94</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1138,14 +1191,21 @@
           <option value="grok-4.3" selected>Zaor</option>
         </select>
         <button id="pe-btn" title="Prompt Engineer mode">✦ PE</button>
-        <button id="library-btn" title="Prompt library">📚</button>
-        <button id="lora-btn" title="LoRA manager">🧬</button>
-        <button id="setup-btn" title="Story Setup — premise, tone, visual style">📖</button>
         <button id="storyboard-btn" title="Storyboard director">🎬</button>
-        <button id="cast-btn" title="Cast — character sheets">👥</button>
-        <button id="savegame-btn" title="Save / Load Game">💾</button>
-        <button id="refresh-btn" title="Force update from GitHub">↻</button>
-        <button id="api-key-btn">Set API Key</button>
+        <div class="menu-wrap">
+          <button id="menu-btn" title="More" aria-haspopup="true" aria-expanded="false">⋯</button>
+          <div id="overflow-menu" class="overflow-menu">
+            <button id="setup-btn" class="menu-item" title="Story Setup — premise, tone, visual style">📖 Story Setup</button>
+            <button id="cast-btn" class="menu-item" title="Cast — character sheets">👥 Cast</button>
+            <button id="library-btn" class="menu-item" title="Prompt library">📚 Prompt Library</button>
+            <button id="lora-btn" class="menu-item" title="LoRA manager">🧬 LoRA Manager</button>
+            <button id="savegame-btn" class="menu-item" title="Save / Load Game">💾 Save / Load Game</button>
+            <button id="export-dt-btn" class="menu-item" title="Export scene to Draw Things">⧉ Export to Draw Things</button>
+            <div class="menu-sep"></div>
+            <button id="refresh-btn" class="menu-item" title="Force update from GitHub">↻ Force Update</button>
+            <button id="api-key-btn" class="menu-item">🔑 Set API Keys</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -1549,6 +1609,49 @@
     <textarea id="savegame-code" placeholder="Your game code appears here when you save — or paste a code here to load." style="width:100%;min-height:120px;margin:10px 0;font-family:monospace;font-size:11px;"></textarea>
     <button class="btn-primary" id="savegame-load" style="width:100%;">📂 Load game from code</button>
     <button class="btn-secondary" id="savegame-close" style="width:100%;margin-top:8px;">Close</button>
+  </div>
+</div>
+
+<!-- Export Scene to Draw Things Modal -->
+<div class="modal-overlay" id="exportdt-overlay">
+  <div class="modal" style="max-width:560px;width:94%;max-height:88vh;overflow-y:auto;">
+    <h2 style="margin-bottom:4px;">⧉ Export scene to Draw Things</h2>
+    <p style="margin-bottom:12px;">Turns this story's storyboard frames into one Draw Things script that renders a video clip per frame on Cloud Compute, one at a time. Zaor writes the script — you paste it into DT and run it.</p>
+
+    <label class="exp-lbl">Mode</label>
+    <select id="exp-mode" class="img-control-select" style="width:100%;margin-bottom:12px;">
+      <option value="i2v">Animate frames (i2v) — uses your frame images</option>
+      <option value="t2v">Prompt-only (t2v) — regenerate from prompts</option>
+    </select>
+
+    <label class="exp-lbl">Model</label>
+    <select id="exp-model" class="img-control-select" style="width:100%;margin-bottom:12px;">
+      <option value="5b">Wan 2.2 5B — recommended (fast, unconstrained)</option>
+      <option value="hero">Wan 2.2 A14B + refiner — hero quality (gated to 40k)</option>
+    </select>
+
+    <div style="display:flex;gap:10px;margin-bottom:12px;">
+      <div style="flex:1;">
+        <label class="exp-lbl">Frames</label>
+        <input type="number" id="exp-frames" value="81" min="16" max="81" step="8" class="img-control-select" style="width:100%;" />
+      </div>
+      <div style="flex:1;">
+        <label class="exp-lbl">Steps</label>
+        <input type="number" id="exp-steps" value="8" min="4" max="20" step="1" class="img-control-select" style="width:100%;" />
+      </div>
+    </div>
+
+    <div id="exp-estimate" style="background:var(--bg);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.5;"></div>
+
+    <button class="btn-primary" id="exp-generate" style="width:100%;">⧉ Generate DT script → copy</button>
+    <textarea id="exp-code" placeholder="The Draw Things script appears here — then paste it into DT's Scripts tab." style="width:100%;min-height:140px;margin:10px 0;font-family:monospace;font-size:11px;"></textarea>
+
+    <details style="margin-bottom:10px;">
+      <summary style="cursor:pointer;font-size:13px;color:var(--lavender);">How to run it in Draw Things</summary>
+      <ol id="exp-checklist" style="font-size:12px;color:var(--text-dim);margin:8px 0 0 0;padding-left:18px;line-height:1.6;"></ol>
+    </details>
+
+    <button class="btn-secondary" id="exp-close" style="width:100%;">Close</button>
   </div>
 </div>
 
@@ -4896,6 +4999,169 @@ document.getElementById('savegame-load')?.addEventListener('click', () => {
   }
 });
 
+// ── Export Scene to Draw Things (v0.94) ──
+const CU_K = { '5b': 1.4e-5, 'hero': 1.7e-4 };
+const RES_LADDER = {
+  '16:9': [[832,480],[768,448],[704,384],[640,384],[512,320]],
+  '9:16': [[480,832],[448,768],[384,704],[384,640],[320,512]],
+  '1:1':  [[640,640],[576,576],[512,512],[448,448],[384,384]],
+  '4:3':  [[768,576],[704,512],[640,512],[576,448],[512,384]],
+  '3:4':  [[576,768],[512,704],[512,640],[448,576],[384,512]]
+};
+function expEstimateCU(model, w, h, frames, steps) {
+  return Math.round((CU_K[model] || CU_K['5b']) * w * h * frames * steps);
+}
+function expFitClip(model, ratio, frames, steps) {
+  const ladder = RES_LADDER[ratio] || RES_LADDER['16:9'];
+  let ri = (model === 'hero') ? 1 : 0;
+  let f = Math.max(16, Math.min(81, frames | 0));
+  let s = Math.max(4, Math.min(20, steps | 0));
+  let trimmed = false;
+  const cu = () => expEstimateCU(model, ladder[ri][0], ladder[ri][1], f, s);
+  if (model === 'hero') {
+    let guard = 0;
+    while (cu() > 38000 && guard < 60) {
+      guard++;
+      if (f > 49) { f -= 8; trimmed = true; }
+      else if (ri < ladder.length - 1) { ri++; trimmed = true; }
+      else if (s > 4) { s -= 1; trimmed = true; }
+      else break;
+    }
+  }
+  return { w: ladder[ri][0], h: ladder[ri][1], frames: f, steps: s, cu: cu(), trimmed: trimmed };
+}
+function expGatherFrames() {
+  const t = getCurrentThread();
+  if (!t || !Array.isArray(t.messages)) return [];
+  return t.messages.filter(m => m && m.type === 'storyboard' && m.src);
+}
+function expJsStr(s) {
+  return '"' + String(s == null ? '' : s)
+    .replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+    .replace(/[\r\n]+/g, ' ').trim() + '"';
+}
+function expUpdateEstimate() {
+  const box = document.getElementById('exp-estimate');
+  if (!box) return null;
+  const model = document.getElementById('exp-model').value;
+  const ratio = storyboardRatio || '16:9';
+  const frames = parseInt(document.getElementById('exp-frames').value, 10) || 81;
+  const steps = parseInt(document.getElementById('exp-steps').value, 10) || 8;
+  const frs = expGatherFrames();
+  const fit = expFitClip(model, ratio, frames, steps);
+  const under = fit.cu <= 40000;
+  const modelName = model === 'hero' ? 'Wan 2.2 A14B + refiner' : 'Wan 2.2 5B';
+  let html = '<div><b>' + frs.length + '</b> frame' + (frs.length === 1 ? '' : 's') + ' in this scene · <b>' + modelName + '</b></div>';
+  html += '<div style="margin-top:4px;">Per clip: <b>' + fit.w + '×' + fit.h + '</b> · ' + fit.frames + ' frames · ' + fit.steps + ' steps</div>';
+  html += '<div style="margin-top:4px;color:' + (under ? 'var(--lavender)' : '#e08a8a') + ';">≈ ' + fit.cu.toLocaleString() + ' compute units / clip · ' + (under ? '✓ under 40k (free, Privacy-Pass OK)' : '⚠ over 40k — needs a Boost') + '</div>';
+  if (fit.trimmed) html += '<div style="margin-top:4px;color:var(--text-dim);font-size:11px;">Auto-trimmed to fit under 40k (frames → resolution → steps).</div>';
+  if (frs.length === 0) html += '<div style="margin-top:4px;color:#e08a8a;font-size:11px;">No storyboard frames in this story yet — generate some frames first.</div>';
+  box.innerHTML = html;
+  return { fit: fit, frames: frs, model: model, modelName: modelName, ratio: ratio, under: under };
+}
+function expFillChecklist() {
+  const ol = document.getElementById('exp-checklist');
+  if (!ol) return;
+  const mode = document.getElementById('exp-mode').value;
+  const steps = [];
+  if (mode === 'i2v') steps.push('Save this scene\'s frames into the DT Pictures folder, named shot_01.png, shot_02.png, …');
+  steps.push('In DT, sign in and turn on Cloud Compute & Sharing, then choose the Draw Things+ tier.');
+  steps.push('Select the model and set Mode / Resolution / Frames / Steps exactly as listed atop the script.');
+  steps.push('Scripts tab → Add Script → paste the script → Run. Keep all quotes straight.');
+  steps.push('Each clip renders on the cloud in turn; save each one from DT as it appears.');
+  ol.innerHTML = steps.map(s => '<li>' + s.replace(/</g, '&lt;') + '</li>').join('');
+}
+function expBuildScript() {
+  const ctx = expUpdateEstimate();
+  if (!ctx || ctx.frames.length === 0) return '';
+  const mode = document.getElementById('exp-mode').value;
+  const fit = ctx.fit, frames = ctx.frames, model = ctx.model, modelName = ctx.modelName;
+  const L = [];
+  L.push('//@api-1.0');
+  L.push('// ===== Zaor scene export · ' + mode + ' · ' + frames.length + ' clip' + (frames.length === 1 ? '' : 's') + ' =====');
+  L.push('// BEFORE RUNNING, set these in the Draw Things UI:');
+  L.push('//   Model: ' + modelName + (model === 'hero' ? '  (High-Noise base + Low-Noise Refiner @ 10% start)' : ''));
+  L.push('//   Mode: ' + (mode === 'i2v' ? 'Image-to-Video' : 'Text-to-Video'));
+  L.push('//   Resolution: ' + fit.w + 'x' + fit.h + '   Frames: ' + fit.frames + '   Steps: ' + fit.steps);
+  L.push('//   Cloud Compute: ON  (Server Offload -> Draw Things+)');
+  L.push('//   Est. cost: ~' + fit.cu.toLocaleString() + ' compute units per clip (' + (ctx.under ? 'under' : 'OVER') + ' 40k)');
+  if (mode === 'i2v') {
+    L.push('// Put these images in the DT Pictures folder first, named exactly:');
+    frames.forEach((f, i) => L.push('//   shot_' + String(i + 1).padStart(2, '0') + '.png'));
+  }
+  L.push('// Quotes must stay straight ( " ) — do not let autocorrect curl them.');
+  L.push('');
+  L.push('var shots = [');
+  frames.forEach((f, i) => {
+    const prompt = f.videoPrompt || f.alt || 'cinematic motion, smooth camera movement';
+    const tail = (i < frames.length - 1) ? ',' : '';
+    if (mode === 'i2v') {
+      L.push('  { img: "shot_' + String(i + 1).padStart(2, '0') + '.png", prompt: ' + expJsStr(prompt) + ' }' + tail);
+    } else {
+      L.push('  { prompt: ' + expJsStr(prompt) + ' }' + tail);
+    }
+  });
+  L.push('];');
+  L.push('');
+  L.push('for (var i = 0; i < shots.length; i++) {');
+  L.push('  var s = shots[i];');
+  if (mode === 'i2v') {
+    L.push('  canvas.loadImageSrc(filesystem.pictures.path + "/" + s.img);');
+  }
+  L.push('  pipeline.run({ configuration: pipeline.configuration, prompt: s.prompt });');
+  L.push('  console.log("clip " + (i + 1) + "/" + shots.length + " done");');
+  L.push('}');
+  L.push('console.log("Scene complete — " + shots.length + " clips.");');
+  return L.join('\n');
+}
+const exportdtOverlay = document.getElementById('exportdt-overlay');
+document.getElementById('export-dt-btn')?.addEventListener('click', () => {
+  document.getElementById('exp-code').value = '';
+  expUpdateEstimate();
+  expFillChecklist();
+  exportdtOverlay.classList.add('open');
+});
+document.getElementById('exp-close')?.addEventListener('click', () => exportdtOverlay.classList.remove('open'));
+exportdtOverlay?.addEventListener('click', e => { if (e.target === exportdtOverlay) exportdtOverlay.classList.remove('open'); });
+['exp-mode', 'exp-model', 'exp-frames', 'exp-steps'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('change', () => { expUpdateEstimate(); expFillChecklist(); });
+  el.addEventListener('input', expUpdateEstimate);
+});
+document.getElementById('exp-generate')?.addEventListener('click', async () => {
+  const script = expBuildScript();
+  if (!script) { appendError('No storyboard frames to export yet — generate some frames first.'); return; }
+  const ta = document.getElementById('exp-code');
+  ta.value = script;
+  try { await navigator.clipboard.writeText(script); } catch (e) {}
+  const b = document.getElementById('exp-generate');
+  const o = b.textContent;
+  b.textContent = '✓ Script copied';
+  setTimeout(() => { b.textContent = o; }, 2000);
+});
+
+// ── Overflow ("More") menu — header declutter (v0.94) ──
+const overflowMenu = document.getElementById('overflow-menu');
+const menuBtn = document.getElementById('menu-btn');
+function closeOverflowMenu() {
+  overflowMenu?.classList.remove('open');
+  menuBtn?.classList.remove('open');
+  menuBtn?.setAttribute('aria-expanded', 'false');
+}
+menuBtn?.addEventListener('click', e => {
+  e.stopPropagation();
+  const open = overflowMenu.classList.toggle('open');
+  menuBtn.classList.toggle('open', open);
+  menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+});
+overflowMenu?.addEventListener('click', e => {
+  if (e.target.closest('.menu-item')) closeOverflowMenu();
+});
+document.addEventListener('click', e => {
+  if (overflowMenu?.classList.contains('open') && !e.target.closest('.menu-wrap')) closeOverflowMenu();
+});
+
 function openModal(type) {
   if (type === 'api') {
     keyInput.value = apiKey;
@@ -5283,7 +5549,7 @@ function pinForPE(url, type, label) {
 }
 
 function updateKeyBtn() {
-  apiKeyBtn.textContent = apiKey ? 'Key ✓' : 'Set API Key';
+  apiKeyBtn.textContent = apiKey ? '🔑 API Keys ✓' : '🔑 Set API Keys';
   apiKeyBtn.classList.toggle('set', !!apiKey);
 }
 
