@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.96" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.97" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.96</title>
+  <title>Zaor Studio 0.97</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1173,7 +1173,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.96</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.97</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1815,13 +1815,13 @@ const MODEL_REGISTRY = {
     } },
   'flux-lora':      { cat:'t2img', label:'Flux Dev · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/flux-dev-lora', price:0.015, verified:true, lora:true, loraBase:'Flux',
     buildBody:p=>{
-      const b = { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), num_inference_steps:((p.steps && p.steps>0) ? p.steps : 28), guidance_scale:((p.guidance != null) ? p.guidance : 3.5), num_images:1, seed:-1, output_format:'jpeg', enable_base64_output:false, enable_safety_checker:false };
+      const b = { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), num_inference_steps:((p.steps && p.steps>0) ? p.steps : 28), guidance_scale:((p.guidance != null) ? p.guidance : 3.5), num_images:1, seed:-1, output_format:'png', enable_base64_output:false, enable_safety_checker:false };
       if (p.loras && p.loras.length) b.loras = p.loras.slice(0,3).map(l=>({ path:l.path, scale:Number(l.scale)||1 }));
       return b;
     } },
   'chroma':         { cat:'t2img', label:'Chroma uncensored · WaveSpeed', provider:'wavespeed', path:'wavespeed-ai/chroma', price:0.015, verified:true,
     buildBody:p=>{
-      return { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, output_format:'jpeg', enable_base64_output:false, enable_sync_mode:false };
+      return { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, output_format:'png', enable_base64_output:false, enable_sync_mode:false };
     } },
   'atlas-flux-dev': { cat:'t2img', label:'Flux Dev · Atlas', provider:'atlas', path:'black-forest-labs/flux-dev', price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
@@ -4038,24 +4038,60 @@ async function ensureHostedUrl(src) {
   return data.secure_url;
 }
 
+// Re-encode any image source to a true PNG blob via canvas. Works for data: URLs and
+// CORS-enabled hosts; rejects (tainted/blocked) so the caller can fall back.
+function imageToPngBlob(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = img.naturalWidth; c.height = img.naturalHeight;
+        if (!c.width || !c.height) { reject(new Error('zero dims')); return; }
+        c.getContext('2d').drawImage(img, 0, 0);
+        c.toBlob(b => b ? resolve(b) : reject(new Error('toBlob null')), 'image/png');
+      } catch (e) { reject(e); }
+    };
+    img.onerror = () => reject(new Error('img load failed'));
+    img.src = src;
+  });
+}
+
 async function saveImageToFiles(src, altText) {
   const safeName = (altText || 'image').slice(0, 40).replace(/[^a-z0-9]/gi, '_').toLowerCase();
   const filename = `aurora_${safeName}_${Date.now()}.png`;
+  const deliver = async (blob, fn) => {
+    const file = new File([blob], fn, { type: blob.type || 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Image' });
+      return true;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = fn; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  };
+  // 1) Try to produce a genuine PNG via canvas (covers data: URLs and CORS-ok hosts).
+  try {
+    const pngBlob = await imageToPngBlob(src);
+    if (pngBlob) { await deliver(pngBlob, filename); return; }
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+    // fall through to raw-bytes fallback
+  }
+  // 2) Fallback: save the original bytes, with an extension that matches the real type
+  //    (so we never mislabel a JPEG as .png).
   try {
     const res = await fetch(src);
     if (!res.ok) throw new Error('fetch blocked');
     const blob = await res.blob();
-    const file = new File([blob], filename, { type: blob.type || 'image/png' });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'Aurora Image' });
-      return;
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const t = blob.type || '';
+    const ext = t.includes('jpeg') || t.includes('jpg') ? 'jpg' : t.includes('webp') ? 'webp' : 'png';
+    await deliver(blob, filename.replace(/\.png$/, '.' + ext));
   } catch(e) {
     if (e.name === 'AbortError') return;
-    // Cross-origin CDN (xAI) blocks blob fetch — open the image so the user can long-press → Save to Photos
+    // Cross-origin CDN blocks blob fetch — open the image so the user can long-press → Save to Photos
     try { window.open(src, '_blank'); }
     catch(e2) { appendError('Save failed: ' + e.message); }
   }
