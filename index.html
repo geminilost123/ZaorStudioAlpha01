@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.86" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.90" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.86</title>
+  <title>Zaor Studio 0.90</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1115,7 +1115,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.86</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.90</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1135,6 +1135,7 @@
         <button id="pe-btn" title="Prompt Engineer mode">✦ PE</button>
         <button id="library-btn" title="Prompt library">📚</button>
         <button id="lora-btn" title="LoRA manager">🧬</button>
+        <button id="setup-btn" title="Story Setup — premise, tone, visual style">📖</button>
         <button id="storyboard-btn" title="Storyboard director">🎬</button>
         <button id="cast-btn" title="Cast — character sheets">👥</button>
         <button id="refresh-btn" title="Force update from GitHub">↻</button>
@@ -1234,7 +1235,7 @@
       <div class="input-row">
         <textarea id="prompt" rows="1" placeholder="Say something…"></textarea>
         <button id="img-toggle" title="Toggle image generation">🎨</button>
-        <button id="vid-toggle" title="Toggle video generation">🎬</button>
+        <button id="vid-toggle" title="Toggle video generation">🎥</button>
         <button id="enhance-toggle" title="Enhancement tools">✨</button>
         <button id="send-btn" title="Send">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -1301,11 +1302,11 @@
           <div class="img-control-group">
             <span class="mode-label">Engine</span>
             <select id="vid-engine-select" class="img-control-select">
-              <option value="aurora" selected>Aurora — $0.05/s</option>
-              <option value="seedance15t2v">Seedance 1.5 T2V — from $0.06</option>
-              <option value="wan26t2v">Wan 2.6 — ~$0.34/5s</option>
-              <option value="wan22spicy">Wan 2.2 Spicy I2V — from $0.15</option>
-              <option value="wan26spicy">Wan 2.7 Spicy I2V — from $0.50</option>
+              <option value="aurora" selected>Aurora · xAI — $0.05/s</option>
+              <option value="seedance15t2v">Seedance 1.5 T2V · WaveSpeed — from $0.06</option>
+              <option value="wan26t2v">Wan 2.6 · WaveSpeed — ~$0.34/5s</option>
+              <option value="wan22spicy">Wan 2.2 Spicy I2V · WaveSpeed — from $0.15</option>
+              <option value="wan26spicy">Wan 2.7 Spicy I2V · WaveSpeed — from $0.50</option>
             </select>
           </div>
           <div class="img-control-group">
@@ -1513,6 +1514,26 @@
   </div>
 </div>
 
+<!-- Story Setup Modal -->
+<div class="modal-overlay" id="setup-overlay">
+  <div class="modal" style="max-width:520px;width:92%;max-height:85vh;overflow-y:auto;">
+    <h2 style="margin-bottom:4px;">📖 Story Setup</h2>
+    <p style="margin-bottom:12px;">Prime a new game. Premise &amp; tone steer the chat; visual style is applied to every storyboard frame; starting characters seed your cast. Per-story — reopen and tweak anytime.</p>
+    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Premise / themes</label>
+    <textarea id="setup-premise" placeholder="The germ of the idea — what's this story about?" style="width:100%;min-height:70px;margin-bottom:10px;"></textarea>
+    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Tone</label>
+    <input type="text" id="setup-tone" placeholder="e.g. noir, cozy, erotic thriller, epic fantasy" autocomplete="off" style="margin-bottom:10px;" />
+    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Visual style (applied to all frames)</label>
+    <input type="text" id="setup-style" placeholder="e.g. grainy 35mm film, moody lighting, cinematic" autocomplete="off" style="margin-bottom:10px;" />
+    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Starting characters — one per line: Name — description</label>
+    <textarea id="setup-characters" placeholder="Maya — late 20s, long black hair, slim, scar on left cheek&#10;Detective Cole — 40s, broad, grey stubble, worn trench coat" style="width:100%;min-height:70px;margin-bottom:8px;"></textarea>
+    <div class="modal-btns" style="margin-top:8px;">
+      <button class="btn-primary" id="setup-save" style="width:100%;">Save setup</button>
+      <button class="btn-secondary" id="setup-close" style="width:100%;margin-top:8px;">Close</button>
+    </div>
+  </div>
+</div>
+
   <div class="modal">
     <h2>Rename Game</h2>
     <p>Give this game a name.</p>
@@ -1692,13 +1713,13 @@ const MODEL_REGISTRY = {
   // NOTE: Aurora video (T2V/I2V/extend/edit) is handled by generateVideoAurora via xAI DIRECT,
   // never through callModel/WaveSpeed. The four 'aurora-*'/'grok-vedit' entries below are legacy
   // and kept inert (verified:false) for reference only — do not wire them into dropdowns.
-  'aurora-t2v':      { cat:'t2v', label:'Aurora T2V',         provider:'xai-video', path:'grok-imagine-video',                      pricePerS:0.05, verified:false,
+  'aurora-t2v':      { cat:'t2v', label:'Aurora T2V · xAI',         provider:'xai-video', path:'grok-imagine-video',                      pricePerS:0.05, verified:false,
     durations:[4,6,8,10], resolutions:['480p','720p'],
     buildBody:p=>({ prompt:p.prompt, duration:Math.min(p.duration||4,10), aspect_ratio:p.aspectRatio||'16:9', resolution:p.resolution||'480p' }) },
-  'seedance15-t2v':  { cat:'t2v', label:'Seedance 1.5 T2V',   provider:'wavespeed', path:'bytedance/seedance-v1.5-pro/text-to-video', price:0.06, verified:true,
+  'seedance15-t2v':  { cat:'t2v', label:'Seedance 1.5 T2V · WaveSpeed',   provider:'wavespeed', path:'bytedance/seedance-v1.5-pro/text-to-video', price:0.06, verified:true,
     durations:[4,5,6,8,10,12], resolutions:['720p','1080p'],
     buildBody:p=>({ prompt:p.prompt, resolution:p.resolution||'720p', aspect_ratio:p.aspectRatio||'16:9', duration:Math.min(p.duration||4,12), generate_audio:false, seed:-1 }) },
-  'wan26-t2v':       { cat:'t2v', label:'Wan 2.6 T2V',        provider:'wavespeed', path:'alibaba/wan-2.6/text-to-video', pricePerS:0.068, verified:true,
+  'wan26-t2v':       { cat:'t2v', label:'Wan 2.6 T2V · WaveSpeed',        provider:'wavespeed', path:'alibaba/wan-2.6/text-to-video', pricePerS:0.068, verified:true,
     durations:[5,8,10,15], resolutions:['720p','1080p'],
     buildBody:p=>({ prompt:p.prompt, resolution:p.resolution||'720p', aspect_ratio:p.aspectRatio||'16:9', duration:Math.min(p.duration||5,15), seed:-1 }) },
   'atlas-wan27-t2v': { cat:'t2v', label:'Wan 2.7 T2V (Atlas)', provider:'atlas', path:'wan-2.7/text-to-video', pricePerS:0.02, verified:false,
@@ -1706,50 +1727,50 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ prompt:p.prompt, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,10) }) },
 
   // ─────────── IMAGE EDIT (instruction-based) ───────────
-  'qwen2-edit':    { cat:'edit', label:'Qwen 2.0 Edit',    provider:'wavespeed', path:'wavespeed-ai/qwen-image-2.0/edit', price:0.03, verified:true,
+  'qwen2-edit':    { cat:'edit', label:'Qwen 2.0 Edit · WaveSpeed',    provider:'wavespeed', path:'wavespeed-ai/qwen-image-2.0/edit', price:0.03, verified:true,
     buildBody:p=>({ prompt:p.prompt, images:[p.image], seed:-1, enable_safety_checker:false }) },
-  'qwen-edit':     { cat:'edit', label:'Qwen Edit',        provider:'wavespeed', path:'wavespeed-ai/qwen-image/edit', price:0.02, verified:true, timeout:180000,
+  'qwen-edit':     { cat:'edit', label:'Qwen Edit · WaveSpeed',        provider:'wavespeed', path:'wavespeed-ai/qwen-image/edit', price:0.02, verified:true, timeout:180000,
     buildBody:p=>({ prompt:p.prompt, image:p.image, seed:-1, enable_safety_checker:false }) },
-  'flux-kontext':  { cat:'edit', label:'Flux Kontext',     provider:'wavespeed', path:'wavespeed-ai/flux-kontext-dev-ultra-fast', price:0.02, verified:true,
+  'flux-kontext':  { cat:'edit', label:'Flux Kontext · WaveSpeed',     provider:'wavespeed', path:'wavespeed-ai/flux-kontext-dev-ultra-fast', price:0.02, verified:true,
     buildBody:p=>({ prompt:p.prompt, image:p.image, seed:-1, enable_safety_checker:false }) },
-  'wan27-edit':    { cat:'edit', label:'Wan 2.7 Edit',     provider:'wavespeed', path:'alibaba/wan-2.7/image-edit', price:0.03, verified:true,
+  'wan27-edit':    { cat:'edit', label:'Wan 2.7 Edit · WaveSpeed',     provider:'wavespeed', path:'alibaba/wan-2.7/image-edit', price:0.03, verified:true,
     buildBody:p=>({ prompt:p.prompt, images:[p.image], seed:-1 }) },
-  'wan27pro-edit': { cat:'edit', label:'Wan 2.7 Pro Edit', provider:'wavespeed', path:'alibaba/wan-2.7/image-edit-pro', price:0.06, verified:true,
+  'wan27pro-edit': { cat:'edit', label:'Wan 2.7 Pro Edit · WaveSpeed', provider:'wavespeed', path:'alibaba/wan-2.7/image-edit-pro', price:0.06, verified:true,
     buildBody:p=>({ prompt:p.prompt, images:[p.image], seed:-1 }) },
-  'aurora-edit':   { cat:'edit', label:'Aurora Edit',      provider:'xai-image', path:'grok-imagine-image', price:0.04, verified:true,
+  'aurora-edit':   { cat:'edit', label:'Aurora Edit · xAI',      provider:'xai-image', path:'grok-imagine-image', price:0.04, verified:true,
     buildBody:p=>({ prompt:p.prompt, image:p.image }) },
 
   // ─────────── IMG2IMG (strength-based) ───  [path pending confirmation] ───
-  'flux-img2img':  { cat:'img2img', label:'Flux img2img',  provider:'wavespeed', path:'wavespeed-ai/flux-dev/image-to-image', price:0.02, verified:false,
+  'flux-img2img':  { cat:'img2img', label:'Flux img2img · WaveSpeed',  provider:'wavespeed', path:'wavespeed-ai/flux-dev/image-to-image', price:0.02, verified:false,
     buildBody:p=>({ prompt:p.prompt, image:p.image, strength:(p.strength!=null?p.strength:0.7), enable_safety_checker:false }) },
 
   // ─────────── IMAGE-TO-VIDEO (animate) ───────────
-  'aurora-i2v':        { cat:'i2v', label:'Aurora I2V',         provider:'wavespeed', path:'x-ai/grok-imagine-video-v1.5/image-to-video', price:0.05, verified:false,
+  'aurora-i2v':        { cat:'i2v', label:'Aurora I2V · WaveSpeed',         provider:'wavespeed', path:'x-ai/grok-imagine-video-v1.5/image-to-video', price:0.05, verified:false,
     durations:[4,6,8,10], resolutions:['480p','720p'],
     buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'480p', duration:Math.min(p.duration||4,10) }) },
-  'seedance15-spicy':  { cat:'i2v', label:'Seedance 1.5 Spicy', provider:'wavespeed', path:'bytedance/seedance-v1.5-pro/image-to-video-spicy', price:0.06, verified:true,
+  'seedance15-spicy':  { cat:'i2v', label:'Seedance 1.5 Spicy · WaveSpeed', provider:'wavespeed', path:'bytedance/seedance-v1.5-pro/image-to-video-spicy', price:0.06, verified:true,
     durations:[4,5,6,8,10,12], resolutions:['480p','720p','1080p'],
     buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'480p', duration:Math.min(p.duration||4,12), aspect_ratio:p.aspectRatio||'16:9', generate_audio:false, seed:-1 }) },
-  'wan22-spicy':       { cat:'i2v', label:'Wan 2.2 Spicy',     provider:'wavespeed', path:'wavespeed-ai/wan-2.2-spicy/image-to-video', price:0.15, verified:true,
+  'wan22-spicy':       { cat:'i2v', label:'Wan 2.2 Spicy · WaveSpeed',     provider:'wavespeed', path:'wavespeed-ai/wan-2.2-spicy/image-to-video', price:0.15, verified:true,
     durations:[5], resolutions:['480p','720p'],
     buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'480p', duration:5, aspect_ratio:p.aspectRatio||'16:9', seed:-1 }) },
-  'wan27-spicy':       { cat:'i2v', label:'Wan 2.7 Spicy',     provider:'wavespeed', path:'alibaba/wan-2.7/image-to-video-spicy', price:0.50, verified:true,
+  'wan27-spicy':       { cat:'i2v', label:'Wan 2.7 Spicy · WaveSpeed',     provider:'wavespeed', path:'alibaba/wan-2.7/image-to-video-spicy', price:0.50, verified:true,
     durations:[5,10,15], resolutions:['720p','1080p'],
     buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,15), aspect_ratio:p.aspectRatio||'16:9', seed:-1 }) },
 
   // ─────────── VIDEO EXTEND ───────────
-  'aurora-extend':      { cat:'extend', label:'Aurora Extend',       provider:'wavespeed', path:'x-ai/grok-imagine-video/video-extend', price:0.35, verified:false,
+  'aurora-extend':      { cat:'extend', label:'Aurora Extend · WaveSpeed',       provider:'wavespeed', path:'x-ai/grok-imagine-video/video-extend', price:0.35, verified:false,
     durations:[4,6,8,10], resolutions:['480p','720p'],
     buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'480p', duration:Math.min(p.duration||4,10) }) },
-  'wan22spicy-extend':  { cat:'extend', label:'Wan 2.2 Spicy Extend', provider:'wavespeed', path:'wavespeed-ai/wan-2.2-spicy/video-extend', price:0.15, verified:true,
+  'wan22spicy-extend':  { cat:'extend', label:'Wan 2.2 Spicy Extend · WaveSpeed', provider:'wavespeed', path:'wavespeed-ai/wan-2.2-spicy/video-extend', price:0.15, verified:true,
     durations:[5], resolutions:['480p','720p'],
     buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'480p', duration:5, seed:-1 }) },
-  'wan27-extend':       { cat:'extend', label:'Wan 2.7 Extend',      provider:'wavespeed', path:'alibaba/wan-2.7/video-extend', price:0.30, verified:true,
+  'wan27-extend':       { cat:'extend', label:'Wan 2.7 Extend · WaveSpeed',      provider:'wavespeed', path:'alibaba/wan-2.7/video-extend', price:0.30, verified:true,
     durations:[2,3,4,5,8,10,15], resolutions:['720p','1080p'],
     buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,15), seed:-1 }) },
 
   // ─────────── VIDEO-TO-VIDEO EDIT ───────────
-  'grok-vedit':        { cat:'v2v', label:'Aurora Video Edit',  provider:'wavespeed', path:'x-ai/grok-imagine-video/edit-video', price:0.10, verified:false,
+  'grok-vedit':        { cat:'v2v', label:'Aurora Video Edit · WaveSpeed',  provider:'wavespeed', path:'x-ai/grok-imagine-video/edit-video', price:0.10, verified:false,
     buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'720p' }) },
   'atlas-wan27-vedit': { cat:'v2v', label:'Wan 2.7 Video Edit (Atlas)', provider:'atlas', path:'wan-2.7/video-edit', pricePerS:0.05, verified:false,
     buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'720p' }) },
@@ -2553,6 +2574,11 @@ async function generateText(userText) {
 
     // Inject PE system prompt if active
     let apiMessages = [...messages];
+    // Story Setup priming (premise/tone/characters) — only for normal story play, not PE mode
+    const _setupSys = buildStorySetupSystem(getStorySetup());
+    if (_setupSys && !promptEngineerMode) {
+      apiMessages = [{ role: 'system', content: _setupSys }, ...messages];
+    }
     if (promptEngineerMode) {
       const peModel = document.getElementById('pe-model-select')?.value || 'aurora';
       const sysPrompt = PE_SYSTEM_PROMPTS[peModel] || PE_SYSTEM_PROMPTS.aurora;
@@ -3182,6 +3208,12 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
   vidCloudBtn.innerHTML = '☁ Cloud';
   vidCloudBtn.addEventListener('click', () => uploadToCloudinary(src, altText, vidCloudBtn, 'video'));
 
+  const lastFrameBtn = document.createElement('button');
+  lastFrameBtn.className = 'vid-save-btn';
+  lastFrameBtn.innerHTML = '◳ Last frame';
+  lastFrameBtn.title = 'Capture the final frame of this video as an image';
+  lastFrameBtn.addEventListener('click', () => grabLastFrame(src, lastFrameBtn));
+
   // Pin for PE button on videos
   const pinVidPEBtn = document.createElement('button');
   pinVidPEBtn.className = 'pe-pin-btn';
@@ -3241,6 +3273,7 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
   wrapper.appendChild(video);
   wrapper.appendChild(saveBtn);
   wrapper.appendChild(vidCloudBtn);
+  wrapper.appendChild(lastFrameBtn);
   wrapper.appendChild(pinVidPEBtn);
   wrapper.appendChild(extendBtn);
   wrapper.appendChild(retryVidBtn);
@@ -3252,7 +3285,7 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
 }
 
 // Shared panel for Animate and Extend
-function buildAnimatePanel(onSubmit, isExtend = false) {
+function buildAnimatePanel(onSubmit, isExtend = false, initialPrompt = '') {
   const panel = document.createElement('div');
   panel.className = 'animate-panel';
   panel.style.cssText = `
@@ -3270,6 +3303,7 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   const promptInput = document.createElement('input');
   promptInput.type = 'text';
   promptInput.placeholder = isExtend ? 'Continue the scene… (optional)' : 'Describe the motion… (optional)';
+  if (initialPrompt) promptInput.value = initialPrompt;
   promptInput.style.cssText = `
     background: var(--bg);
     border: 1px solid rgba(255,255,255,0.1);
@@ -3295,16 +3329,16 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   engineSel.className = 'img-control-select';
   if (isExtend) {
     engineSel.innerHTML = `
-      <option value="aurora" selected>Aurora — $0.05/s</option>
-      <option value="wan27extend">Wan 2.7 Extend — from ~$0.30</option>
-      <option value="wan22spicy">Wan 2.2 Spicy — from $0.15</option>
+      <option value="aurora" selected>Aurora · xAI — $0.05/s</option>
+      <option value="wan27extend">Wan 2.7 Extend · WaveSpeed — from ~$0.30</option>
+      <option value="wan22spicy">Wan 2.2 Spicy · WaveSpeed — from $0.15</option>
     `;
   } else {
     engineSel.innerHTML = `
-      <option value="aurora" selected>Aurora — $0.05/s</option>
-      <option value="seedance15spicy">Seedance 1.5 Spicy — from $0.06</option>
-      <option value="wan22spicy">Wan 2.2 Spicy — from $0.15</option>
-      <option value="wan26spicy">Wan 2.7 Spicy — from $0.50</option>
+      <option value="aurora" selected>Aurora · xAI — $0.05/s</option>
+      <option value="seedance15spicy">Seedance 1.5 Spicy · WaveSpeed — from $0.06</option>
+      <option value="wan22spicy">Wan 2.2 Spicy · WaveSpeed — from $0.15</option>
+      <option value="wan26spicy">Wan 2.7 Spicy · WaveSpeed — from $0.50</option>
     `;
   }
 
@@ -3373,6 +3407,57 @@ function buildAnimatePanel(onSubmit, isExtend = false) {
   panel.appendChild(promptInput);
   panel.appendChild(controlRow);
   return panel;
+}
+
+// Capture the final frame of a video to a JPEG data URL (in-browser via canvas).
+function captureLastFrame(videoSrc) {
+  return new Promise((resolve, reject) => {
+    const v = document.createElement('video');
+    v.crossOrigin = 'anonymous'; // required so the canvas isn't tainted on export
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = 'auto';
+    let done = false;
+    const cleanup = () => { try { v.removeAttribute('src'); v.load(); } catch (e) {} };
+    const fail = (msg) => { if (done) return; done = true; cleanup(); reject(new Error(msg)); };
+    v.addEventListener('error', () => fail('video could not be loaded (the source may not allow cross-origin reads)'));
+    v.addEventListener('loadedmetadata', () => {
+      if (!isFinite(v.duration) || v.duration === 0) return fail('video duration unavailable');
+      const target = Math.max(0, v.duration - 0.05);
+      v.addEventListener('seeked', () => {
+        if (done) return;
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = v.videoWidth;
+          canvas.height = v.videoHeight;
+          canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+          done = true; cleanup(); resolve(dataUrl);
+        } catch (err) {
+          fail(err && err.name === 'SecurityError' ? 'the video host doesn\'t allow frame capture (CORS)' : (err.message || 'capture failed'));
+        }
+      }, { once: true });
+      try { v.currentTime = target; } catch (e) { fail('could not seek to the end of the video'); }
+    }, { once: true });
+    setTimeout(() => fail('timed out reading the video'), 20000);
+    v.src = videoSrc;
+  });
+}
+
+async function grabLastFrame(videoSrc, btn) {
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.innerHTML = '◳ Grabbing…'; btn.disabled = true; }
+  try {
+    const dataUrl = await captureLastFrame(videoSrc);
+    renderImage(dataUrl, 'Last frame', true, null, 'Last frame');
+    addMessageToThread({ role: 'assistant', type: 'image', src: dataUrl, alt: 'Last frame', modelLabel: 'Last frame' });
+    lastImageUrl = dataUrl;
+    showEditButton();
+    if (btn) { btn.innerHTML = '✓ Grabbed'; setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 2000); }
+  } catch (e) {
+    if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    appendError('Couldn\'t grab last frame: ' + e.message);
+  }
 }
 
 async function saveVideoToFiles(src, altText) {
@@ -4311,7 +4396,10 @@ async function runStoryboardDirector(beatText, forceFrame) {
 // (so any t2img model works — Aurora/xAI, Atlas, Chroma, Z-Image, and LoRA models apply active LoRAs).
 function buildStoryboardCallParams(imagePrompt) {
   const m = MODEL_REGISTRY[storyboardModel] || MODEL_REGISTRY['chroma'];
-  const callParams = { prompt: imagePrompt, aspectRatio: storyboardRatio, resolution: '1k' };
+  let basePrompt = imagePrompt;
+  const setup = getStorySetup();
+  if (setup && setup.style) basePrompt = basePrompt + ', ' + setup.style; // locked visual style for all frames
+  const callParams = { prompt: basePrompt, aspectRatio: storyboardRatio, resolution: '1k' };
   if (storyboardModel === 'flux-lora') {
     const st = parseInt(document.getElementById('flux-steps')?.value);
     const gd = parseFloat(document.getElementById('flux-guidance')?.value);
@@ -4383,6 +4471,11 @@ function fillStoryboardCard(card, src, videoPrompt, reason, frameId, modelLabel)
     });
     bar.appendChild(btn);
   }
+  // Animate (image-to-video) — same machinery as normal images, pre-filled with the drafted video prompt
+  const animBtn = document.createElement('button');
+  animBtn.className = 'sb-makevideo';
+  animBtn.textContent = '▶ Animate';
+  bar.appendChild(animBtn);
   const sbCloudBtn = document.createElement('button');
   sbCloudBtn.className = 'sb-makevideo';
   sbCloudBtn.textContent = '☁ Cloud';
@@ -4393,6 +4486,27 @@ function fillStoryboardCard(card, src, videoPrompt, reason, frameId, modelLabel)
   editBtn.textContent = '✎ Edit';
   bar.appendChild(editBtn);
   card.appendChild(bar);
+  // Animate panel (image-to-video from this frame), pre-filled with the drafted video prompt
+  const vidPanelOuter = document.createElement('div');
+  vidPanelOuter.className = 'animate-panel-outer';
+  card.appendChild(vidPanelOuter);
+  let vidPanelOpen = false;
+  animBtn.addEventListener('click', () => {
+    vidPanelOpen = !vidPanelOpen;
+    if (vidPanelOpen) {
+      const panel = buildAnimatePanel(async (p, engine, duration, resolution) => {
+        vidPanelOuter.innerHTML = '';
+        vidPanelOpen = false;
+        animBtn.disabled = true;
+        await generateVideo(p || videoPrompt || 'cinematic motion, smooth camera movement', src, engine, null, duration, resolution);
+        animBtn.disabled = false;
+      }, false, videoPrompt || '');
+      vidPanelOuter.innerHTML = '';
+      vidPanelOuter.appendChild(panel);
+    } else {
+      vidPanelOuter.innerHTML = '';
+    }
+  });
   // Inline editor (its own edit-model dropdown so the model in use is always clear)
   const editor = document.createElement('div');
   editor.className = 'sb-editor';
@@ -4578,6 +4692,55 @@ document.getElementById('cast-add-btn')?.addEventListener('click', () => {
   document.getElementById('cast-add-name').value = '';
   document.getElementById('cast-add-desc').value = '';
   renderCastPanel();
+});
+
+// ═══════════════════════════════════════════════════════
+// STORY SETUP (per-story premise/tone/style/characters)
+// ═══════════════════════════════════════════════════════
+function getStorySetup() {
+  const t = getCurrentThread();
+  return (t && t.setup) ? t.setup : {};
+}
+function saveStorySetup(setup) {
+  const threads = getThreads();
+  const idx = threads.findIndex(t => t.id === currentThreadId);
+  if (idx < 0) return;
+  threads[idx].setup = setup;
+  saveThreads(threads);
+}
+// System-prompt block that primes the chat (premise + tone + characters). Visual style is NOT included here — it's for frames only.
+function buildStorySetupSystem(setup) {
+  if (!setup) return '';
+  const parts = [];
+  if (setup.premise) parts.push('PREMISE: ' + setup.premise);
+  if (setup.tone) parts.push('TONE: ' + setup.tone);
+  if (setup.characters) parts.push('STARTING CHARACTERS:\n' + setup.characters);
+  if (!parts.length) return '';
+  return 'You are running an interactive story for the user. Stay consistent with this setup:\n\n' + parts.join('\n') + '\n\nPlay each scene vividly in the established tone. The user directs; you narrate what unfolds.';
+}
+
+const setupOverlay = document.getElementById('setup-overlay');
+document.getElementById('setup-btn')?.addEventListener('click', () => {
+  if (!currentThreadId || !getCurrentThread()) createThread('New Game');
+  const s = getStorySetup();
+  document.getElementById('setup-premise').value = s.premise || '';
+  document.getElementById('setup-tone').value = s.tone || '';
+  document.getElementById('setup-style').value = s.style || '';
+  document.getElementById('setup-characters').value = s.characters || '';
+  setupOverlay.classList.add('open');
+});
+document.getElementById('setup-close')?.addEventListener('click', () => setupOverlay.classList.remove('open'));
+setupOverlay?.addEventListener('click', e => { if (e.target === setupOverlay) setupOverlay.classList.remove('open'); });
+document.getElementById('setup-save')?.addEventListener('click', () => {
+  const setup = {
+    premise: document.getElementById('setup-premise').value.trim(),
+    tone: document.getElementById('setup-tone').value.trim(),
+    style: document.getElementById('setup-style').value.trim(),
+    characters: document.getElementById('setup-characters').value.trim()
+  };
+  saveStorySetup(setup);
+  if (setup.characters) mergeCastFromDirector(setup.characters); // seed cast (adds only new names)
+  setupOverlay.classList.remove('open');
 });
 
 function openModal(type) {
