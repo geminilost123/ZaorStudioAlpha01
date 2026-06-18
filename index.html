@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.94" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.95" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.94</title>
+  <title>Zaor Studio 0.95</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1173,7 +1173,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.94</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.95</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1373,6 +1373,7 @@
               <option value="wan26t2v">Wan 2.6 · WaveSpeed — ~$0.34/5s</option>
               <option value="wan22spicy">Wan 2.2 Spicy I2V · WaveSpeed — from $0.15</option>
               <option value="wan26spicy">Wan 2.7 Spicy I2V · WaveSpeed — from $0.50</option>
+              <option value="ltx23spicy">LTX 2.3 Spicy I2V (+audio) · WaveSpeed — from $0.10</option>
             </select>
           </div>
           <div class="img-control-group">
@@ -1620,24 +1621,29 @@
 
     <label class="exp-lbl">Mode</label>
     <select id="exp-mode" class="img-control-select" style="width:100%;margin-bottom:12px;">
-      <option value="i2v">Animate frames (i2v) — uses your frame images</option>
-      <option value="t2v">Prompt-only (t2v) — regenerate from prompts</option>
+      <option value="i2v">Animate frames (i2v) — loads each frame as the video's first frame</option>
+      <option value="t2v">Prompt-only (t2v) — generate from the prompt, no image</option>
     </select>
 
-    <label class="exp-lbl">Model</label>
+    <label class="exp-lbl">Model (select this exact name in Draw Things)</label>
     <select id="exp-model" class="img-control-select" style="width:100%;margin-bottom:12px;">
-      <option value="5b">Wan 2.2 5B — recommended (fast, unconstrained)</option>
-      <option value="hero">Wan 2.2 A14B + refiner — hero quality (gated to 40k)</option>
+      <option value="wan-ti2v-5b">Wan 2.2 TI2V 5B — recommended (does both t2v &amp; i2v)</option>
+      <option value="wan-i2v-14b-480">Wan v2.1 I2V 14B 480p</option>
+      <option value="wan-i2v-14b-720">Wan v2.1 I2V 14B 720p</option>
+      <option value="ltx-distilled-720">LTX-2.3 22B [distilled] 720p</option>
     </select>
+
+    <label class="exp-lbl" id="exp-res-lbl">Image size (matched to your frames)</label>
+    <select id="exp-res" class="img-control-select" style="width:100%;margin-bottom:12px;"></select>
 
     <div style="display:flex;gap:10px;margin-bottom:12px;">
       <div style="flex:1;">
         <label class="exp-lbl">Frames</label>
-        <input type="number" id="exp-frames" value="81" min="16" max="81" step="8" class="img-control-select" style="width:100%;" />
+        <input type="number" id="exp-frames" value="81" min="16" max="121" step="1" class="img-control-select" style="width:100%;" />
       </div>
       <div style="flex:1;">
         <label class="exp-lbl">Steps</label>
-        <input type="number" id="exp-steps" value="8" min="4" max="20" step="1" class="img-control-select" style="width:100%;" />
+        <input type="number" id="exp-steps" value="8" min="4" max="30" step="1" class="img-control-select" style="width:100%;" />
       </div>
     </div>
 
@@ -3060,6 +3066,11 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
     } else if (engine === 'wan26spicy') {
       modelPath = 'alibaba/wan-2.7/image-to-video-spicy';
       body = { prompt, image: imageDataUrl, resolution: res, duration: Math.min(duration, 15), aspect_ratio: ratio, seed: -1 };
+    } else if (engine === 'ltx23spicy') {
+      // LTX 2.3 Spicy I2V — generates synchronized audio; safety checker off for uncensored.
+      // No aspect_ratio param: output follows the input image's aspect ratio.
+      modelPath = 'wavespeed-ai/ltx-2.3-spicy/image-to-video';
+      body = { prompt, image: imageDataUrl, resolution: res, duration: Math.min(Math.max(duration, 3), 20), seed: -1, enable_safety_checker: false };
     } else {
       modelPath = 'wavespeed-ai/wan-2.2-spicy/image-to-video';
       body = { prompt, image: imageDataUrl, resolution: res, duration: Math.min(duration, 5), aspect_ratio: ratio, seed: -1 };
@@ -3104,7 +3115,7 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   );
 
   if (videoUrl) {
-    const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', seedance15spicy: 'Seedance 1.5 Spicy', seedance15t2v: 'Seedance 1.5 T2V', aurora: 'Aurora', 'aurora_extend': 'Aurora Extend' };
+    const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', seedance15spicy: 'Seedance 1.5 Spicy', seedance15t2v: 'Seedance 1.5 T2V', ltx23spicy: 'LTX 2.3 Spicy', aurora: 'Aurora', 'aurora_extend': 'Aurora Extend' };
     const vidLabel = engineLabels[engine] || engine;
     addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: vidLabel, storedDuration: duration, storedRes: res });
     renderVideo(videoUrl, prompt, true, vidLabel, duration, res);
@@ -3382,7 +3393,8 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
     const engineKeyMap = {
       'aurora t2v': 'aurora', 'aurora': 'aurora',
       'wan 2.2 spicy': 'wan22spicy', 'wan 2.7 spicy': 'wan26spicy',
-      'wan 2.6': 'wan26t2v', 'seedance 1.5 spicy': 'seedance15spicy', 'seedance 1.5 t2v': 'seedance15t2v'
+      'wan 2.6': 'wan26t2v', 'seedance 1.5 spicy': 'seedance15spicy', 'seedance 1.5 t2v': 'seedance15t2v',
+      'ltx 2.3 spicy': 'ltx23spicy'
     };
     const labelKey = engineLabel.toLowerCase().replace(' video','').trim();
     const engineKey = engineKeyMap[labelKey] || 'aurora';
@@ -3463,6 +3475,7 @@ function buildAnimatePanel(onSubmit, isExtend = false, initialPrompt = '') {
       <option value="seedance15spicy">Seedance 1.5 Spicy · WaveSpeed — from $0.06</option>
       <option value="wan22spicy">Wan 2.2 Spicy · WaveSpeed — from $0.15</option>
       <option value="wan26spicy">Wan 2.7 Spicy · WaveSpeed — from $0.50</option>
+      <option value="ltx23spicy">LTX 2.3 Spicy (+audio) · WaveSpeed — from $0.10</option>
     `;
   }
 
@@ -4999,36 +5012,34 @@ document.getElementById('savegame-load')?.addEventListener('click', () => {
   }
 });
 
-// ── Export Scene to Draw Things (v0.94) ──
-const CU_K = { '5b': 1.4e-5, 'hero': 1.7e-4 };
-const RES_LADDER = {
-  '16:9': [[832,480],[768,448],[704,384],[640,384],[512,320]],
-  '9:16': [[480,832],[448,768],[384,704],[384,640],[320,512]],
-  '1:1':  [[640,640],[576,576],[512,512],[448,448],[384,384]],
-  '4:3':  [[768,576],[704,512],[640,512],[576,448],[512,384]],
-  '3:4':  [[576,768],[512,704],[512,640],[448,576],[384,512]]
+// ── Export Scene to Draw Things (v0.95) ──
+// DT's real, selectable video sizes, grouped by the scene's aspect ratio (draft / standard).
+const DT_SIZES = {
+  '16:9': ['512x320', '1024x576'],
+  '9:16': ['320x640', '576x1024'],
+  '1:1':  ['512x512', '768x768'],
+  '4:3':  ['768x576'],
+  '3:4':  ['576x768']
 };
-function expEstimateCU(model, w, h, frames, steps) {
-  return Math.round((CU_K[model] || CU_K['5b']) * w * h * frames * steps);
-}
-function expFitClip(model, ratio, frames, steps) {
-  const ladder = RES_LADDER[ratio] || RES_LADDER['16:9'];
-  let ri = (model === 'hero') ? 1 : 0;
-  let f = Math.max(16, Math.min(81, frames | 0));
-  let s = Math.max(4, Math.min(20, steps | 0));
-  let trimmed = false;
-  const cu = () => expEstimateCU(model, ladder[ri][0], ladder[ri][1], f, s);
-  if (model === 'hero') {
-    let guard = 0;
-    while (cu() > 38000 && guard < 60) {
-      guard++;
-      if (f > 49) { f -= 8; trimmed = true; }
-      else if (ri < ladder.length - 1) { ri++; trimmed = true; }
-      else if (s > 4) { s -= 1; trimmed = true; }
-      else break;
-    }
-  }
-  return { w: ladder[ri][0], h: ladder[ri][1], frames: f, steps: s, cu: cu(), trimmed: trimmed };
+const EXP_MODELS = {
+  'wan-ti2v-5b':       { name: 'Wan 2.2 TI2V 5B',             note: 'unified text+image→video; lightest — fits the 40k meter easily', i2v: true },
+  'wan-i2v-14b-480':   { name: 'Wan v2.1 I2V 14B 480p',       note: 'heavier — keep frames/size modest and watch the meter', i2v: true },
+  'wan-i2v-14b-720':   { name: 'Wan v2.1 I2V 14B 720p',       note: 'heaviest — likely needs fewer frames to stay ≤40k', i2v: true },
+  'ltx-distilled-720': { name: 'LTX-2.3 22B [distilled] 720p', note: 'distilled — use ~8 steps', i2v: true }
+};
+function expPopulateRes() {
+  const sel = document.getElementById('exp-res');
+  if (!sel) return;
+  const ratio = storyboardRatio || '16:9';
+  const sizes = DT_SIZES[ratio] || DT_SIZES['16:9'];
+  const cur = sel.value;
+  sel.innerHTML = sizes.map((s, i) => {
+    const tier = sizes.length > 1 ? (i === 0 ? ' (draft)' : ' (standard)') : '';
+    return '<option value="' + s + '"' + (i === sizes.length - 1 ? ' selected' : '') + '>' + s.replace('x', '×') + tier + '</option>';
+  }).join('');
+  if (cur && sizes.indexOf(cur) >= 0) sel.value = cur;
+  const lbl = document.getElementById('exp-res-lbl');
+  if (lbl) lbl.textContent = 'Image size (matched to your ' + ratio + ' frames)';
 }
 function expGatherFrames() {
   const t = getCurrentThread();
@@ -5043,21 +5054,22 @@ function expJsStr(s) {
 function expUpdateEstimate() {
   const box = document.getElementById('exp-estimate');
   if (!box) return null;
-  const model = document.getElementById('exp-model').value;
+  const modelId = document.getElementById('exp-model').value;
+  const mode = document.getElementById('exp-mode').value;
   const ratio = storyboardRatio || '16:9';
-  const frames = parseInt(document.getElementById('exp-frames').value, 10) || 81;
+  const sizes = DT_SIZES[ratio] || DT_SIZES['16:9'];
+  const res = document.getElementById('exp-res').value || sizes[sizes.length - 1];
+  const framesN = parseInt(document.getElementById('exp-frames').value, 10) || 81;
   const steps = parseInt(document.getElementById('exp-steps').value, 10) || 8;
   const frs = expGatherFrames();
-  const fit = expFitClip(model, ratio, frames, steps);
-  const under = fit.cu <= 40000;
-  const modelName = model === 'hero' ? 'Wan 2.2 A14B + refiner' : 'Wan 2.2 5B';
-  let html = '<div><b>' + frs.length + '</b> frame' + (frs.length === 1 ? '' : 's') + ' in this scene · <b>' + modelName + '</b></div>';
-  html += '<div style="margin-top:4px;">Per clip: <b>' + fit.w + '×' + fit.h + '</b> · ' + fit.frames + ' frames · ' + fit.steps + ' steps</div>';
-  html += '<div style="margin-top:4px;color:' + (under ? 'var(--lavender)' : '#e08a8a') + ';">≈ ' + fit.cu.toLocaleString() + ' compute units / clip · ' + (under ? '✓ under 40k (free, Privacy-Pass OK)' : '⚠ over 40k — needs a Boost') + '</div>';
-  if (fit.trimmed) html += '<div style="margin-top:4px;color:var(--text-dim);font-size:11px;">Auto-trimmed to fit under 40k (frames → resolution → steps).</div>';
+  const m = EXP_MODELS[modelId] || EXP_MODELS['wan-ti2v-5b'];
+  let html = '<div><b>' + frs.length + '</b> frame' + (frs.length === 1 ? '' : 's') + ' · <b>' + m.name + '</b> · ' + (mode === 'i2v' ? 'i2v' : 't2v') + '</div>';
+  html += '<div style="margin-top:4px;">Per clip: <b>' + res.replace('x', '×') + '</b> · ' + framesN + ' frames · ' + steps + ' steps</div>';
+  html += '<div style="margin-top:6px;color:var(--text-dim);font-size:11.5px;line-height:1.5;">' + m.note + '. DT\'s compute-unit meter is the real gauge — after setting these in DT, keep each job <b>≤ 40,000</b>. If a job exceeds it, DT cancels it free; trim frames or size and rerun.</div>';
+  if (mode === 'i2v' && !m.i2v) html += '<div style="margin-top:4px;color:#e08a8a;font-size:11px;">This model is text-to-video only — switch to t2v or pick an i2v-capable model.</div>';
   if (frs.length === 0) html += '<div style="margin-top:4px;color:#e08a8a;font-size:11px;">No storyboard frames in this story yet — generate some frames first.</div>';
   box.innerHTML = html;
-  return { fit: fit, frames: frs, model: model, modelName: modelName, ratio: ratio, under: under };
+  return { frames: frs, modelId: modelId, model: m, mode: mode, ratio: ratio, res: res, framesN: framesN, steps: steps };
 }
 function expFillChecklist() {
   const ol = document.getElementById('exp-checklist');
@@ -5066,29 +5078,34 @@ function expFillChecklist() {
   const steps = [];
   if (mode === 'i2v') steps.push('Save this scene\'s frames into the DT Pictures folder, named shot_01.png, shot_02.png, …');
   steps.push('In DT, sign in and turn on Cloud Compute & Sharing, then choose the Draw Things+ tier.');
-  steps.push('Select the model and set Mode / Resolution / Frames / Steps exactly as listed atop the script.');
-  steps.push('Scripts tab → Add Script → paste the script → Run. Keep all quotes straight.');
+  steps.push('Select the exact model named atop the script, and set Image Size / Frames / Steps to match.');
+  if (mode === 'i2v') steps.push('In the Strength panel, switch to the film-strip (video) icon and set Strength below 100% so the loaded frame conditions the video (100% = ignores the image).');
+  steps.push('Set Save Video as → Movie (.mov).');
+  steps.push('Read DT\'s compute-unit meter — keep it ≤ 40,000. If higher, lower frames or image size.');
+  steps.push('Scripts tab → Add Script → paste → Run. Keep all quotes straight.');
   steps.push('Each clip renders on the cloud in turn; save each one from DT as it appears.');
   ol.innerHTML = steps.map(s => '<li>' + s.replace(/</g, '&lt;') + '</li>').join('');
 }
 function expBuildScript() {
   const ctx = expUpdateEstimate();
   if (!ctx || ctx.frames.length === 0) return '';
-  const mode = document.getElementById('exp-mode').value;
-  const fit = ctx.fit, frames = ctx.frames, model = ctx.model, modelName = ctx.modelName;
+  const mode = ctx.mode, frames = ctx.frames, m = ctx.model, res = ctx.res;
+  const dims = res.split('x');
   const L = [];
   L.push('//@api-1.0');
   L.push('// ===== Zaor scene export · ' + mode + ' · ' + frames.length + ' clip' + (frames.length === 1 ? '' : 's') + ' =====');
   L.push('// BEFORE RUNNING, set these in the Draw Things UI:');
-  L.push('//   Model: ' + modelName + (model === 'hero' ? '  (High-Noise base + Low-Noise Refiner @ 10% start)' : ''));
-  L.push('//   Mode: ' + (mode === 'i2v' ? 'Image-to-Video' : 'Text-to-Video'));
-  L.push('//   Resolution: ' + fit.w + 'x' + fit.h + '   Frames: ' + fit.frames + '   Steps: ' + fit.steps);
+  L.push('//   Model: ' + m.name);
+  L.push('//   Image Size: ' + dims[0] + 'x' + dims[1] + '   Frames: ' + ctx.framesN + '   Steps: ' + ctx.steps);
+  L.push('//   Sampler: UniPC Trailing   Shift: 5.0   Text Guidance (CFG): ~3.5   Refiner: Disabled');
+  L.push('//   Save Video as: Movie (.mov)');
   L.push('//   Cloud Compute: ON  (Server Offload -> Draw Things+)');
-  L.push('//   Est. cost: ~' + fit.cu.toLocaleString() + ' compute units per clip (' + (ctx.under ? 'under' : 'OVER') + ' 40k)');
   if (mode === 'i2v') {
+    L.push('//   Strength panel: film-strip (video) mode, Strength < 100% (so the frame conditions the video)');
     L.push('// Put these images in the DT Pictures folder first, named exactly:');
     frames.forEach((f, i) => L.push('//   shot_' + String(i + 1).padStart(2, '0') + '.png'));
   }
+  L.push('// IMPORTANT: read DT\'s compute-unit meter before running — keep each clip <= 40,000.');
   L.push('// Quotes must stay straight ( " ) — do not let autocorrect curl them.');
   L.push('');
   L.push('var shots = [');
@@ -5117,13 +5134,14 @@ function expBuildScript() {
 const exportdtOverlay = document.getElementById('exportdt-overlay');
 document.getElementById('export-dt-btn')?.addEventListener('click', () => {
   document.getElementById('exp-code').value = '';
+  expPopulateRes();
   expUpdateEstimate();
   expFillChecklist();
   exportdtOverlay.classList.add('open');
 });
 document.getElementById('exp-close')?.addEventListener('click', () => exportdtOverlay.classList.remove('open'));
 exportdtOverlay?.addEventListener('click', e => { if (e.target === exportdtOverlay) exportdtOverlay.classList.remove('open'); });
-['exp-mode', 'exp-model', 'exp-frames', 'exp-steps'].forEach(id => {
+['exp-mode', 'exp-model', 'exp-res', 'exp-frames', 'exp-steps'].forEach(id => {
   const el = document.getElementById(id);
   if (!el) return;
   el.addEventListener('change', () => { expUpdateEstimate(); expFillChecklist(); });
@@ -5290,6 +5308,7 @@ const MODEL_CONSTRAINTS = {
   wan22spicy: { durations: [5],            resolutions: ['480p','720p'], hasRatio: false, maxDur: 5,  defaultDur: 5,  defaultRes: '480p' },
   wan26spicy:     { durations: [5,10,15],      resolutions: ['720p','1080p'], hasRatio: false, maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
   seedance15spicy: { durations: [4,5,6,8,10,12], resolutions: ['480p','720p','1080p'], hasRatio: true, maxDur: 12, defaultDur: 4,  defaultRes: '480p' },
+  ltx23spicy: { durations: [3,5,8,10,15,20], resolutions: ['480p','720p','1080p'], hasRatio: false, maxDur: 20, defaultDur: 5, defaultRes: '480p' },
   // extend variants
   aurora_extend:        { durations: [4,6,8,10],       resolutions: ['480p','720p'],        hasRatio: false, maxDur: 10, defaultDur: 4,  defaultRes: '480p' },
   wan22spicy_extend:    { durations: [5],               resolutions: ['480p','720p'],        hasRatio: false, maxDur: 5,  defaultDur: 5,  defaultRes: '480p' },
@@ -5367,6 +5386,10 @@ function estimateVideoCost(engine, duration, res) {
       return hi ? '~$0.20+' : '~$0.15';
     case 'wan26spicy':                   // Wan 2.7 Spicy: ~$0.10/s @720p, scales with duration
       return `~$${(0.10 * d).toFixed(2)}`;
+    case 'ltx23spicy': {                  // LTX 2.3 Spicy: 480p $0.02/s, 720p $0.04/s, 1080p $0.06/s; min 5s billed
+      const rate = res === '1080p' ? 0.06 : (res === '720p' ? 0.04 : 0.02);
+      return `~$${Math.max(0.10, rate * Math.max(5, d)).toFixed(2)}`;
+    }
     case 'wan27extend':                  // Wan 2.7 extend (approx base)
       return `~$${(0.10 * d).toFixed(2)}`;
     default:
@@ -5461,6 +5484,7 @@ const PE_SYSTEM_PROMPTS = {
   ltx23: peSys("MODEL: LTX 2.3 (Lightricks video — T2V/I2V/extend with NATIVE AUDIO). Write the prompt as a flowing cinematic NARRATIVE in prose — never labelled fields like 'Subject:/Camera:'. Structure first, style second: give a clear subject, ONE specific action with concrete motion verbs ('hands moving with practiced precision', not 'cooking'), and the setting; then layer lighting and style words last. Describe the camera move in plain language, usually near the end ('the camera slowly dollies from behind the subject to in front'). CRUCIAL: LTX generates sound natively — explicitly describe the audio: ambient room tone, specific sound effects, and any music or dialogue (e.g. 'the strong thud of the hammer, soft country blues from an old gramophone'). Add realism cues (natural directional light, authentic skin texture). If animating from an image (I2V), describe ONLY the motion, light changes and audio — do NOT redescribe what is already in the frame. Keep to one coherent beat."),
   seedance_i2v: peSys("MODEL: Seedance image-to-video. Describe the motion, camera behaviour, emotional tone and visual style. Seedance handles bold, expressive motion well. Describe motion not appearance. Under ~100 words."),
   wan22spicy_i2v: peSys("MODEL: Wan 2.2 image-to-video. Lead with subject + motion, then camera. Pick ONE clear motion — avoid complex multi-action. Use motion-intensity words (subtle/gentle, smooth/flowing, dynamic/sweeping). Under ~60 words."),
+  ltx23spicy: peSys("MODEL: LTX 2.3 Spicy image-to-video with synchronized audio. Describe ONE clear action/motion plus the camera move, and explicitly describe any audio you want (e.g. 'soft ambient music', 'waves', 'breathing') since this model generates sound. Keep motion focused — one action per prompt. Under ~60 words."),
   wan27spicy_i2v: peSys("MODEL: Wan 2.7 image-to-video. Supports a short arc: opening motion → development → resolution. Order subject → motion → camera → scene. Include camera work and clear motion-intensity. Under ~100 words."),
 
   // ── Video Extend ──
