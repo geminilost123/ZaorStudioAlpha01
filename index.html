@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.84" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.86" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.84</title>
+  <title>Zaor Studio 0.86</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -374,6 +374,7 @@
     }
     .edit-img-btn:hover { background: rgba(201,184,232,0.25); }
     .edit-img-btn.visible { display: inline-flex; align-items: center; gap: 5px; }
+    .edit-img-btn.active { background: rgba(201,184,232,0.32); border-color: var(--lavender); color: var(--lavender); font-weight: 600; }
 
     .save-btn {
       background: var(--surface);
@@ -1114,7 +1115,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.84</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.86</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -2064,7 +2065,7 @@ function loadThread(id) {
       } else if (m.type === 'video') {
         renderVideo(m.src, m.alt, false, m.engineLabel || 'Aurora', m.storedDuration || null, m.storedRes || null);
       } else if (m.type === 'storyboard') {
-        renderStoryboardFrameCard(m.src, m.alt, m.videoPrompt || '', m.reason || '', m.frameId);
+        renderStoryboardFrameCard(m.src, m.alt, m.videoPrompt || '', m.reason || '', m.frameId, m.modelLabel);
       } else if (m.type === 'error') {
         const div = document.createElement('div');
         div.className = 'error-bubble';
@@ -2207,6 +2208,7 @@ function setMode(mode) {
     promptEngineerMode = false;
     peUseImage = pePinnedUrl != null; // keep if something is pinned
     updatePeImgToggle();
+    syncPePinHighlights(); // clear the pin highlight while PE is off (pin URL is kept)
   }
   const peBtn = document.getElementById('pe-btn');
   if (peBtn) {
@@ -3185,11 +3187,11 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
   pinVidPEBtn.className = 'pe-pin-btn';
   pinVidPEBtn.textContent = '✦ PE';
   pinVidPEBtn.title = 'Pin this video as context for Prompt Engineer extend prompts';
+  pinVidPEBtn.dataset.peUrl = src;
+  if (promptEngineerMode && pePinnedUrl === src) { pinVidPEBtn.classList.add('active'); pinVidPEBtn.textContent = '✦ PE ✓'; }
   pinVidPEBtn.addEventListener('click', () => {
     pinForPE(src, 'video', engineLabel + ' Video');
-    document.querySelectorAll('.pe-pin-btn').forEach(b => { b.classList.remove('active'); b.textContent = '✦ PE'; });
-    pinVidPEBtn.classList.add('active');
-    pinVidPEBtn.textContent = '✦ PE ✓';
+    syncPePinHighlights();
   });
 
   // Extend button
@@ -3558,11 +3560,11 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   pinPEBtn.className = 'pe-pin-btn';
   pinPEBtn.textContent = '✦ PE';
   pinPEBtn.title = 'Pin this image as visual context for Prompt Engineer mode';
+  pinPEBtn.dataset.peUrl = hostedUrl || src;
+  if (promptEngineerMode && pePinnedUrl === (hostedUrl || src)) { pinPEBtn.classList.add('active'); pinPEBtn.textContent = '✦ PE ✓'; }
   pinPEBtn.addEventListener('click', () => {
     pinForPE(hostedUrl || src, 'image', modelLabel);
-    document.querySelectorAll('.pe-pin-btn').forEach(b => { b.classList.remove('active'); b.textContent = '✦ PE'; });
-    pinPEBtn.classList.add('active');
-    pinPEBtn.textContent = '✦ PE ✓';
+    syncPePinHighlights();
   });
 
   // Set as edit target button
@@ -4340,19 +4342,23 @@ async function addStoryboardFrame(imagePrompt, videoPrompt, reason) {
   try {
     const src = await callModel(storyboardModel, buildStoryboardCallParams(imagePrompt));
     if (!src) throw new Error('no image returned');
-    fillStoryboardCard(card, src, videoPrompt, reason, frameId);
-    addMessageToThread({ role: 'assistant', type: 'storyboard', src, alt: imagePrompt, videoPrompt: videoPrompt || '', reason: reason || '', frameId });
+    const modelLabel = (MODEL_REGISTRY[storyboardModel] && MODEL_REGISTRY[storyboardModel].label) || storyboardModel;
+    fillStoryboardCard(card, src, videoPrompt, reason, frameId, modelLabel);
+    addMessageToThread({ role: 'assistant', type: 'storyboard', src, alt: imagePrompt, videoPrompt: videoPrompt || '', reason: reason || '', frameId, modelLabel });
+    // make the frame editable + reveal the edit menu (so the edit model is visible in story mode)
+    lastImageUrl = src;
+    showEditButton();
   } catch (e) {
     card.innerHTML = '<div class="sb-frame-load" style="color:var(--text-dim);">🎬 Frame skipped — ' + (e.message || 'error').replace(/</g, '&lt;') + '</div>';
   }
 }
 
-function fillStoryboardCard(card, src, videoPrompt, reason, frameId) {
+function fillStoryboardCard(card, src, videoPrompt, reason, frameId, modelLabel) {
   card.innerHTML = '';
   if (frameId) card.dataset.frameId = frameId;
   const label = document.createElement('div');
   label.className = 'msg-label';
-  label.textContent = '🎬 Storyboard · ' + (reason || 'frame');
+  label.textContent = '🎬 ' + (modelLabel || 'Storyboard') + (reason ? ' · ' + reason : '');
   card.appendChild(label);
   const wrapper = document.createElement('div');
   wrapper.className = 'img-wrapper';
@@ -4387,9 +4393,14 @@ function fillStoryboardCard(card, src, videoPrompt, reason, frameId) {
   editBtn.textContent = '✎ Edit';
   bar.appendChild(editBtn);
   card.appendChild(bar);
-  // Inline editor (uses the currently-selected edit model; replaces this frame in place)
+  // Inline editor (its own edit-model dropdown so the model in use is always clear)
   const editor = document.createElement('div');
   editor.className = 'sb-editor';
+  const modelSel = document.createElement('select');
+  modelSel.className = 'img-control-select';
+  modelSel.style.width = '100%';
+  const globalSel = document.getElementById('edit-model-select');
+  if (globalSel) { modelSel.innerHTML = globalSel.innerHTML; modelSel.value = globalSel.value; }
   const inp = document.createElement('input');
   inp.type = 'text';
   inp.className = 'sb-edit-input';
@@ -4404,6 +4415,7 @@ function fillStoryboardCard(card, src, videoPrompt, reason, frameId) {
   cancelBtn.textContent = 'Cancel';
   editorBtns.appendChild(applyBtn);
   editorBtns.appendChild(cancelBtn);
+  editor.appendChild(modelSel);
   editor.appendChild(inp);
   editor.appendChild(editorBtns);
   card.appendChild(editor);
@@ -4415,38 +4427,42 @@ function fillStoryboardCard(card, src, videoPrompt, reason, frameId) {
   applyBtn.addEventListener('click', async () => {
     const p = inp.value.trim();
     if (!p) return;
-    const editModel = document.getElementById('edit-model-select')?.value || 'wan27';
+    const editModel = modelSel.value || 'wan27';
     card.innerHTML = '<div class="sb-frame-load">✎ Editing frame…</div>';
     try {
       const r = await runEdit(p, src, editModel);
-      updateStoryboardFrameSrc(frameId, r.src);
-      fillStoryboardCard(card, r.src, videoPrompt, reason, frameId);
+      updateStoryboardFrameSrc(frameId, r.src, r.modelLabel);
+      fillStoryboardCard(card, r.src, videoPrompt, reason, frameId, r.modelLabel);
     } catch (e) {
       appendError('Frame edit failed: ' + e.message);
-      fillStoryboardCard(card, src, videoPrompt, reason, frameId); // restore original on failure
+      fillStoryboardCard(card, src, videoPrompt, reason, frameId, modelLabel); // restore original on failure
     }
   });
 }
 
-// Persist an edited frame's new image to the thread (matched by frameId)
-function updateStoryboardFrameSrc(frameId, newSrc) {
+// Persist an edited frame's new image (and engine label) to the thread (matched by frameId)
+function updateStoryboardFrameSrc(frameId, newSrc, newModelLabel) {
   if (!frameId) return;
   const threads = getThreads();
   const idx = threads.findIndex(t => t.id === currentThreadId);
   if (idx < 0) return;
   const msgs = threads[idx].messages || [];
   for (let i = msgs.length - 1; i >= 0; i--) {
-    if (msgs[i].type === 'storyboard' && msgs[i].frameId === frameId) { msgs[i].src = newSrc; break; }
+    if (msgs[i].type === 'storyboard' && msgs[i].frameId === frameId) {
+      msgs[i].src = newSrc;
+      if (newModelLabel) msgs[i].modelLabel = newModelLabel;
+      break;
+    }
   }
   saveThreads(threads);
 }
 
 // Re-render a persisted storyboard frame (no generation)
-function renderStoryboardFrameCard(src, imagePrompt, videoPrompt, reason, frameId) {
+function renderStoryboardFrameCard(src, imagePrompt, videoPrompt, reason, frameId, modelLabel) {
   const card = document.createElement('div');
   card.className = 'msg assistant';
   messagesEl.appendChild(card);
-  fillStoryboardCard(card, src, videoPrompt, reason, frameId);
+  fillStoryboardCard(card, src, videoPrompt, reason, frameId, modelLabel);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -4879,13 +4895,24 @@ document.getElementById('pe-btn')?.addEventListener('click', () => {
   if (modelRow) modelRow.classList.toggle('visible', promptEngineerMode);
   if (promptEngineerMode) {
     btn.textContent = '✦ PE ON';
+    syncPePinHighlights(); // re-light the pinned card (pin was remembered)
   } else {
     btn.textContent = '✦ PE';
-    // Keep pin but deactivate use
+    // Keep pin but deactivate use, and clear the pin highlight while PE is off
     peUseImage = false;
     updatePeImgToggle();
+    syncPePinHighlights();
   }
 });
+
+// Pin highlight = PE is on AND this card is the pinned one. Matches by URL so it survives re-renders.
+function syncPePinHighlights() {
+  document.querySelectorAll('.pe-pin-btn').forEach(b => {
+    const isPinned = promptEngineerMode && !!pePinnedUrl && b.dataset.peUrl === pePinnedUrl;
+    b.classList.toggle('active', isPinned);
+    b.textContent = isPinned ? '✦ PE ✓' : '✦ PE';
+  });
+}
 
 function updatePeImgToggle() {
   const btn = document.getElementById('pe-img-toggle');
@@ -4915,6 +4942,7 @@ function updatePeImgToggle() {
 document.getElementById('pe-pin-clear')?.addEventListener('click', () => {
   pePinnedUrl = null; pePinnedType = null; pePinnedLabel = '';
   updatePeImgToggle();
+  syncPePinHighlights();
 });
 
 // Pin button — cycles through showing instructions
