@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.90" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.91" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.90</title>
+  <title>Zaor Studio 0.91</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1115,7 +1115,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.90</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.91</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1138,6 +1138,7 @@
         <button id="setup-btn" title="Story Setup — premise, tone, visual style">📖</button>
         <button id="storyboard-btn" title="Storyboard director">🎬</button>
         <button id="cast-btn" title="Cast — character sheets">👥</button>
+        <button id="savegame-btn" title="Save / Load Game">💾</button>
         <button id="refresh-btn" title="Force update from GitHub">↻</button>
         <button id="api-key-btn">Set API Key</button>
       </div>
@@ -1531,6 +1532,18 @@
       <button class="btn-primary" id="setup-save" style="width:100%;">Save setup</button>
       <button class="btn-secondary" id="setup-close" style="width:100%;margin-top:8px;">Close</button>
     </div>
+  </div>
+</div>
+
+<!-- Save / Load Game Modal -->
+<div class="modal-overlay" id="savegame-overlay">
+  <div class="modal" style="max-width:520px;width:92%;max-height:85vh;overflow-y:auto;">
+    <h2 style="margin-bottom:4px;">💾 Save / Load Game</h2>
+    <p style="margin-bottom:12px;">Save the current game as a code — story, cast, Story Setup, and storyboard settings. Images/videos are <em>not</em> included (save those separately); frames regenerate as you continue. Paste a code to recreate a game in a new thread.</p>
+    <button class="btn-primary" id="savegame-make" style="width:100%;">💾 Save this game → copy code</button>
+    <textarea id="savegame-code" placeholder="Your game code appears here when you save — or paste a code here to load." style="width:100%;min-height:120px;margin:10px 0;font-family:monospace;font-size:11px;"></textarea>
+    <button class="btn-primary" id="savegame-load" style="width:100%;">📂 Load game from code</button>
+    <button class="btn-secondary" id="savegame-close" style="width:100%;margin-top:8px;">Close</button>
   </div>
 </div>
 
@@ -3857,6 +3870,24 @@ async function uploadToCloudinary(src, altText, btn, mediaType = 'image') {
   }
 }
 
+// Returns a hosted https URL for a source. If it's already hosted, returns as-is.
+// If it's a data:/blob: image (e.g. some Atlas/Z-Image outputs), uploads to Cloudinary to get one.
+async function ensureHostedUrl(src) {
+  if (typeof src === 'string' && /^https?:\/\//i.test(src)) return src;
+  if (!cloudinaryCloud || !cloudinaryPreset) {
+    throw new Error('This frame isn\'t a hosted URL yet. Set up Cloudinary (Set API Key), or tap ☁ Cloud on the frame first, then animate.');
+  }
+  let fileVal = src;
+  if (typeof src === 'string' && src.startsWith('blob:')) fileVal = await (await fetch(src)).blob();
+  const form = new FormData();
+  form.append('file', fileVal);
+  form.append('upload_preset', cloudinaryPreset);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudinaryCloud}/image/upload`, { method: 'POST', body: form });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.secure_url) throw new Error('Cloudinary upload failed: ' + (data.error?.message || res.status));
+  return data.secure_url;
+}
+
 async function saveImageToFiles(src, altText) {
   const safeName = (altText || 'image').slice(0, 40).replace(/[^a-z0-9]/gi, '_').toLowerCase();
   const filename = `aurora_${safeName}_${Date.now()}.png`;
@@ -4498,7 +4529,16 @@ function fillStoryboardCard(card, src, videoPrompt, reason, frameId, modelLabel)
         vidPanelOuter.innerHTML = '';
         vidPanelOpen = false;
         animBtn.disabled = true;
-        await generateVideo(p || videoPrompt || 'cinematic motion, smooth camera movement', src, engine, null, duration, resolution);
+        const origTxt = animBtn.textContent;
+        try {
+          animBtn.textContent = '▶ Preparing…';
+          const hosted = await ensureHostedUrl(src);
+          animBtn.textContent = origTxt;
+          await generateVideo(p || videoPrompt || 'cinematic motion, smooth camera movement', hosted, engine, null, duration, resolution);
+        } catch (e) {
+          animBtn.textContent = origTxt;
+          appendError(e.message);
+        }
         animBtn.disabled = false;
       }, false, videoPrompt || '');
       vidPanelOuter.innerHTML = '';
@@ -4741,6 +4781,85 @@ document.getElementById('setup-save')?.addEventListener('click', () => {
   saveStorySetup(setup);
   if (setup.characters) mergeCastFromDirector(setup.characters); // seed cast (adds only new names)
   setupOverlay.classList.remove('open');
+});
+
+// ═══════════════════════════════════════════════════════
+// SAVE / LOAD GAME (string code — story + cast + setup + storyboard settings; media excluded)
+// ═══════════════════════════════════════════════════════
+function serializeGame() {
+  const t = getCurrentThread();
+  if (!t) return null;
+  const payload = {
+    v: 1,
+    name: t.name || 'Saved Game',
+    history: t.history || [],
+    cast: t.cast || [],
+    setup: t.setup || {},
+    sb: { model: storyboardModel, ratio: storyboardRatio, on: storyboardOn }
+  };
+  const json = JSON.stringify(payload);
+  return 'ZAOR1:' + btoa(unescape(encodeURIComponent(json))); // unicode-safe base64
+}
+
+function deserializeGame(code) {
+  let raw = (code || '').trim();
+  if (raw.startsWith('ZAOR1:')) raw = raw.slice(6);
+  let json;
+  try { json = decodeURIComponent(escape(atob(raw))); }
+  catch (e) { throw new Error('not a valid game code'); }
+  const payload = JSON.parse(json);
+  if (!payload || !Array.isArray(payload.history)) throw new Error('missing story data');
+  return payload;
+}
+
+function loadGame(payload) {
+  const thread = createThread(payload.name || 'Saved Game');
+  thread.history = payload.history || [];
+  thread.cast = payload.cast || [];
+  thread.setup = payload.setup || {};
+  // Rebuild a readable transcript from history (media isn't saved; frames regenerate as you continue)
+  thread.messages = (payload.history || [])
+    .filter(h => h && typeof h.content === 'string' && h.content.trim())
+    .map(h => ({ role: h.role === 'user' ? 'user' : 'assistant', type: 'text', content: h.content }));
+  saveThread(thread);
+  // Restore storyboard settings
+  if (payload.sb) {
+    if (payload.sb.model) { storyboardModel = payload.sb.model; localStorage.setItem('zaor_sb_model', storyboardModel); }
+    if (payload.sb.ratio) { storyboardRatio = payload.sb.ratio; localStorage.setItem('zaor_sb_ratio', storyboardRatio); }
+    storyboardOn = !!payload.sb.on; localStorage.setItem('zaor_sb_on', storyboardOn ? '1' : '0');
+    try { updateStoryboardBtn(); } catch (e) {}
+  }
+  loadThread(thread.id);
+}
+
+const savegameOverlay = document.getElementById('savegame-overlay');
+document.getElementById('savegame-btn')?.addEventListener('click', () => {
+  document.getElementById('savegame-code').value = '';
+  savegameOverlay.classList.add('open');
+});
+document.getElementById('savegame-close')?.addEventListener('click', () => savegameOverlay.classList.remove('open'));
+savegameOverlay?.addEventListener('click', e => { if (e.target === savegameOverlay) savegameOverlay.classList.remove('open'); });
+document.getElementById('savegame-make')?.addEventListener('click', async () => {
+  const code = serializeGame();
+  if (!code) { appendError('No game to save yet — start a story first.'); return; }
+  const ta = document.getElementById('savegame-code');
+  ta.value = code;
+  try { await navigator.clipboard.writeText(code); } catch (e) {}
+  const b = document.getElementById('savegame-make');
+  const o = b.textContent;
+  b.textContent = '✓ Saved · code copied';
+  setTimeout(() => { b.textContent = o; }, 2000);
+});
+document.getElementById('savegame-load')?.addEventListener('click', () => {
+  const code = document.getElementById('savegame-code').value.trim();
+  if (!code) { appendError('Paste a game code first.'); return; }
+  try {
+    const payload = deserializeGame(code);
+    loadGame(payload);
+    savegameOverlay.classList.remove('open');
+  } catch (e) {
+    appendError('Couldn\'t load that code: ' + e.message);
+  }
 });
 
 function openModal(type) {
