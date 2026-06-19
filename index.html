@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.99" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 1.00" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.99</title>
+  <title>Zaor Studio 1.00</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1173,7 +1173,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.99</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.00</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -3006,14 +3006,22 @@ async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progres
   const ratio  = document.getElementById('vid-ratio-select')?.value || '16:9';
   if (!apiKey) throw new Error('xAI API key required for Aurora. Tap "Set API Key" to add it.');
 
-  // Mode is determined by which input field is set. xAI grok-imagine-video supports 1–15s.
+  // Mode is determined by which input field is set. xAI grok-imagine-video supports 1–15s for generation.
   const duration = Math.min(isNaN(durRaw) ? 4 : durRaw, 15);
-  const xaiBody = { model: 'grok-imagine-video', prompt, duration, resolution: res };
   let label = 'Aurora T2V';
+  let xaiBody, xaiEndpoint;
   if (extendVideoUrl) {
-    xaiBody.video = { url: extendVideoUrl };
+    // Extend uses a DEDICATED endpoint (/v1/videos/extensions), not /v1/videos/generations.
+    // Field is video_url (string), NOT video:{url}. Extend duration range is 2-10s.
+    // No resolution param — output dimensions are inherited from the source video.
+    xaiEndpoint = 'https://api.x.ai/v1/videos/extensions';
+    xaiBody = { model: 'grok-imagine-video', prompt, video_url: extendVideoUrl, duration: Math.min(Math.max(duration, 2), 10) };
     label = 'Aurora Extend';
-  } else if (imageDataUrl) {
+  } else {
+    xaiEndpoint = 'https://api.x.ai/v1/videos/generations';
+    xaiBody = { model: 'grok-imagine-video', prompt, duration, resolution: res };
+  }
+  if (!extendVideoUrl && imageDataUrl) {
     let imageForXai = imageDataUrl;
     // Atlas/Aliyun OSS URLs are referer-locked — xAI can't fetch them directly.
     // Fetch locally with no-referrer and convert to base64 so xAI can use the image.
@@ -3031,19 +3039,16 @@ async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progres
         throw new Error('This image is hosted by Atlas, which blocks downloads, so it can\u2019t be sent to Aurora to animate. To animate it: long-press the image to save it, then re-upload it as a new image \u2014 or generate the image with an Aurora model, which animates directly.');
       }
     }
-    // xAI accepts { url } for hosted images and { b64 } for base64 data URLs
-    if (imageForXai.startsWith('data:')) {
-      const b64 = imageForXai.split(',')[1];
-      xaiBody.image = { b64 };
-    } else {
-      xaiBody.image = { url: imageForXai };
-    }
+    // xAI image-to-video only accepts { url: <string> } — the string can be
+    // either a hosted https:// URL OR a data:...;base64,... URI. There is no
+    // separate b64 key in xAI's schema (confirmed against xAI's own docs).
+    xaiBody.image = { url: imageForXai };
     label = 'Aurora I2V';
-  } else {
+  } else if (!extendVideoUrl) {
     xaiBody.aspect_ratio = ratio;
   }
 
-  const submit = await fetch('https://api.x.ai/v1/videos/generations', {
+  const submit = await fetch(xaiEndpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify(xaiBody)
