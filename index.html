@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.98" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio 0.99" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 0.98</title>
+  <title>Zaor Studio 0.99</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1173,7 +1173,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.98</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v0.99</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1289,6 +1289,7 @@
             <option value="fluxkontext">Flux Kontext · WaveSpeed — $0.02</option>
             <option value="wan27" selected>Wan 2.7 Edit · WaveSpeed — $0.03</option>
             <option value="wan27pro">Wan 2.7 Pro Edit · WaveSpeed — $0.06</option>
+            <option value="klein9b-edit-lora">Flux.2 Klein 9B Edit · WaveSpeed · LoRA — $0.021</option>
             <option value="atlas-flux-kontext">Flux Kontext · Atlas · uncensored — $0.025</option>
             <option value="atlas-qwen-edit">Qwen Edit · Atlas — $0.02</option>
             <option value="aurora-simple">Aurora Simple Edit · xAI — ~$0.02</option>
@@ -1503,7 +1504,7 @@
 <div class="modal-overlay" id="lora-overlay">
   <div class="modal" style="max-width:560px;width:92%;max-height:85vh;display:flex;flex-direction:column;">
     <h2 style="margin-bottom:4px;">🧬 LoRA Manager</h2>
-    <p style="margin-bottom:10px;">Save a LoRA once (link + trigger word), then tick up to 3 to apply. Works with the <b>Flux Dev + LoRA</b> and <b>Z-Image Turbo + LoRA</b> models. A LoRA only works on its matching base model. Trigger words are added to your prompt automatically.</p>
+    <p style="margin-bottom:10px;">Save a LoRA once (link + trigger word), then tick up to 3 to apply. Works with the <b>Flux Dev + LoRA</b>, <b>Flux.2 Klein 9B</b> (generate + edit), and <b>Z-Image Turbo + LoRA</b> models. A LoRA only works on its matching base model. Trigger words are added to your prompt automatically.</p>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
       <button class="lib-filter" id="lora-unload-all">Unload all</button>
       <button class="lib-filter" id="lora-export">⤓ Back up</button>
@@ -1518,6 +1519,7 @@
         <input type="text" id="lora-trigger" placeholder="Always-on trigger word(s), comma-separated" autocomplete="off" spellcheck="false" style="flex:1;margin-bottom:6px;" />
         <select id="lora-base" class="img-control-select" style="width:110px;margin-bottom:6px;" title="Which base model this LoRA is for">
           <option value="Flux" selected>For: Flux</option>
+          <option value="Flux2-Klein">For: Flux.2 Klein</option>
           <option value="Z-Image">For: Z-Image</option>
           <option value="Other">For: Other</option>
         </select>
@@ -1822,6 +1824,12 @@ const MODEL_REGISTRY = {
   'chroma':         { cat:'t2img', label:'Chroma uncensored · WaveSpeed', provider:'wavespeed', path:'wavespeed-ai/chroma', price:0.015, verified:true,
     buildBody:p=>{
       return { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, output_format:'png', enable_base64_output:false, enable_sync_mode:false };
+    } },
+  'klein9b-lora':   { cat:'t2img', label:'Flux.2 Klein 9B · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/flux-2-klein-9b/text-to-image-lora', price:0.015, verified:true, lora:true, loraBase:'Flux2-Klein',
+    buildBody:p=>{
+      const b = { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, enable_safety_checker:false, enable_base64_output:false };
+      if (p.loras && p.loras.length) b.loras = p.loras.slice(0,3).map(l=>({ path:l.path, scale:Number(l.scale)||1 }));
+      return b;
     } },
   'atlas-flux-dev': { cat:'t2img', label:'Flux Dev · Atlas', provider:'atlas', path:'black-forest-labs/flux-dev', price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
@@ -2653,20 +2661,29 @@ async function runEdit(fullPrompt, imageUrl, editModel) {
     return { src: resultUrl, hostedUrl: resultUrl, modelLabel: (editModel === 'atlas-flux-kontext') ? 'Flux Kontext Edit · Atlas' : 'Qwen Edit · Atlas' };
 
   } else {
-    // ── WaveSpeed edits (Wan / Qwen / Flux Kontext) ──
+    // ── WaveSpeed edits (Wan / Qwen / Flux Kontext / Klein 9B LoRA) ──
     if (!wavespeedKey) throw new Error('WaveSpeed API key required for Wan edit. Tap "Set API Key" to add it.');
+    // LoRA injection for LoRA-capable edit models (Klein 9B). Only Flux2-Klein-base (or untagged) LoRAs apply.
+    let editLoras = [];
+    if (editModel === 'klein9b-edit-lora') {
+      editLoras = activeLoras()
+        .filter(l => !l.base || l.base === 'Other' || l.base === 'Flux2-Klein')
+        .map(l => ({ path: l.url, scale: Number(l.scale) || 1 }))
+        .slice(0, 3);
+    }
     const wsModels = {
       wan27pro:    { path: 'alibaba/wan-2.7/image-edit-pro',          body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
       wan27:       { path: 'alibaba/wan-2.7/image-edit',              body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
       fluxkontext: { path: 'wavespeed-ai/flux-kontext-dev-ultra-fast', body: { prompt: fullPrompt, image: imageUrl, seed: -1, enable_safety_checker: false } },
       qwen2:       { path: 'wavespeed-ai/qwen-image-2.0/edit',        body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false } },
       qwen:        { path: 'wavespeed-ai/qwen-image/edit',            body: { prompt: fullPrompt, image: imageUrl, seed: -1, enable_safety_checker: false }, timeout: 180000 },
+      'klein9b-edit-lora': { path: 'wavespeed-ai/flux-2-klein-9b/edit-lora', body: { prompt: fullPrompt, images: [imageUrl], seed: -1, enable_safety_checker: false, loras: editLoras } },
     };
     const wsModel = wsModels[editModel] || wsModels.qwen;
     const { path: wsPath, body: wsBody, timeout: wsTimeout = 120000 } = wsModel;
     const resultUrl = await callWaveSpeed(wsPath, wsBody, wsTimeout, 3000);
     if (!resultUrl) throw new Error('Edit timed out');
-    const editLabels = { wan27pro: 'Wan 2.7 Pro Edit', wan27: 'Wan 2.7 Edit', fluxkontext: 'Flux Kontext Edit', qwen2: 'Qwen 2.0 Edit', qwen: 'Qwen Edit' };
+    const editLabels = { wan27pro: 'Wan 2.7 Pro Edit', wan27: 'Wan 2.7 Edit', fluxkontext: 'Flux Kontext Edit', qwen2: 'Qwen 2.0 Edit', qwen: 'Qwen Edit', 'klein9b-edit-lora': 'Flux.2 Klein 9B Edit · LoRA' };
     return { src: resultUrl, hostedUrl: resultUrl, modelLabel: editLabels[editModel] || 'Qwen Edit' };
   }
 }
@@ -3912,6 +3929,7 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
         <option value="qwen">Qwen Edit · WaveSpeed — $0.02</option>
         <option value="wan27">Wan 2.7 — $0.03</option>
         <option value="wan27pro">Wan 2.7 Pro Edit · WaveSpeed — $0.06</option>
+        <option value="klein9b-edit-lora">Flux.2 Klein 9B Edit · LoRA — $0.021</option>
         <option value="aurora">Aurora Edit · xAI — ~$0.04</option>
       `;
 
@@ -5491,7 +5509,7 @@ function updateCostEstimate() {
   } else if (editMode) {
     // Edit = input image + output image
     const editMod = document.getElementById('edit-model-select')?.value || 'wan27';
-    const editCostMap = { aurora: '~$0.04', 'aurora-simple': '~$0.02', wan27pro: '$0.06', wan27: '$0.03', fluxkontext: '$0.02', qwen2: '$0.03', qwen: '$0.02', 'atlas-flux-kontext': '$0.025', 'atlas-qwen-edit': '$0.02' };
+    const editCostMap = { aurora: '~$0.04', 'aurora-simple': '~$0.02', wan27pro: '$0.06', wan27: '$0.03', fluxkontext: '$0.02', qwen2: '$0.03', qwen: '$0.02', 'klein9b-edit-lora': '$0.021', 'atlas-flux-kontext': '$0.025', 'atlas-qwen-edit': '$0.02' };
     el.textContent = editCostMap[editMod] || '$0.02';
     modeText.textContent = 'Edit image mode';
 
