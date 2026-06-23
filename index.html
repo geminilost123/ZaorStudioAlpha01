@@ -1173,7 +1173,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.00</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.01</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -2054,15 +2054,107 @@ const sidebarBack   = document.getElementById('sidebar-backdrop');
 // ═══════════════════════════════════════════════════════
 // STORAGE HELPERS
 // ═══════════════════════════════════════════════════════
+// ── Persistent storage: IndexedDB with an in-memory cache ──
+// Threads are held in memory (threadsCache) so getThreads()/saveThreads() stay
+// SYNCHRONOUS — no existing call site changes. Writes flush through to IndexedDB
+// asynchronously. IndexedDB has no practical 5MB cap, so heavy image/video
+// sessions no longer crash the way localStorage did. The whole thread array is
+// stored as ONE value under a single key (open-the-locker-once, save-as-one-piece),
+// which can't half-write or lose data mid-save. Boot awaits initThreadStorage()
+// before the first render (see the boot block lower in this file).
+const THREADS_KEY = 'gs_threads';
+
+const idbKV = (() => {
+  let dbPromise = null;
+  function openDB() {
+    if (!dbPromise) {
+      dbPromise = new Promise((resolve, reject) => {
+        let req;
+        try { req = indexedDB.open('zaor-studio', 1); }
+        catch (e) { return reject(e); }
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    return dbPromise;
+  }
+  function run(mode, fn) {
+    return openDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction('kv', mode);
+      const store = tx.objectStore('kv');
+      let req;
+      try { req = fn(store); } catch (e) { return reject(e); }
+      tx.oncomplete = () => resolve(req ? req.result : undefined);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    }));
+  }
+  return {
+    get: (k) => run('readonly',  s => s.get(k)),
+    set: (k, v) => run('readwrite', s => s.put(v, k)),
+    del: (k) => run('readwrite', s => s.delete(k)),
+  };
+})();
+
+let threadsCache = [];
+let idbReady = false;
+
+// One-time boot load + migration from legacy localStorage. Await before first render.
+async function initThreadStorage() {
+  try {
+    const stored = await idbKV.get(THREADS_KEY);
+    if (Array.isArray(stored)) {
+      threadsCache = stored;
+      idbReady = true;
+      try { localStorage.removeItem(THREADS_KEY); } catch (e) {} // drop stale legacy copy
+      return;
+    }
+    // No IndexedDB data yet — migrate legacy localStorage threads if any exist.
+    let legacy = [];
+    try { legacy = JSON.parse(localStorage.getItem(THREADS_KEY) || '[]'); } catch (e) { legacy = []; }
+    threadsCache = Array.isArray(legacy) ? legacy : [];
+    idbReady = true;
+    if (threadsCache.length) {
+      await idbKV.set(THREADS_KEY, threadsCache);          // copy old data into IndexedDB
+      try { localStorage.removeItem(THREADS_KEY); } catch (e) {} // free the old 5MB slot
+    }
+  } catch (e) {
+    // IndexedDB blocked/unavailable (e.g. private mode) — fall back to localStorage.
+    console.error('[Zaor storage init]', e && (e.stack || e.message));
+    idbReady = false;
+    try { threadsCache = JSON.parse(localStorage.getItem(THREADS_KEY) || '[]'); }
+    catch (e2) { threadsCache = []; }
+  }
+}
+
+// Returns a COPY each call, matching the previous JSON.parse behaviour so that
+// read-modify-write patterns (and code that reads without saving) behave exactly
+// as before — no accidental shared-reference mutations.
 function getThreads() {
-  try { return JSON.parse(localStorage.getItem('gs_threads') || '[]'); }
-  catch { return []; }
+  const src = Array.isArray(threadsCache) ? threadsCache : [];
+  try { return structuredClone(src); }
+  catch (e) {
+    try { return JSON.parse(JSON.stringify(src)); } catch (e2) { return []; }
+  }
 }
 
 function saveThreads(threads) {
-  try { localStorage.setItem('gs_threads', JSON.stringify(threads)); }
-  catch(e) {
-    if (e.name === 'QuotaExceededError') appendError('Storage full — save images to Files to free space.');
+  threadsCache = Array.isArray(threads) ? threads : [];
+  if (idbReady) {
+    idbKV.set(THREADS_KEY, threadsCache).catch(e => {
+      console.error('[Zaor storage save]', e && (e.stack || e.message));
+      appendError('Could not save locally — your latest changes may not persist.');
+    });
+  } else {
+    // Fallback when IndexedDB is unavailable.
+    try { localStorage.setItem(THREADS_KEY, JSON.stringify(threadsCache)); }
+    catch (e) {
+      if (e.name === 'QuotaExceededError') appendError('Storage full — save images to Files to free space.');
+    }
   }
 }
 
@@ -2087,16 +2179,29 @@ function newThreadId() {
 }
 
 function updateStorageInfo() {
-  try {
-    let used = 0;
-    for (let k in localStorage) {
-      if (localStorage.hasOwnProperty(k)) used += localStorage[k].length * 2;
-    }
-    const mb = (used / 1024 / 1024).toFixed(1);
-    storageInfo.textContent = `${mb} MB used locally`;
+  const setText = (txt) => {
+    try { storageInfo.textContent = txt; } catch (e) {}
     const mEl = document.getElementById('storage-usage-modal');
-    if (mEl) mEl.textContent = `${mb} MB used locally`;
-  } catch { storageInfo.textContent = ''; }
+    if (mEl) mEl.textContent = txt;
+  };
+  // Prefer the browser's own estimate of on-device usage (covers IndexedDB).
+  if (navigator.storage && navigator.storage.estimate) {
+    navigator.storage.estimate().then(est => {
+      const mb = ((est.usage || 0) / 1024 / 1024).toFixed(1);
+      setText(`${mb} MB used locally`);
+    }).catch(() => {
+      // Fallback: size the in-memory thread cache.
+      try {
+        const mb = (JSON.stringify(threadsCache).length * 2 / 1024 / 1024).toFixed(1);
+        setText(`${mb} MB used locally`);
+      } catch (e) { setText(''); }
+    });
+  } else {
+    try {
+      const mb = (JSON.stringify(threadsCache).length * 2 / 1024 / 1024).toFixed(1);
+      setText(`${mb} MB used locally`);
+    } catch (e) { setText(''); }
+  }
 }
 
 // Strip heavy media (image/video messages + base64 vision frames) from saved threads.
@@ -2127,6 +2232,8 @@ function clearStoredMedia() {
 }
 
 function clearAllChats() {
+  threadsCache = [];
+  if (idbReady) { idbKV.del(THREADS_KEY).catch(e => console.error('[Zaor clearAll]', e)); }
   try { localStorage.removeItem('gs_threads'); } catch(e) {}
 }
 
@@ -2335,19 +2442,30 @@ document.getElementById('img-model-select')?.addEventListener('change', updateFl
 try { updateFluxAdvancedRow(); } catch(e) {}
 try { updateCostEstimate(); } catch (e) { console.error('[Zaor INIT cost]', e && (e.stack || e.message)); }
 
-// Load most recent thread or create one
-try {
-  const existing = getThreads();
-  if (existing.length > 0) {
-    loadThread(existing[0].id);
-  } else {
-    createThread('New Game');
+// Load most recent thread or create one.
+// IndexedDB is async, so we await initThreadStorage() before the first render.
+// renderThreadList() refreshes the sidebar once the cache is populated.
+(async () => {
+  try {
+    await initThreadStorage();
+  } catch (e) {
+    console.error('[Zaor INIT storage]', e && (e.stack || e.message));
   }
-} catch (e) {
-  console.error('[Zaor INIT thread]', e && (e.stack || e.message));
-  // Recover into a usable empty state so the app still works
-  try { createThread('New Game'); } catch (e2) { console.error('[Zaor INIT recover]', e2 && (e2.stack || e2.message)); }
-}
+  try {
+    const existing = getThreads();
+    if (existing.length > 0) {
+      loadThread(existing[0].id);
+    } else {
+      createThread('New Game');
+    }
+    try { renderThreadList(); } catch (e) {}
+    try { updateStorageInfo(); } catch (e) {}
+  } catch (e) {
+    console.error('[Zaor INIT thread]', e && (e.stack || e.message));
+    // Recover into a usable empty state so the app still works
+    try { createThread('New Game'); } catch (e2) { console.error('[Zaor INIT recover]', e2 && (e2.stack || e2.message)); }
+  }
+})();
 
 // ═══════════════════════════════════════════════════════
 // INPUT
