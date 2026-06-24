@@ -1096,7 +1096,7 @@
     #storyboard-btn.active { background: rgba(201,184,232,0.2); border-color: var(--lavender); }
 
     /* Visible header icon buttons + overflow ("More") menu */
-    #storyboard-btn, #menu-btn {
+    #storyboard-btn, #menu-btn, #style-lock-btn {
       background: transparent;
       border: 1px solid rgba(255,255,255,0.1);
       color: var(--text-dim);
@@ -1108,7 +1108,30 @@
       transition: all 0.2s;
       flex-shrink: 0;
     }
-    #storyboard-btn:hover, #menu-btn:hover { border-color: var(--lavender); color: var(--lavender); }
+    #storyboard-btn:hover, #menu-btn:hover, #style-lock-btn:hover { border-color: var(--lavender); color: var(--lavender); }
+    #style-lock-btn.open { border-color: var(--lavender); color: var(--lavender); background: rgba(201,184,232,0.12); }
+    #style-lock-btn.lock-on { border-color: #7ee0a8; color: #7ee0a8; background: rgba(126,224,168,0.14); }
+
+    /* Circular "Zaor" badge next to the burger */
+    #zaor-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 5px 14px; border-radius: 999px;
+      border: 1.5px solid var(--lavender); color: var(--lavender);
+      font-family: Georgia, 'Times New Roman', serif; font-size: 14px; font-weight: 600; letter-spacing: 0.4px;
+      flex-shrink: 0; white-space: nowrap; user-select: none;
+    }
+
+    /* Style Lock panel — now lives at the TOP of the screen, toggled by the header 🔒 button */
+    #style-lock-panel {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px 14px;
+      background: var(--surface);
+      border-bottom: 1px solid rgba(185,167,240,0.22);
+    }
+    #style-lock-panel.open { display: flex; }
+
     #menu-btn.open { border-color: var(--lavender); color: var(--lavender); }
     .menu-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
     .overflow-menu {
@@ -1244,7 +1267,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.12</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.13</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1256,11 +1279,13 @@
   <div id="main">
     <header>
       <button id="sidebar-toggle" title="Games">☰</button>
-      <span class="thread-label" id="thread-label">New Game</span>
+      <span id="zaor-badge" title="Zaor">Zaor</span>
+      <span class="thread-label" id="thread-label" style="display:none;">New Game</span>
       <div class="header-right">
-        <select id="model-select">
+        <select id="model-select" style="display:none;">
           <option value="grok-4.3" selected>Zaor</option>
         </select>
+        <button id="style-lock-btn" title="Style Lock">🔒</button>
         <button id="pe-btn" title="Prompt Engineer mode">✦ PE</button>
         <button id="storyboard-btn" title="Storyboard director">🎬</button>
         <div class="menu-wrap">
@@ -1278,6 +1303,18 @@
         </div>
       </div>
     </header>
+
+    <div id="style-lock-panel">
+      <div class="style-lock-header">
+        <span class="style-lock-label">🔒 Style Lock</span>
+        <span id="style-lock-badge" class="style-lock-active-badge">Inactive</span>
+      </div>
+      <textarea id="style-lock-input" rows="1" placeholder="e.g. 1980s Frank Miller ink style, high contrast, gritty…"></textarea>
+      <div class="style-lock-btns">
+        <button class="save-btn" id="style-lock-set-btn">🔒 Lock Style</button>
+        <button class="save-btn" id="style-lock-clear-btn">✕ Clear</button>
+      </div>
+    </div>
 
     <div id="pe-model-row">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:0 14px 6px;">
@@ -1339,17 +1376,6 @@
 
     <div id="input-area">
       <div id="mode-indicator"><span id="mode-label-text">Chat mode</span><span id="cost-estimate"></span></div>
-      <div id="style-lock-row">
-        <div class="style-lock-header">
-          <span class="style-lock-label">Style Lock</span>
-          <span id="style-lock-badge" class="style-lock-active-badge">Active</span>
-        </div>
-        <textarea id="style-lock-input" rows="1" placeholder="e.g. 1980s Frank Miller ink style, high contrast, gritty…"></textarea>
-        <div class="style-lock-btns">
-          <button class="save-btn" id="style-lock-set-btn">🔒 Lock Style</button>
-          <button class="save-btn" id="style-lock-clear-btn">✕ Clear</button>
-        </div>
-      </div>
       <div id="upload-edit-row" style="display:flex;gap:6px;margin-bottom:6px;padding:0 4px;flex-wrap:wrap;align-items:center;">
         <button id="upload-img-btn" class="edit-img-btn visible" title="Upload an image to edit or animate">🖼 Upload Image</button>
         <button id="sb-frame-btn" class="edit-img-btn" style="display:none;" title="Generate a storyboard frame from the latest story beat">🎬 Generate Frame</button>
@@ -5616,6 +5642,9 @@ function updateStyleBadge() {
       b.title = (styleLockActive && lockedStyle.trim()) ? 'Apply active style lock' : 'No style lock active — lock a style first';
     }
   });
+  // Reflect lock state on the header 🔒 button (green when a style is locked)
+  const headerBtn = document.getElementById('style-lock-btn');
+  if (headerBtn) headerBtn.classList.toggle('lock-on', !!(styleLockActive && lockedStyle.trim()));
 }
 
 document.getElementById('style-lock-set-btn')?.addEventListener('click', () => {
@@ -5646,6 +5675,16 @@ document.getElementById('style-lock-clear-btn')?.addEventListener('click', () =>
   const input = document.getElementById('style-lock-input');
   if (input) input.value = '';
   updateStyleBadge();
+});
+
+// Header 🔒 button toggles the Style Lock panel at the top of the screen
+document.getElementById('style-lock-btn')?.addEventListener('click', () => {
+  const panel = document.getElementById('style-lock-panel');
+  const btn = document.getElementById('style-lock-btn');
+  if (!panel) return;
+  const open = panel.classList.toggle('open');
+  btn?.classList.toggle('open', open);
+  if (open) { const ta = document.getElementById('style-lock-input'); setTimeout(() => ta?.focus(), 50); }
 });
 
 // Init style lock UI
