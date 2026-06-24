@@ -1219,7 +1219,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.02</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.03</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1548,9 +1548,9 @@
 
 <!-- LoRA Manager Modal (redesigned) -->
 <div class="modal-overlay" id="lora-overlay">
-  <div class="modal" style="max-width:560px;width:92%;max-height:88vh;display:flex;flex-direction:column;">
-    <h2 style="margin-bottom:4px;">🧬 LoRA Manager</h2>
-    <p style="margin-bottom:12px;font-size:12.5px;">Tether custom weights from Hugging Face / Civitai. Up to <b>3</b> active at once. Each LoRA only fires on its matching base model — turning one on drops its trigger words straight into your prompt, where you can edit or delete them.</p>
+  <div class="modal" style="max-width:720px;width:95%;max-height:94vh;padding:18px 14px 14px;display:flex;flex-direction:column;">
+    <h2 style="margin-bottom:10px;flex-shrink:0;">🧬 LoRA Manager</h2>
+    <div id="lora-scroll" style="overflow-y:auto;flex:1;padding:0 4px;-webkit-overflow-scrolling:touch;">
 
     <!-- ACTIVE STRIP -->
     <div id="lora-active-wrap">
@@ -1578,7 +1578,7 @@
       <button class="lora-tab" data-filter="style">Style</button>
     </div>
 
-    <div id="lora-list" style="overflow-y:auto;flex:1;margin:8px 0 4px;"></div>
+    <div id="lora-list" style="margin:8px 0 4px;"></div>
 
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
       <button class="lib-filter" id="lora-unload-all">Turn all off</button>
@@ -1606,7 +1606,9 @@
       </select>
       <input type="text" id="lora-notes" placeholder="Notes / hint (optional) — e.g. recommended weight & what it does" autocomplete="off" style="margin-bottom:6px;" />
     </details>
-    <div class="modal-btns" style="margin-top:8px;">
+
+    </div><!-- /#lora-scroll -->
+    <div class="modal-btns" style="margin-top:10px;flex-shrink:0;">
       <button class="btn-secondary" id="lora-close">Close</button>
       <button class="btn-primary" id="lora-add">+ Add LoRA</button>
     </div>
