@@ -464,6 +464,30 @@
     }
     #input-area.image-mode #img-mode-row { display: flex; }
 
+    /* Edit mode — its own dedicated toolbar, separate from text-to-image */
+    #edit-mode-row {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 7px;
+      padding: 0 4px;
+    }
+    #input-area.edit-mode #edit-mode-row { display: flex; }
+    #input-area.edit-mode #img-mode-row { display: none !important; }
+    #input-area.edit-mode #vid-mode-row { display: none !important; }
+    #input-area.edit-mode #style-lock-row { display: none !important; }
+    #input-area.edit-mode { border-top-color: rgba(185,167,240,0.4); }
+    #input-area.edit-mode .input-row:focus-within { border-color: var(--lavender); box-shadow: 0 0 0 3px rgba(185,167,240,0.22); }
+    #input-area.edit-mode #send-btn { background: var(--lavender); color: #1a1a2e; }
+    #input-area.edit-mode #mode-indicator { color: var(--lavender); }
+    #input-area.edit-mode #cost-estimate { display: inline-block; }
+    #edit-toggle {
+      background: none; border: none; cursor: pointer; font-size: 17px;
+      padding: 6px 8px; border-radius: 9px; opacity: 0.65; transition: all 0.15s;
+    }
+    #edit-toggle:hover { opacity: 1; background: rgba(185,167,240,0.12); }
+    #edit-toggle.active { background: rgba(185,167,240,0.2); color: var(--lavender); opacity: 1; }
+
     .mode-label { font-size: 11px; color: var(--text-dim); letter-spacing: 0.05em; text-transform: uppercase; }
 
     #send-btn {
@@ -1220,7 +1244,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.10</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.12</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1329,34 +1353,12 @@
       <div id="upload-edit-row" style="display:flex;gap:6px;margin-bottom:6px;padding:0 4px;flex-wrap:wrap;align-items:center;">
         <button id="upload-img-btn" class="edit-img-btn visible" title="Upload an image to edit or animate">🖼 Upload Image</button>
         <button id="sb-frame-btn" class="edit-img-btn" style="display:none;" title="Generate a storyboard frame from the latest story beat">🎬 Generate Frame</button>
-        <div id="edit-btn-row" style="display:none;gap:6px;align-items:center;">
-          <button id="edit-img-btn" class="edit-img-btn visible" title="Edit last image">✏️ Edit</button>
-          <select id="edit-model-select" class="img-control-select" title="Edit model">
-            <option value="qwen2">Qwen 2.0 Edit · WaveSpeed — $0.03</option>
-            <option value="qwen">Qwen Edit · WaveSpeed — $0.02</option>
-            <option value="fluxkontext">Flux Kontext · WaveSpeed — $0.02</option>
-            <option value="wan27" selected>Wan 2.7 Edit · WaveSpeed — $0.03</option>
-            <option value="wan27pro">Wan 2.7 Pro Edit · WaveSpeed — $0.06</option>
-            <option value="klein9b-edit-lora">Flux.2 Klein 9B Edit · WaveSpeed · LoRA — $0.021</option>
-            <option value="z-image-i2i-lora">Z-Image i2i · WaveSpeed · LoRA — $0.01</option>
-            <option value="z-image-i2i">Z-Image i2i · WaveSpeed — $0.005</option>
-            <option value="atlas-flux-kontext">Flux Kontext · Atlas · uncensored — $0.025</option>
-            <option value="atlas-qwen-edit">Qwen Edit · Atlas — $0.02</option>
-            <option value="aurora-simple">Aurora Simple Edit · xAI — ~$0.02</option>
-            <option value="aurora">Aurora Quality Edit · xAI — ~$0.04</option>
-          </select>
-          <div id="zimg-strength-wrap" style="display:none;align-items:center;gap:6px;">
-            <span style="font-size:11px;color:var(--text-dim);">strength</span>
-            <input type="range" id="zimg-strength" min="0.1" max="1" step="0.05" value="0.6" style="width:90px;" title="Z-Image transform strength: low = subtle/enhance, high = reimagine" />
-            <span id="zimg-strength-val" style="font-family:ui-monospace,monospace;font-size:11px;color:var(--lavender);">0.6</span>
-          </div>
-        </div>
       </div>
-      <div style="font-size:11px;color:var(--text-dim);margin-top:-4px;margin-bottom:8px;line-height:1.4;">These are the edit models. Chroma and the other text-to-image models are generate-only — find them in the Image tab.</div>
       <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/webp" style="display:none;" />
       <div class="input-row">
         <textarea id="prompt" rows="1" placeholder="Say something…"></textarea>
         <button id="img-toggle" title="Toggle image generation">🎨</button>
+        <button id="edit-toggle" title="Edit an image">✏️</button>
         <button id="vid-toggle" title="Toggle video generation">🎥</button>
         <button id="enhance-toggle" title="Enhancement tools">✨</button>
         <button id="send-btn" title="Send">
@@ -1418,6 +1420,35 @@
             <b>Steps</b>: 28 default · 36–45 for tricky anatomy (slower). &nbsp;<b>Guidance</b>: 3–4 sweet spot · higher = more literal, can over-cook.
           </div>
         </div>
+      </div>
+      <div id="edit-mode-row">
+        <div class="img-controls-row">
+          <div class="img-control-group" style="flex:1;min-width:180px;">
+            <span class="mode-label">Edit model</span>
+            <select id="edit-model-select" class="img-control-select" title="Edit model" style="width:100%;">
+              <option value="qwen2">Qwen 2.0 Edit · WaveSpeed — $0.03</option>
+              <option value="qwen">Qwen Edit · WaveSpeed — $0.02</option>
+              <option value="fluxkontext">Flux Kontext · WaveSpeed — $0.02</option>
+              <option value="wan27" selected>Wan 2.7 Edit · WaveSpeed — $0.03</option>
+              <option value="wan27pro">Wan 2.7 Pro Edit · WaveSpeed — $0.06</option>
+              <option value="klein9b-edit-lora">Flux.2 Klein 9B Edit · WaveSpeed · LoRA — $0.021</option>
+              <option value="z-image-i2i-lora">Z-Image i2i · WaveSpeed · LoRA — $0.01</option>
+              <option value="z-image-i2i">Z-Image i2i · WaveSpeed — $0.005</option>
+              <option value="atlas-flux-kontext">Flux Kontext · Atlas · uncensored — $0.025</option>
+              <option value="atlas-qwen-edit">Qwen Edit · Atlas — $0.02</option>
+              <option value="aurora-simple">Aurora Simple Edit · xAI — ~$0.02</option>
+              <option value="aurora">Aurora Quality Edit · xAI — ~$0.04</option>
+            </select>
+          </div>
+          <div class="img-control-group" id="zimg-strength-wrap" style="display:none;">
+            <span class="mode-label">Strength</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <input type="range" id="zimg-strength" min="0.1" max="1" step="0.05" value="0.6" style="width:90px;" title="Z-Image transform strength: low = subtle/enhance, high = reimagine" />
+              <span id="zimg-strength-val" style="font-family:ui-monospace,monospace;font-size:12px;color:var(--lavender);">0.6</span>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);padding:2px 4px 0;line-height:1.45;">Pick an image (🖼 Upload, or generate one first), then describe your edit and hit send. Text-to-image models live in 🎨 Image mode.</div>
       </div>
       <div id="vid-mode-row">
         <div class="img-controls-row">
@@ -1877,9 +1908,9 @@ const MODEL_REGISTRY = {
     } },
   'atlas-flux-dev': { cat:'t2img', label:'Flux Dev · Atlas', provider:'atlas', path:'black-forest-labs/flux-dev', price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
-  'atlas-z-image-lora': { cat:'t2img', label:'Z-Image Turbo · Atlas · LoRA (fallback)', provider:'atlas', path:'z-image/turbo-lora', price:0.01, verified:false, lora:true, loraBase:'Z-Image',
+  'atlas-z-image-lora': { cat:'t2img', label:'Z-Image Turbo · Atlas · LoRA (fallback)', provider:'atlas', path:'z-image/turbo-lora', price:0.01, verified:true, lora:true, loraBase:'Z-Image',
     buildBody:p=>{ const b={ prompt:p.prompt, enable_safety_checker:false }; if(p.loras&&p.loras.length) b.loras=p.loras.slice(0,3).map(l=>({path:l.path,scale:Number(l.scale)||1})); return b; } },
-  'atlas-flux-dev-lora': { cat:'t2img', label:'Flux Dev · Atlas · LoRA (fallback)', provider:'atlas', path:'black-forest-labs/flux-dev-lora', price:0.015, verified:false, lora:true, loraBase:'Flux',
+  'atlas-flux-dev-lora': { cat:'t2img', label:'Flux Dev · Atlas · LoRA (fallback)', provider:'atlas', path:'black-forest-labs/flux-dev-lora', price:0.015, verified:true, lora:true, loraBase:'Flux',
     buildBody:p=>{ const b={ prompt:p.prompt, num_images:1, enable_safety_checker:false }; if(p.loras&&p.loras.length) b.loras=p.loras.slice(0,3).map(l=>({path:l.path,scale:Number(l.scale)||1})); return b; } },
   'atlas-flux-schnell': { cat:'t2img', label:'Flux Schnell · Atlas', provider:'atlas', path:'black-forest-labs/flux-schnell', price:0.003, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
@@ -2557,9 +2588,10 @@ function setMode(mode) {
   imgToggle?.classList.toggle('active', mode === 'image');
   document.getElementById('vid-toggle')?.classList.toggle('active', mode === 'video');
   document.getElementById('enhance-toggle')?.classList.toggle('active', mode === 'enhance');
-  document.getElementById('edit-img-btn')?.classList.toggle('active', mode === 'edit');
+  document.getElementById('edit-toggle')?.classList.toggle('active', mode === 'edit');
 
-  inputArea?.classList.toggle('image-mode', mode === 'image' || mode === 'edit');
+  inputArea?.classList.toggle('image-mode', mode === 'image');
+  inputArea?.classList.toggle('edit-mode', mode === 'edit');
   inputArea?.classList.toggle('video-mode', mode === 'video');
   inputArea?.classList.toggle('enhance-mode', mode === 'enhance');
 
@@ -2575,9 +2607,12 @@ function setEditMode(on)  { setMode(on ? 'edit'  : 'chat'); }
 
 imgToggle.addEventListener('click', () => setMode(imageMode ? 'chat' : 'image'));
 
-document.getElementById('edit-img-btn').addEventListener('click', () => {
-  if (!lastImageUrl) return;
-  setMode(editMode ? 'chat' : 'edit');
+document.getElementById('edit-toggle')?.addEventListener('click', () => {
+  if (editMode) { setMode('chat'); return; }
+  setMode('edit');
+  if (!lastImageUrl && !(typeof activeEditTarget !== 'undefined' && activeEditTarget)) {
+    appendError('Pick an image to edit — tap 🖼 Upload Image, or generate one first.');
+  }
 });
 
 // ── Upload image for editing/animating ──
@@ -4639,15 +4674,19 @@ try {
 zaorLoras.forEach(l => { if (!l.category) l.category = (l.base === 'Z-Image' ? 'style' : 'realism'); });
 
 // One-time cleanup: remove duplicate LoRAs left over from loading earlier builds / restores.
-// Keep the FIRST occurrence of each link (user-added entries sit at the front).
+// Collapse copies that share the same LINK *or* the same NAME (case-insensitive); keep the
+// first occurrence (user-added entries sit at the front).
 (function dedupeLoras(){
-  const seen = new Set();
+  const seenUrl = new Set(), seenName = new Set();
   const before = zaorLoras.length;
   zaorLoras = zaorLoras.filter(l => {
-    const key = (l.url || '').trim().toLowerCase();
-    if (!key) return true;            // keep entries with no link rather than collapse them
-    if (seen.has(key)) return false;  // drop later copies of the same link
-    seen.add(key); return true;
+    const url = (l.url || '').trim().toLowerCase();
+    const name = (l.name || '').trim().toLowerCase();
+    if (url && seenUrl.has(url)) return false;
+    if (name && seenName.has(name)) return false;
+    if (url) seenUrl.add(url);
+    if (name) seenName.add(name);
+    return true;
   });
   if (zaorLoras.length !== before) { try { localStorage.setItem('zaor_loras', JSON.stringify(zaorLoras)); } catch(e) {} }
 })();
