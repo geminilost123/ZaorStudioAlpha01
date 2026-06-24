@@ -1219,7 +1219,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.03</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.04</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1246,7 +1246,6 @@
             <button id="library-btn" class="menu-item" title="Prompt library">📚 Prompt Library</button>
             <button id="lora-btn" class="menu-item" title="LoRA manager">🧬 LoRA Manager</button>
             <button id="savegame-btn" class="menu-item" title="Save / Load Game">💾 Save / Load Game</button>
-            <button id="export-dt-btn" class="menu-item" title="Export scene to Draw Things">⧉ Export to Draw Things</button>
             <div class="menu-sep"></div>
             <button id="refresh-btn" class="menu-item" title="Force update from GitHub">↻ Force Update</button>
             <button id="api-key-btn" class="menu-item">🔑 Set API Keys</button>
@@ -1327,6 +1326,7 @@
       </div>
       <div id="upload-edit-row" style="display:flex;gap:6px;margin-bottom:6px;padding:0 4px;flex-wrap:wrap;align-items:center;">
         <button id="upload-img-btn" class="edit-img-btn visible" title="Upload an image to edit or animate">🖼 Upload Image</button>
+        <button id="sb-frame-btn" class="edit-img-btn" style="display:none;" title="Generate a storyboard frame from the latest story beat">🎬 Generate Frame</button>
         <div id="edit-btn-row" style="display:none;gap:6px;align-items:center;">
           <button id="edit-img-btn" class="edit-img-btn visible" title="Edit last image">✏️ Edit</button>
           <select id="edit-model-select" class="img-control-select" title="Edit model">
@@ -1619,7 +1619,7 @@
 <div class="modal-overlay" id="storyboard-overlay">
   <div class="modal" style="max-width:480px;width:92%;">
     <h2 style="margin-bottom:4px;">🎬 Storyboard director</h2>
-    <p style="margin-bottom:14px;">While you roleplay, this auto-builds an inline storyboard — generating a frame whenever a new character, location, or wardrobe change appears (or when you type "giggity"). Each frame also drafts a Wan 2.2 video prompt you can copy.</p>
+    <p style="margin-bottom:14px;">Turn this on to show a <b>🎬 Generate Frame</b> button by the message bar. Tap it whenever you want a storyboard frame from the latest story moment — nothing generates automatically, so you only spend when you choose to. Each frame also drafts a Wan 2.2 video prompt you can copy. Returning characters reuse their saved looks from your cast.</p>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
       <div style="min-width:0;">
         <div style="font-size:14px;color:var(--text);">Storyboard mode</div>
@@ -1693,54 +1693,6 @@
     <textarea id="savegame-code" placeholder="Your game code appears here when you save — or paste a code here to load." style="width:100%;min-height:120px;margin:10px 0;font-family:monospace;font-size:11px;"></textarea>
     <button class="btn-primary" id="savegame-load" style="width:100%;">📂 Load game from code</button>
     <button class="btn-secondary" id="savegame-close" style="width:100%;margin-top:8px;">Close</button>
-  </div>
-</div>
-
-<!-- Export Scene to Draw Things Modal -->
-<div class="modal-overlay" id="exportdt-overlay">
-  <div class="modal" style="max-width:560px;width:94%;max-height:88vh;overflow-y:auto;">
-    <h2 style="margin-bottom:4px;">⧉ Export scene to Draw Things</h2>
-    <p style="margin-bottom:12px;">Turns this story's storyboard frames into one Draw Things script that renders a video clip per frame on Cloud Compute, one at a time. Zaor writes the script — you paste it into DT and run it.</p>
-
-    <label class="exp-lbl">Mode</label>
-    <select id="exp-mode" class="img-control-select" style="width:100%;margin-bottom:12px;">
-      <option value="i2v">Animate frames (i2v) — loads each frame as the video's first frame</option>
-      <option value="t2v">Prompt-only (t2v) — generate from the prompt, no image</option>
-    </select>
-
-    <label class="exp-lbl">Model (select this exact name in Draw Things)</label>
-    <select id="exp-model" class="img-control-select" style="width:100%;margin-bottom:12px;">
-      <option value="wan-ti2v-5b">Wan 2.2 TI2V 5B — recommended (does both t2v &amp; i2v)</option>
-      <option value="wan-i2v-14b-480">Wan v2.1 I2V 14B 480p</option>
-      <option value="wan-i2v-14b-720">Wan v2.1 I2V 14B 720p</option>
-      <option value="ltx-distilled-720">LTX-2.3 22B [distilled] 720p</option>
-    </select>
-
-    <label class="exp-lbl" id="exp-res-lbl">Image size (matched to your frames)</label>
-    <select id="exp-res" class="img-control-select" style="width:100%;margin-bottom:12px;"></select>
-
-    <div style="display:flex;gap:10px;margin-bottom:12px;">
-      <div style="flex:1;">
-        <label class="exp-lbl">Frames</label>
-        <input type="number" id="exp-frames" value="81" min="16" max="121" step="1" class="img-control-select" style="width:100%;" />
-      </div>
-      <div style="flex:1;">
-        <label class="exp-lbl">Steps</label>
-        <input type="number" id="exp-steps" value="8" min="4" max="30" step="1" class="img-control-select" style="width:100%;" />
-      </div>
-    </div>
-
-    <div id="exp-estimate" style="background:var(--bg);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.5;"></div>
-
-    <button class="btn-primary" id="exp-generate" style="width:100%;">⧉ Generate DT script → copy</button>
-    <textarea id="exp-code" placeholder="The Draw Things script appears here — then paste it into DT's Scripts tab." style="width:100%;min-height:140px;margin:10px 0;font-family:monospace;font-size:11px;"></textarea>
-
-    <details style="margin-bottom:10px;">
-      <summary style="cursor:pointer;font-size:13px;color:var(--lavender);">How to run it in Draw Things</summary>
-      <ol id="exp-checklist" style="font-size:12px;color:var(--text-dim);margin:8px 0 0 0;padding-left:18px;line-height:1.6;"></ol>
-    </details>
-
-    <button class="btn-secondary" id="exp-close" style="width:100%;">Close</button>
   </div>
 </div>
 
@@ -2745,25 +2697,13 @@ async function handleSend() {
   if (!rawText || isLoading) return;
   if (!apiKey) { openModal('api'); return; }
 
-  // Storyboard "giggity" manual trigger — strip it from the story, remember it forced a frame
-  const giggityHit = storyboardOn && /giggity/i.test(rawText);
-  const text = giggityHit ? rawText.replace(/giggity/ig, '').replace(/\s{2,}/g, ' ').trim() : rawText;
-  sbForceFrame = giggityHit;
+  const text = rawText;
 
   // Ensure we have a VALID thread (recover if the current one was lost/evicted from storage)
   if (!currentThreadId || !getCurrentThread()) createThread('New Game');
 
   // Clear empty state
   document.getElementById('empty-state')?.remove();
-
-  // "giggity" typed alone → just fire a storyboard frame from the last beat, no story call
-  if (giggityHit && text === '') {
-    promptEl.value = ''; promptEl.style.height = 'auto';
-    setLoading(true);
-    await runStoryboardDirector(lastStoryBeat(), true);
-    setLoading(false);
-    return;
-  }
 
   autoNameThread(text);
   renderMessage('user', text);
@@ -3035,10 +2975,7 @@ async function generateText(userText) {
     addToHistory('assistant', reply);
     addMessageToThread({ role: 'assistant', type: 'text', content: reply });
     renderMessage('assistant', reply);
-    // Storyboard: hidden second pass watches this beat (never touches the story text/history)
-    if (storyboardOn && !promptEngineerMode) {
-      runStoryboardDirector('Director instruction: ' + userText + '\n\nScene played out: ' + reply, sbForceFrame);
-    }
+    // Storyboard frames are now generated manually via the 🎬 Generate Frame button (no automatic spend).
   } catch(e) {
     removeTyping(typingId);
     addMessageToThread({ role: 'assistant', type: 'error', content: e.message });
@@ -4904,6 +4841,8 @@ let storyboardRatio = localStorage.getItem('zaor_sb_ratio') || '16:9';
 function updateStoryboardBtn() {
   const b = document.getElementById('storyboard-btn');
   if (b) b.classList.toggle('active', storyboardOn);
+  const fb = document.getElementById('sb-frame-btn');
+  if (fb) fb.style.display = storyboardOn ? 'inline-flex' : 'none';
 }
 const storyboardOverlay = document.getElementById('storyboard-overlay');
 document.getElementById('storyboard-btn')?.addEventListener('click', () => {
@@ -4928,6 +4867,17 @@ document.getElementById('sb-ratio-select')?.addEventListener('change', e => {
   localStorage.setItem('zaor_sb_ratio', storyboardRatio);
 });
 updateStoryboardBtn();
+
+// Manual storyboard frame — the ONLY way frames are generated now (no automatic spend).
+document.getElementById('sb-frame-btn')?.addEventListener('click', async () => {
+  if (isLoading) return;
+  if (!apiKey) { openModal('api'); return; }
+  const beat = lastStoryBeat();
+  if (!beat) { appendError('No story yet — chat a bit first, then tap 🎬 Generate Frame to make a frame from the latest moment.'); return; }
+  setLoading(true);
+  try { await runStoryboardDirector(beat, true); }
+  finally { setLoading(false); }
+});
 
 // ── Stage 2: hidden "director's eye" call + parsing (no image yet — preview only) ──
 let sbForceFrame = false;
@@ -5459,177 +5409,6 @@ document.getElementById('savegame-load')?.addEventListener('click', () => {
   }
 });
 
-// ── Export Scene to Draw Things (v0.95) ──
-// DT's real, selectable video sizes, grouped by the scene's aspect ratio (draft / standard).
-const DT_SIZES = {
-  '16:9': ['512x320', '1024x576'],
-  '9:16': ['320x640', '576x1024'],
-  '1:1':  ['512x512', '768x768'],
-  '4:3':  ['768x576'],
-  '3:4':  ['576x768']
-};
-const EXP_MODELS = {
-  'wan-ti2v-5b':       { name: 'Wan 2.2 TI2V 5B',             note: 'unified text+image→video; lightest — fits the 40k meter easily', i2v: true },
-  'wan-i2v-14b-480':   { name: 'Wan v2.1 I2V 14B 480p',       note: 'heavier — keep frames/size modest and watch the meter', i2v: true },
-  'wan-i2v-14b-720':   { name: 'Wan v2.1 I2V 14B 720p',       note: 'heaviest — likely needs fewer frames to stay ≤40k', i2v: true },
-  'ltx-distilled-720': { name: 'LTX-2.3 22B [distilled] 720p', note: 'distilled — use ~8 steps', i2v: true }
-};
-let expSceneRatio = null;
-// Detect the scene's real aspect ratio from the actual frame image, so the export
-// offers tall sizes for tall frames regardless of the (possibly stale) storyboard setting.
-function expClassifyRatio(w, h) {
-  if (!w || !h) return null;
-  const r = w / h;
-  if (r > 1.15) return r > 1.5 ? '16:9' : '4:3';
-  if (r < 0.87) return r < 0.66 ? '9:16' : '3:4';
-  return '1:1';
-}
-function expDetectRatio(cb) {
-  const frs = expGatherFrames();
-  if (!frs.length) { expSceneRatio = null; cb(); return; }
-  const img = new Image();
-  let done = false;
-  const finish = (ratio) => { if (done) return; done = true; expSceneRatio = ratio; cb(); };
-  img.onload = () => finish(expClassifyRatio(img.naturalWidth, img.naturalHeight) || storyboardRatio || '16:9');
-  img.onerror = () => finish(storyboardRatio || '16:9');
-  setTimeout(() => finish(storyboardRatio || '16:9'), 4000); // safety: don't hang on a slow CDN
-  img.src = frs[0].src;
-}
-function expPopulateRes() {
-  const sel = document.getElementById('exp-res');
-  if (!sel) return;
-  const ratio = expSceneRatio || storyboardRatio || '16:9';
-  const sizes = DT_SIZES[ratio] || DT_SIZES['16:9'];
-  const cur = sel.value;
-  sel.innerHTML = sizes.map((s, i) => {
-    const tier = sizes.length > 1 ? (i === 0 ? ' (draft)' : ' (standard)') : '';
-    return '<option value="' + s + '"' + (i === sizes.length - 1 ? ' selected' : '') + '>' + s.replace('x', '×') + tier + '</option>';
-  }).join('');
-  if (cur && sizes.indexOf(cur) >= 0) sel.value = cur;
-  const lbl = document.getElementById('exp-res-lbl');
-  if (lbl) lbl.textContent = 'Image size (matched to your ' + ratio + ' frames)';
-}
-function expGatherFrames() {
-  const t = getCurrentThread();
-  if (!t || !Array.isArray(t.messages)) return [];
-  return t.messages.filter(m => m && m.type === 'storyboard' && m.src);
-}
-function expJsStr(s) {
-  return '"' + String(s == null ? '' : s)
-    .replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-    .replace(/[\r\n]+/g, ' ').trim() + '"';
-}
-function expUpdateEstimate() {
-  const box = document.getElementById('exp-estimate');
-  if (!box) return null;
-  const modelId = document.getElementById('exp-model').value;
-  const mode = document.getElementById('exp-mode').value;
-  const ratio = expSceneRatio || storyboardRatio || '16:9';
-  const sizes = DT_SIZES[ratio] || DT_SIZES['16:9'];
-  const res = document.getElementById('exp-res').value || sizes[sizes.length - 1];
-  const framesN = parseInt(document.getElementById('exp-frames').value, 10) || 81;
-  const steps = parseInt(document.getElementById('exp-steps').value, 10) || 8;
-  const frs = expGatherFrames();
-  const m = EXP_MODELS[modelId] || EXP_MODELS['wan-ti2v-5b'];
-  let html = '<div><b>' + frs.length + '</b> frame' + (frs.length === 1 ? '' : 's') + ' · <b>' + m.name + '</b> · ' + (mode === 'i2v' ? 'i2v' : 't2v') + '</div>';
-  html += '<div style="margin-top:4px;">Per clip: <b>' + res.replace('x', '×') + '</b> · ' + framesN + ' frames · ' + steps + ' steps</div>';
-  html += '<div style="margin-top:6px;color:var(--text-dim);font-size:11.5px;line-height:1.5;">' + m.note + '. DT\'s compute-unit meter is the real gauge — after setting these in DT, keep each job <b>≤ 40,000</b>. If a job exceeds it, DT cancels it free; trim frames or size and rerun.</div>';
-  if (mode === 'i2v' && !m.i2v) html += '<div style="margin-top:4px;color:#e08a8a;font-size:11px;">This model is text-to-video only — switch to t2v or pick an i2v-capable model.</div>';
-  if (frs.length === 0) html += '<div style="margin-top:4px;color:#e08a8a;font-size:11px;">No storyboard frames in this story yet — generate some frames first.</div>';
-  box.innerHTML = html;
-  return { frames: frs, modelId: modelId, model: m, mode: mode, ratio: ratio, res: res, framesN: framesN, steps: steps };
-}
-function expFillChecklist() {
-  const ol = document.getElementById('exp-checklist');
-  if (!ol) return;
-  const mode = document.getElementById('exp-mode').value;
-  const steps = [];
-  if (mode === 'i2v') steps.push('Save this scene\'s frames into the DT Pictures folder, named shot_01.png, shot_02.png, …');
-  steps.push('In DT, sign in and turn on Cloud Compute & Sharing, then choose the Draw Things+ tier.');
-  steps.push('Select the exact model named atop the script, and set Image Size / Frames / Steps to match.');
-  if (mode === 'i2v') steps.push('In the Strength panel, switch to the film-strip (video) icon and set Strength below 100% so the loaded frame conditions the video (100% = ignores the image).');
-  steps.push('Set Save Video as → Movie (.mov).');
-  steps.push('Read DT\'s compute-unit meter — keep it ≤ 40,000. If higher, lower frames or image size.');
-  steps.push('Scripts tab → Add Script → paste → Run. Keep all quotes straight.');
-  steps.push('Each clip renders on the cloud in turn; save each one from DT as it appears.');
-  ol.innerHTML = steps.map(s => '<li>' + s.replace(/</g, '&lt;') + '</li>').join('');
-}
-function expBuildScript() {
-  const ctx = expUpdateEstimate();
-  if (!ctx || ctx.frames.length === 0) return '';
-  const mode = ctx.mode, frames = ctx.frames, m = ctx.model, res = ctx.res;
-  const dims = res.split('x');
-  const L = [];
-  L.push('//@api-1.0');
-  L.push('// ===== Zaor scene export · ' + mode + ' · ' + frames.length + ' clip' + (frames.length === 1 ? '' : 's') + ' =====');
-  L.push('// BEFORE RUNNING, set these in the Draw Things UI:');
-  L.push('//   Model: ' + m.name);
-  L.push('//   Image Size: ' + dims[0] + 'x' + dims[1] + '   Frames: ' + ctx.framesN + '   Steps: ' + ctx.steps);
-  L.push('//   Sampler: UniPC Trailing   Shift: 5.0   Text Guidance (CFG): ~3.5   Refiner: Disabled');
-  L.push('//   Save Video as: Movie (.mov)');
-  L.push('//   Cloud Compute: ON  (Server Offload -> Draw Things+)');
-  if (mode === 'i2v') {
-    L.push('//   Strength panel: film-strip (video) mode, Strength < 100% (so the frame conditions the video)');
-    L.push('// Put these images in the DT Pictures folder first, named exactly:');
-    frames.forEach((f, i) => L.push('//   shot_' + String(i + 1).padStart(2, '0') + '.png'));
-  }
-  L.push('// IMPORTANT: read DT\'s compute-unit meter before running — keep each clip <= 40,000.');
-  L.push('// Quotes must stay straight ( " ) — do not let autocorrect curl them.');
-  L.push('');
-  L.push('var shots = [');
-  frames.forEach((f, i) => {
-    const prompt = f.videoPrompt || f.alt || 'cinematic motion, smooth camera movement';
-    const tail = (i < frames.length - 1) ? ',' : '';
-    if (mode === 'i2v') {
-      L.push('  { img: "shot_' + String(i + 1).padStart(2, '0') + '.png", prompt: ' + expJsStr(prompt) + ' }' + tail);
-    } else {
-      L.push('  { prompt: ' + expJsStr(prompt) + ' }' + tail);
-    }
-  });
-  L.push('];');
-  L.push('');
-  L.push('for (var i = 0; i < shots.length; i++) {');
-  L.push('  var s = shots[i];');
-  if (mode === 'i2v') {
-    L.push('  canvas.loadImageSrc(filesystem.pictures.path + "/" + s.img);');
-  }
-  L.push('  pipeline.run({ configuration: pipeline.configuration, prompt: s.prompt });');
-  L.push('  console.log("clip " + (i + 1) + "/" + shots.length + " done");');
-  L.push('}');
-  L.push('console.log("Scene complete — " + shots.length + " clips.");');
-  return L.join('\n');
-}
-const exportdtOverlay = document.getElementById('exportdt-overlay');
-document.getElementById('export-dt-btn')?.addEventListener('click', () => {
-  document.getElementById('exp-code').value = '';
-  exportdtOverlay.classList.add('open');
-  expPopulateRes();          // provisional fill
-  expUpdateEstimate();
-  expFillChecklist();
-  expDetectRatio(() => {     // correct once the real frame ratio is measured
-    expPopulateRes();
-    expUpdateEstimate();
-  });
-});
-document.getElementById('exp-close')?.addEventListener('click', () => exportdtOverlay.classList.remove('open'));
-exportdtOverlay?.addEventListener('click', e => { if (e.target === exportdtOverlay) exportdtOverlay.classList.remove('open'); });
-['exp-mode', 'exp-model', 'exp-res', 'exp-frames', 'exp-steps'].forEach(id => {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.addEventListener('change', () => { expUpdateEstimate(); expFillChecklist(); });
-  el.addEventListener('input', expUpdateEstimate);
-});
-document.getElementById('exp-generate')?.addEventListener('click', async () => {
-  const script = expBuildScript();
-  if (!script) { appendError('No storyboard frames to export yet — generate some frames first.'); return; }
-  const ta = document.getElementById('exp-code');
-  ta.value = script;
-  try { await navigator.clipboard.writeText(script); } catch (e) {}
-  const b = document.getElementById('exp-generate');
-  const o = b.textContent;
-  b.textContent = '✓ Script copied';
-  setTimeout(() => { b.textContent = o; }, 2000);
-});
 
 // ── Overflow ("More") menu — header declutter (v0.94) ──
 const overflowMenu = document.getElementById('overflow-menu');
