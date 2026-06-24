@@ -613,6 +613,7 @@
     .lb-zimage { background:rgba(224,143,200,.16); color:#e08fc8; }
     .lb-flux2-klein { background:rgba(126,180,224,.16); color:#8fc0e0; }
     .lb-flux { background:rgba(185,167,240,.16); color:var(--lavender); }
+    .lb-wan { background:rgba(126,224,168,.16); color:#7ee0a8; }
     .lb-other { background:rgba(255,255,255,.1); color:var(--text-dim); }
     .lora-wbox { display:flex; align-items:center; gap:6px; margin-top:7px; }
     .lora-wbox span { font-size:11px; color:var(--text-dim); }
@@ -1219,7 +1220,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.04</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.05</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1596,6 +1597,7 @@
           <option value="Flux" selected>For: Flux</option>
           <option value="Flux2-Klein">For: Flux.2 Klein</option>
           <option value="Z-Image">For: Z-Image</option>
+          <option value="Wan">For: Wan video</option>
           <option value="Other">For: Other</option>
         </select>
         <input type="number" id="lora-scale" value="0.85" min="0" max="3" step="0.05" title="Strength. ~0.85 for most. Concept-slider LoRAs may want 2–3." style="width:74px;margin-bottom:6px;" />
@@ -3229,7 +3231,13 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
     }
   } else if (imageDataUrl) {
     // I2V
-    if (engine === 'seedance15spicy') {
+    if (engine === 'wan22spicylora') {
+      // Wan 2.2 Spicy Image-to-Video LoRA — applies your active "Wan"-tagged LoRAs (up to 3).
+      modelPath = 'wavespeed-ai/wan-2.2-spicy/image-to-video-lora';
+      const wanLoras = activeLoras().filter(l => l.base === 'Wan').slice(0,3).map(l => ({ path: l.url, scale: Number(l.scale) || 1 }));
+      body = { prompt, image: imageDataUrl, resolution: res, duration: (duration === 8 ? 8 : 5), seed: -1, enable_safety_checker: false, loras: wanLoras };
+      if (!wanLoras.length) appendError('Tip: no Wan LoRAs are active — tap 🧬, add/tick a LoRA tagged "Wan", or this animates as plain Wan 2.2 Spicy.');
+    } else if (engine === 'seedance15spicy') {
       modelPath = 'bytedance/seedance-v1.5-pro/image-to-video-spicy';
       body = { prompt, image: imageDataUrl, resolution: res, duration: Math.min(duration, 12), aspect_ratio: ratio, generate_audio: false, seed: -1 };
     } else if (engine === 'wan26spicy') {
@@ -3284,7 +3292,7 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   );
 
   if (videoUrl) {
-    const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', seedance15spicy: 'Seedance 1.5 Spicy', seedance15t2v: 'Seedance 1.5 T2V', ltx23spicy: 'LTX 2.3 Spicy', aurora: 'Aurora', 'aurora_extend': 'Aurora Extend' };
+    const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan22spicylora: 'Wan 2.2 Spicy LoRA', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', seedance15spicy: 'Seedance 1.5 Spicy', seedance15t2v: 'Seedance 1.5 T2V', ltx23spicy: 'LTX 2.3 Spicy', aurora: 'Aurora', 'aurora_extend': 'Aurora Extend' };
     const vidLabel = engineLabels[engine] || engine;
     addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: vidLabel, storedDuration: duration, storedRes: res });
     renderVideo(videoUrl, prompt, true, vidLabel, duration, res);
@@ -3643,6 +3651,7 @@ function buildAnimatePanel(onSubmit, isExtend = false, initialPrompt = '') {
       <option value="aurora" selected>Aurora · xAI — $0.05/s</option>
       <option value="seedance15spicy">Seedance 1.5 Spicy · WaveSpeed — from $0.06</option>
       <option value="wan22spicy">Wan 2.2 Spicy · WaveSpeed — from $0.15</option>
+      <option value="wan22spicylora">Wan 2.2 Spicy · LoRA · WaveSpeed — from $0.20</option>
       <option value="wan26spicy">Wan 2.7 Spicy · WaveSpeed — from $0.50</option>
       <option value="ltx23spicy">LTX 2.3 Spicy (+audio) · WaveSpeed — from $0.10</option>
     `;
@@ -5557,6 +5566,7 @@ const MODEL_CONSTRAINTS = {
   seedance15t2v: { durations: [4,5,6,8,10,12], resolutions: ['720p','1080p'], hasRatio: true, maxDur: 12, defaultDur: 4, defaultRes: '720p' },
   wan26t2v:   { durations: [5,8,10,15],   resolutions: ['720p','1080p'], hasRatio: true,  maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
   wan22spicy: { durations: [5],            resolutions: ['480p','720p'], hasRatio: false, maxDur: 5,  defaultDur: 5,  defaultRes: '480p' },
+  wan22spicylora: { durations: [5,8],      resolutions: ['480p','720p'], hasRatio: false, maxDur: 8,  defaultDur: 5,  defaultRes: '480p' },
   wan26spicy:     { durations: [5,10,15],      resolutions: ['720p','1080p'], hasRatio: false, maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
   seedance15spicy: { durations: [4,5,6,8,10,12], resolutions: ['480p','720p','1080p'], hasRatio: true, maxDur: 12, defaultDur: 4,  defaultRes: '480p' },
   ltx23spicy: { durations: [3,5,8,10,15,20], resolutions: ['480p','720p','1080p'], hasRatio: false, maxDur: 20, defaultDur: 5, defaultRes: '480p' },
@@ -5635,6 +5645,8 @@ function estimateVideoCost(engine, duration, res) {
     }
     case 'wan22spicy':                   // Wan 2.2 Spicy: base $0.15 (5s, 480p)
       return hi ? '~$0.20+' : '~$0.15';
+    case 'wan22spicylora':               // Wan 2.2 Spicy LoRA: base ~$0.20 (5s), more at 8s/720p
+      return (d >= 8 || hi) ? '~$0.30+' : '~$0.20';
     case 'wan26spicy':                   // Wan 2.7 Spicy: ~$0.10/s @720p, scales with duration
       return `~$${(0.10 * d).toFixed(2)}`;
     case 'ltx23spicy': {                  // LTX 2.3 Spicy: 480p $0.02/s, 720p $0.04/s, 1080p $0.06/s; min 5s billed
