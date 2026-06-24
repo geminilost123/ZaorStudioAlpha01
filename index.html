@@ -1220,7 +1220,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.08</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.10</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1260,9 +1260,9 @@
         <span class="mode-label">Tool</span>
         <select id="pe-model-select" class="img-control-select" style="flex:1;min-width:140px;">
           <optgroup label="── Image ──">
-            <option value="aurora">Aurora / Flux</option>
-            <option value="zimage">Z-Image Turbo</option>
-            <option value="wan26t2v">Wan 2.6 T2I</option>
+            <option value="aurora">Aurora / Flux / Chroma / Klein</option>
+            <option value="zimage">Z-Image (text &amp; i2i)</option>
+            <option value="wan26t2v">Wan 2.6 / 2.7 Image</option>
             <option value="qwen2">Qwen 2.0 Edit</option>
             <option value="qwen">Qwen Edit</option>
             <option value="wan27">Wan 2.7 Edit</option>
@@ -1276,8 +1276,9 @@
           <optgroup label="── Animate (I2V) ──">
             <option value="aurora_i2v">Aurora I2V</option>
             <option value="seedance_i2v">Seedance 1.5 Spicy I2V</option>
-            <option value="wan22spicy_i2v">Wan 2.2 Spicy I2V</option>
+            <option value="wan22spicy_i2v">Wan 2.2 Spicy I2V (incl. LoRA)</option>
             <option value="wan27spicy_i2v">Wan 2.7 Spicy I2V</option>
+            <option value="ltx23spicy">LTX 2.3 Spicy I2V (audio)</option>
           </optgroup>
           <optgroup label="── Video Extend ──">
             <option value="aurora_extend">Aurora Extend</option>
@@ -1876,6 +1877,10 @@ const MODEL_REGISTRY = {
     } },
   'atlas-flux-dev': { cat:'t2img', label:'Flux Dev · Atlas', provider:'atlas', path:'black-forest-labs/flux-dev', price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
+  'atlas-z-image-lora': { cat:'t2img', label:'Z-Image Turbo · Atlas · LoRA (fallback)', provider:'atlas', path:'z-image/turbo-lora', price:0.01, verified:false, lora:true, loraBase:'Z-Image',
+    buildBody:p=>{ const b={ prompt:p.prompt, enable_safety_checker:false }; if(p.loras&&p.loras.length) b.loras=p.loras.slice(0,3).map(l=>({path:l.path,scale:Number(l.scale)||1})); return b; } },
+  'atlas-flux-dev-lora': { cat:'t2img', label:'Flux Dev · Atlas · LoRA (fallback)', provider:'atlas', path:'black-forest-labs/flux-dev-lora', price:0.015, verified:false, lora:true, loraBase:'Flux',
+    buildBody:p=>{ const b={ prompt:p.prompt, num_images:1, enable_safety_checker:false }; if(p.loras&&p.loras.length) b.loras=p.loras.slice(0,3).map(l=>({path:l.path,scale:Number(l.scale)||1})); return b; } },
   'atlas-flux-schnell': { cat:'t2img', label:'Flux Schnell · Atlas', provider:'atlas', path:'black-forest-labs/flux-schnell', price:0.003, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
   'atlas-flux-2-pro': { cat:'t2img', label:'Flux 2 Pro · Atlas', provider:'atlas', path:'black-forest-labs/flux-2-pro/text-to-image', price:0.04, verified:true,
@@ -4632,6 +4637,20 @@ try {
 } catch(e) {}
 // Backfill a category on any older entries that lack one.
 zaorLoras.forEach(l => { if (!l.category) l.category = (l.base === 'Z-Image' ? 'style' : 'realism'); });
+
+// One-time cleanup: remove duplicate LoRAs left over from loading earlier builds / restores.
+// Keep the FIRST occurrence of each link (user-added entries sit at the front).
+(function dedupeLoras(){
+  const seen = new Set();
+  const before = zaorLoras.length;
+  zaorLoras = zaorLoras.filter(l => {
+    const key = (l.url || '').trim().toLowerCase();
+    if (!key) return true;            // keep entries with no link rather than collapse them
+    if (seen.has(key)) return false;  // drop later copies of the same link
+    seen.add(key); return true;
+  });
+  if (zaorLoras.length !== before) { try { localStorage.setItem('zaor_loras', JSON.stringify(zaorLoras)); } catch(e) {} }
+})();
 
 function saveZaorLoras() { try { localStorage.setItem('zaor_loras', JSON.stringify(zaorLoras)); } catch(e) {} }
 function activeLoras() { return zaorLoras.filter(l => l.active).slice(0, 3); }
