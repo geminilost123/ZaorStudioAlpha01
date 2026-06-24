@@ -577,6 +577,52 @@
     .lora-item { background: var(--bg); border: 1px solid rgba(255,255,255,0.10); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
     .lora-meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; word-break: break-word; }
 
+    /* LoRA manager — redesign */
+    #lora-active-wrap { background: linear-gradient(180deg,#241f37,#201b30); border:1px solid rgba(185,167,240,.22); border-radius:14px; padding:12px 12px 11px; margin-bottom:13px; }
+    #lora-active-chips { display:flex; flex-wrap:wrap; gap:7px; }
+    .lora-chip { display:flex; align-items:center; gap:7px; background:rgba(126,224,168,.1); border:1px solid rgba(126,224,168,.32); border-radius:20px; padding:5px 7px 5px 11px; font-size:12.5px; }
+    .lora-chip .nm { font-weight:600; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .lora-chip .w { font-family:ui-monospace,monospace; font-size:10.5px; color:#7ee0a8; background:rgba(0,0,0,.3); padding:1px 6px; border-radius:10px; }
+    .lora-chip .x { color:var(--text-dim); font-size:13px; width:18px; height:18px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:rgba(255,255,255,.07); cursor:pointer; }
+    .lora-empty-active { color:#7d6fae; font-size:12px; font-style:italic; }
+
+    #lora-cfg-box { background: var(--bg); border:1px solid rgba(255,255,255,.08); border-radius:13px; padding:12px 13px; margin-bottom:14px; }
+    #lora-cfg-box input[type=range]{ -webkit-appearance:none; appearance:none; width:100%; height:4px; border-radius:4px; background:rgba(255,255,255,.14); }
+    #lora-cfg-box input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:24px; height:24px; border-radius:50%; background:#efeaf8; box-shadow:0 1px 5px rgba(0,0,0,.5); cursor:pointer; }
+    #lora-cfg-box input[type=range]::-moz-range-thumb{ width:24px; height:24px; border:none; border-radius:50%; background:#efeaf8; cursor:pointer; }
+
+    .lora-tab { flex:1; text-align:center; padding:9px 0; border-radius:10px; font-size:12.5px; font-weight:600; background:var(--bg); border:1px solid rgba(255,255,255,.08); color:var(--text-dim); cursor:pointer; }
+    .lora-tab.on { background:rgba(185,167,240,.16); border-color:rgba(185,167,240,.4); color:var(--lavender); }
+
+    .lora-grp { display:flex; align-items:center; gap:8px; margin:16px 2px 9px; }
+    .lora-grp .gt { font-size:11px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase; color:#cdc6e0; }
+    .lora-grp .ct { margin-left:auto; font-family:ui-monospace,monospace; font-size:11px; color:var(--text-dim); }
+    .lora-grp .ln { height:1px; background:rgba(255,255,255,.08); flex:1; }
+
+    .lora-card { background:var(--bg); border:1px solid rgba(255,255,255,.08); border-radius:13px; padding:11px 12px; margin-bottom:9px; display:flex; align-items:flex-start; gap:11px; }
+    .lora-card.off { opacity:.55; }
+    .lora-card.mismatch { border-color:rgba(240,196,106,.34); }
+    .lora-tog { flex-shrink:0; width:44px; height:26px; border-radius:20px; background:#3a3450; position:relative; margin-top:2px; cursor:pointer; transition:background .15s; }
+    .lora-tog.on { background:#7ee0a8; }
+    .lora-tog .knob { position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:left .15s; }
+    .lora-tog.on .knob { left:21px; }
+    .lora-cbody { flex:1; min-width:0; }
+    .lora-cname { font-size:14px; font-weight:600; margin-bottom:5px; word-break:break-word; }
+    .lora-badges { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+    .lora-badge { font-size:10px; font-weight:700; letter-spacing:.3px; padding:2px 8px; border-radius:20px; text-transform:uppercase; }
+    .lb-zimage { background:rgba(224,143,200,.16); color:#e08fc8; }
+    .lb-flux2-klein { background:rgba(126,180,224,.16); color:#8fc0e0; }
+    .lb-flux { background:rgba(185,167,240,.16); color:var(--lavender); }
+    .lb-other { background:rgba(255,255,255,.1); color:var(--text-dim); }
+    .lora-wbox { display:flex; align-items:center; gap:6px; margin-top:7px; }
+    .lora-wbox span { font-size:11px; color:var(--text-dim); }
+    .lora-cnote { font-size:11.5px; color:var(--text-dim); margin-top:6px; font-style:italic; word-break:break-word; }
+    .lora-trig { font-size:11px; color:#9a96a8; margin-top:5px; font-family:ui-monospace,monospace; word-break:break-word; }
+    .lora-flag { display:flex; align-items:center; gap:6px; margin-top:8px; font-size:11px; color:#f0c46a; background:rgba(240,196,106,.1); padding:5px 9px; border-radius:8px; }
+    .lora-cact { display:flex; flex-direction:column; gap:8px; align-items:center; }
+    .lora-ic { color:var(--text-dim); font-size:14px; width:30px; height:30px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.05); border-radius:9px; cursor:pointer; }
+    .lora-edit-fields { margin-top:9px; padding-top:9px; border-top:1px solid rgba(255,255,255,.07); display:flex; flex-direction:column; gap:6px; }
+
     /* PE final prompt cards */
     .pe-final-cards { margin: 10px 0; display: flex; flex-direction: column; gap: 8px; }
     .pe-final-head { font-size: 11px; color: var(--lavender); text-transform: uppercase; letter-spacing: 0.04em; padding-left: 2px; }
@@ -1173,7 +1219,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.01</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.02</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1500,34 +1546,67 @@
   </div>
 </div>
 
-<!-- LoRA Manager Modal -->
+<!-- LoRA Manager Modal (redesigned) -->
 <div class="modal-overlay" id="lora-overlay">
-  <div class="modal" style="max-width:560px;width:92%;max-height:85vh;display:flex;flex-direction:column;">
+  <div class="modal" style="max-width:560px;width:92%;max-height:88vh;display:flex;flex-direction:column;">
     <h2 style="margin-bottom:4px;">🧬 LoRA Manager</h2>
-    <p style="margin-bottom:10px;">Save a LoRA once (link + trigger word), then tick up to 3 to apply. Works with the <b>Flux Dev + LoRA</b>, <b>Flux.2 Klein 9B</b> (generate + edit), and <b>Z-Image Turbo + LoRA</b> models. A LoRA only works on its matching base model. Trigger words are added to your prompt automatically.</p>
+    <p style="margin-bottom:12px;font-size:12.5px;">Tether custom weights from Hugging Face / Civitai. Up to <b>3</b> active at once. Each LoRA only fires on its matching base model — turning one on drops its trigger words straight into your prompt, where you can edit or delete them.</p>
+
+    <!-- ACTIVE STRIP -->
+    <div id="lora-active-wrap">
+      <div style="display:flex;align-items:center;margin-bottom:8px;">
+        <span style="font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--lavender);text-transform:uppercase;">● Active now</span>
+        <span id="lora-slot-count" style="margin-left:auto;font-family:ui-monospace,monospace;font-size:11px;color:var(--text-dim);background:rgba(0,0,0,0.3);padding:3px 9px;border-radius:20px;">0 / 3 slots</span>
+      </div>
+      <div id="lora-active-chips"></div>
+    </div>
+
+    <!-- CFG SLIDER -->
+    <div id="lora-cfg-box">
+      <div style="display:flex;align-items:center;margin-bottom:3px;">
+        <span style="font-size:12.5px;font-weight:600;letter-spacing:.3px;">Prompt Strength (CFG)</span>
+        <span id="lora-cfg-val" style="margin-left:auto;font-family:ui-monospace,monospace;font-size:14px;color:var(--lavender);background:rgba(0,0,0,0.3);padding:3px 11px;border-radius:9px;border:1px solid rgba(255,255,255,0.1);">3.5</span>
+      </div>
+      <p style="font-size:11px;color:var(--text-dim);margin:0 0 10px;">Lower = more creative · Higher = follows your words more strictly. Affects Flux &amp; Klein (Z-Image Turbo ignores it).</p>
+      <input type="range" id="lora-cfg" min="1" max="10" step="0.5" value="3.5" style="width:100%;" />
+    </div>
+
+    <!-- FILTER TABS -->
+    <div id="lora-filter-row" style="display:flex;gap:7px;margin-bottom:4px;">
+      <button class="lora-tab on" data-filter="all">All</button>
+      <button class="lora-tab" data-filter="realism">Realism</button>
+      <button class="lora-tab" data-filter="style">Style</button>
+    </div>
+
+    <div id="lora-list" style="overflow-y:auto;flex:1;margin:8px 0 4px;"></div>
+
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-      <button class="lib-filter" id="lora-unload-all">Unload all</button>
+      <button class="lib-filter" id="lora-unload-all">Turn all off</button>
       <button class="lib-filter" id="lora-export">⤓ Back up</button>
       <button class="lib-filter" id="lora-import">⤒ Restore</button>
     </div>
-    <div id="lora-list" style="overflow-y:auto;flex:1;margin-bottom:10px;"></div>
-    <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;">
-      <div style="font-size:12px;color:var(--lavender);margin-bottom:6px;">Add a LoRA</div>
+
+    <details id="lora-add-details" style="border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;">
+      <summary style="font-size:12.5px;color:var(--lavender);cursor:pointer;margin-bottom:8px;">＋ Add a new LoRA</summary>
       <input type="text" id="lora-name" placeholder="Name (e.g. My comic style)" autocomplete="off" style="margin-bottom:6px;" />
       <input type="text" id="lora-url" placeholder="LoRA link or Hugging Face owner/repo" autocomplete="off" spellcheck="false" style="margin-bottom:6px;" />
       <div style="display:flex;gap:6px;">
-        <input type="text" id="lora-trigger" placeholder="Always-on trigger word(s), comma-separated" autocomplete="off" spellcheck="false" style="flex:1;margin-bottom:6px;" />
+        <input type="text" id="lora-trigger" placeholder="Trigger word(s), comma-separated — leave blank for none" autocomplete="off" spellcheck="false" style="flex:1;margin-bottom:6px;" />
         <select id="lora-base" class="img-control-select" style="width:110px;margin-bottom:6px;" title="Which base model this LoRA is for">
           <option value="Flux" selected>For: Flux</option>
           <option value="Flux2-Klein">For: Flux.2 Klein</option>
           <option value="Z-Image">For: Z-Image</option>
           <option value="Other">For: Other</option>
         </select>
-        <input type="number" id="lora-scale" value="1" min="0" max="2" step="0.05" title="Strength 0.5–1.0" style="width:74px;margin-bottom:6px;" />
+        <input type="number" id="lora-scale" value="0.85" min="0" max="3" step="0.05" title="Strength. ~0.85 for most. Concept-slider LoRAs may want 2–3." style="width:74px;margin-bottom:6px;" />
       </div>
-      <input type="text" id="lora-notes" placeholder="Notes (optional) — e.g. other trigger words & what each does" autocomplete="off" style="margin-bottom:6px;" />
-    </div>
-    <div class="modal-btns" style="margin-top:4px;">
+      <select id="lora-category" class="img-control-select" style="width:100%;margin-bottom:6px;" title="Which group this LoRA shows under">
+        <option value="style">Group: Style</option>
+        <option value="realism">Group: Realism</option>
+      </select>
+      <input type="text" id="lora-notes" placeholder="Notes / hint (optional) — e.g. recommended weight & what it does" autocomplete="off" style="margin-bottom:6px;" />
+    </details>
+    <div class="modal-btns" style="margin-top:8px;">
       <button class="btn-secondary" id="lora-close">Close</button>
       <button class="btn-primary" id="lora-add">+ Add LoRA</button>
     </div>
@@ -1828,6 +1907,7 @@ const MODEL_REGISTRY = {
   'klein9b-lora':   { cat:'t2img', label:'Flux.2 Klein 9B · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/flux-2-klein-9b/text-to-image-lora', price:0.015, verified:true, lora:true, loraBase:'Flux2-Klein',
     buildBody:p=>{
       const b = { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, enable_safety_checker:false, enable_base64_output:false };
+      if (p.guidance != null) b.guidance_scale = p.guidance;
       if (p.loras && p.loras.length) b.loras = p.loras.slice(0,3).map(l=>({ path:l.path, scale:Number(l.scale)||1 }));
       return b;
     } },
@@ -3012,13 +3092,11 @@ async function generateImage(prompt) {
       const matching = act.filter(l => !l.base || l.base === 'Other' || l.base === m.loraBase);
       const skipped = act.filter(l => matching.indexOf(l) === -1);
       callParams.loras = matching.map(l => ({ path: l.url, scale: Number(l.scale) || 1 }));
-      let p2 = callParams.prompt;
-      matching.forEach(l => {
-        (l.trigger || '').split(',').map(t => t.trim()).filter(Boolean).forEach(t => {
-          if (!p2.toLowerCase().includes(t.toLowerCase())) p2 = t + ', ' + p2;
-        });
-      });
-      callParams.prompt = p2;
+      // NOTE: trigger words are no longer injected here — they already live in the visible
+      // prompt box (added when the LoRA is toggled on, and removable by the user). What you
+      // see in the prompt is exactly what's sent.
+      // Prompt Strength (CFG) from the LoRA menu slider — applies to Flux & Klein LoRA models.
+      if (callParams.guidance == null && typeof loraCfg === 'number') callParams.guidance = loraCfg;
       if (skipped.length) {
         appendError('Skipped ' + skipped.length + ' LoRA(s) not made for the ' + m.loraBase + ' model: ' + skipped.map(l => l.name || 'Untitled').join(', ') + '. Only matching-base LoRAs are applied.');
       }
@@ -4544,77 +4622,250 @@ document.getElementById('pe-finalize-btn')?.addEventListener('click', finalizePr
 // ═══════════════════════════════════════════════════════
 let zaorLoras = [];
 try { zaorLoras = JSON.parse(localStorage.getItem('zaor_loras') || '[]'); } catch(e) { zaorLoras = []; }
+
+// ── Seed default LoRAs once (first run only). After this, the user's edits/deletions stick. ──
+const DEFAULT_LORAS = [
+  { id:90001, name:'Z-Image Anime 01',    url:'https://civitai.com/api/download/models/2448896', trigger:'', base:'Z-Image',     category:'style',   scale:0.85, notes:'Flat, vibrant 2D anime style', active:false },
+  { id:90002, name:'Z-Image-Turbo-Anime', url:'https://civitai.com/api/download/models/2543657', trigger:'', base:'Z-Image',     category:'style',   scale:0.85, notes:'Foundational anime style for turbo', active:false },
+  { id:90003, name:'Z-IMAGE ANIME - ILL', url:'https://civitai.com/api/download/models/2463859', trigger:'', base:'Z-Image',     category:'style',   scale:0.85, notes:'High-contrast digital illustration', active:false },
+  { id:90005, name:'samdoearts',          url:'https://civitai.com/api/download/models/2541753', trigger:'', base:'Z-Image',     category:'style',   scale:0.85, notes:'Semi-realistic 3D-cartoon digital painting', active:false },
+  { id:90006, name:'SNOFS (Klein 9B)',    url:'https://civitai.red/api/download/models/2960556?fileId=2839878', trigger:'', base:'Flux2-Klein', category:'realism', scale:0.90, notes:'NSFW training · high flexibility', active:false },
+  { id:90007, name:'Lenovo styles real',  url:'https://civitai.com/api/download/models/2545735', trigger:'', base:'Flux2-Klein', category:'realism', scale:0.85, notes:'Highly realistic details for Klein', active:false },
+  { id:90009, name:'Anatomy fixer (slider)', url:'https://civitai.com/api/download/models/2615554?fileId=2502989', trigger:'', base:'Flux2-Klein', category:'realism', scale:2.0, notes:'Klein anatomy/quality slider. No trigger — works by WEIGHT only. Use ~2.0 for minor fixes, up to 3.0 for bigger artifacts. Negative weights make anatomy WORSE. Far stronger than normal LoRAs.', active:false }
+];
+try {
+  if (localStorage.getItem('zaor_loras_seeded') !== '1') {
+    const haveUrls = new Set(zaorLoras.map(l => l.url));
+    DEFAULT_LORAS.forEach(d => { if (!haveUrls.has(d.url)) zaorLoras.push({ ...d }); });
+    localStorage.setItem('zaor_loras_seeded', '1');
+    try { localStorage.setItem('zaor_loras', JSON.stringify(zaorLoras)); } catch(e) {}
+  }
+} catch(e) {}
+// Backfill a category on any older entries that lack one.
+zaorLoras.forEach(l => { if (!l.category) l.category = (l.base === 'Z-Image' ? 'style' : 'realism'); });
+
 function saveZaorLoras() { try { localStorage.setItem('zaor_loras', JSON.stringify(zaorLoras)); } catch(e) {} }
 function activeLoras() { return zaorLoras.filter(l => l.active).slice(0, 3); }
+
+// Which base model does the currently selected image model use for LoRAs? (for the mismatch flag)
+function currentLoraBase() {
+  try {
+    const mid = document.getElementById('img-model-select')?.value;
+    const m = mid && MODEL_REGISTRY[mid];
+    return (m && m.lora) ? (m.loraBase || null) : null; // null = current model isn't a LoRA model
+  } catch(e) { return null; }
+}
+
+// ── Trigger words as VISIBLE, DELETABLE text in the prompt box ──
+function loraTriggerWords(l) {
+  return (l.trigger || '').split(',').map(t => t.trim()).filter(Boolean);
+}
+function insertLoraTrigger(l) {
+  const box = document.getElementById('prompt'); if (!box) return;
+  const words = loraTriggerWords(l); if (!words.length) return;
+  let cur = box.value || '';
+  words.slice().reverse().forEach(w => {
+    if (!cur.toLowerCase().includes(w.toLowerCase())) cur = w + ', ' + cur;
+  });
+  box.value = cur;
+  try { box.dispatchEvent(new Event('input', { bubbles:true })); } catch(e) {}
+}
+function removeLoraTrigger(l) {
+  const box = document.getElementById('prompt'); if (!box) return;
+  const words = loraTriggerWords(l); if (!words.length) return;
+  let cur = box.value || '';
+  words.forEach(w => {
+    // remove "w, " or ", w" or bare "w" (case-insensitive), trimming leftover separators
+    const esc = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    cur = cur.replace(new RegExp('(^|,\\s*)' + esc + '(\\s*,|$)', 'i'), (m, p1, p2) => (p1 && p2 && p2.trim().startsWith(',')) ? ', ' : '');
+  });
+  cur = cur.replace(/^\s*,\s*/, '').replace(/\s*,\s*$/, '').replace(/,\s*,/g, ', ').trim();
+  box.value = cur;
+  try { box.dispatchEvent(new Event('input', { bubbles:true })); } catch(e) {}
+}
 
 const loraOverlay = document.getElementById('lora-overlay');
 const loraList = document.getElementById('lora-list');
 
+let loraFilter = 'all';
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function renderLoraActiveStrip() {
+  const chips = document.getElementById('lora-active-chips');
+  const slot = document.getElementById('lora-slot-count');
+  if (!chips || !slot) return;
+  const act = activeLoras();
+  slot.innerHTML = '<b style="color:#7ee0a8;">' + act.length + '</b> / 3 slots';
+  if (!act.length) { chips.innerHTML = '<span class="lora-empty-active">Nothing active — toggle a LoRA below to use it.</span>'; return; }
+  chips.innerHTML = act.map(l =>
+    '<div class="lora-chip"><span class="nm">' + esc(l.name || 'Untitled') + '</span>' +
+    '<span class="w">' + (Number(l.scale)||1) + '</span>' +
+    '<span class="x" data-off="' + l.id + '" title="Turn off">\u2715</span></div>'
+  ).join('');
+}
+
+function loraCardHTML(l) {
+  const baseClass = 'lb-' + String(l.base || 'Other').toLowerCase();
+  const curBase = currentLoraBase();
+  // mismatch = current model IS a lora model, but this LoRA's base doesn't match (and isn't "Other")
+  const mism = curBase && l.base && l.base !== 'Other' && l.base !== curBase;
+  const trig = (l.trigger || '').trim();
+  return '<div class="lora-card ' + (l.active ? '' : 'off ') + (mism ? 'mismatch' : '') + '">' +
+    '<div class="lora-tog ' + (l.active ? 'on' : '') + '" data-id="' + l.id + '"><div class="knob"></div></div>' +
+    '<div class="lora-cbody">' +
+      '<div class="lora-cname">' + esc(l.name || 'Untitled') + '</div>' +
+      '<div class="lora-badges">' +
+        '<span class="lora-badge ' + baseClass + '">' + esc(l.base || 'Other') + '</span>' +
+        '<span class="lora-badge lb-other" style="font-family:ui-monospace,monospace;">w ' + (Number(l.scale)||1) + '</span>' +
+      '</div>' +
+      (trig ? '<div class="lora-trig">trigger: ' + esc(trig) + '</div>' : '') +
+      (l.notes ? '<div class="lora-cnote">' + esc(l.notes) + '</div>' : '') +
+      (mism ? '<div class="lora-flag">\u26A0 Needs the ' + esc(l.base) + ' model selected to fire</div>' : '') +
+      '<div class="lora-wbox"><span>weight</span>' +
+        '<input type="number" class="lora-scale-edit" data-id="' + l.id + '" value="' + (Number(l.scale)||1) + '" min="0" max="3" step="0.05" style="width:74px;padding:4px 7px;font-size:12px;" /></div>' +
+      '<div class="lora-edit-fields" data-edit="' + l.id + '" style="display:none;">' +
+        '<input type="text" class="lora-f-name" data-id="' + l.id + '" value="' + esc(l.name) + '" placeholder="Name" />' +
+        '<input type="text" class="lora-f-url" data-id="' + l.id + '" value="' + esc(l.url) + '" placeholder="Link" spellcheck="false" />' +
+        '<input type="text" class="lora-f-trigger" data-id="' + l.id + '" value="' + esc(l.trigger) + '" placeholder="Trigger word(s) — blank for none" spellcheck="false" />' +
+        '<input type="text" class="lora-f-notes" data-id="' + l.id + '" value="' + esc(l.notes) + '" placeholder="Notes / hint" />' +
+      '</div>' +
+    '</div>' +
+    '<div class="lora-cact">' +
+      '<span class="lora-ic" data-editbtn="' + l.id + '" title="Edit">\u270E</span>' +
+      '<span class="lora-ic" data-del="' + l.id + '" title="Delete">\uD83D\uDDD1</span>' +
+    '</div>' +
+  '</div>';
+}
+
 function renderLoras() {
+  renderLoraActiveStrip();
   if (!loraList) return;
   if (!zaorLoras.length) {
-    loraList.innerHTML = '<div class="lib-empty">No LoRAs yet. Add one below — paste a Hugging Face or Civitai file link plus its trigger word.</div>';
+    loraList.innerHTML = '<div class="lib-empty">No LoRAs yet. Tap “Add a new LoRA” below — paste a Hugging Face or Civitai file link.</div>';
     return;
   }
-  const count = activeLoras().length;
-  loraList.innerHTML = zaorLoras.map(l =>
-    '<div class="lora-item"><div style="display:flex;align-items:center;gap:8px;">' +
-      '<input type="checkbox" class="lora-active" data-id="' + l.id + '"' + (l.active ? ' checked' : '') + ' style="width:18px;height:18px;flex-shrink:0;" />' +
-      '<div style="flex:1;min-width:0;"><div class="lib-item-title">' + (l.name || 'Untitled').replace(/</g,'&lt;') + '</div>' +
-      '<div class="lora-meta">' + (l.base ? '<b>' + l.base + '</b> · ' : '') + 'trigger: <b>' + (l.trigger || '—').replace(/</g,'&lt;') + '</b></div>' +
-      (l.notes ? '<div class="lora-meta" style="opacity:0.8;">\uD83D\uDCDD ' + l.notes.replace(/</g,'&lt;') + '</div>' : '') +
-      '<div style="display:flex;align-items:center;gap:6px;margin-top:5px;"><span style="font-size:11px;color:var(--text-dim);">weight</span>' +
-      '<input type="number" class="lora-scale-edit" data-id="' + l.id + '" value="' + l.scale + '" min="0" max="2" step="0.05" style="width:70px;padding:3px 6px;font-size:12px;" /></div></div>' +
-      '<span class="lib-del" data-del="' + l.id + '" title="Delete">\u2715</span>' +
-    '</div></div>'
-  ).join('') + '<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">' + count + '/3 active</div>';
+  const groups = [
+    { key:'style',   label:'\uD83C\uDFA8 Style' },
+    { key:'realism', label:'\uD83D\uDCF7 Realism' }
+  ];
+  let html = '';
+  groups.forEach(g => {
+    if (loraFilter !== 'all' && loraFilter !== g.key) return;
+    const items = zaorLoras.filter(l => (l.category || 'style') === g.key);
+    if (!items.length) return;
+    html += '<div class="lora-grp"><span class="gt">' + g.label + '</span><span class="ln"></span><span class="ct">' + items.length + '</span></div>';
+    html += items.map(loraCardHTML).join('');
+  });
+  if (!html) html = '<div class="lib-empty">No LoRAs in this group.</div>';
+  loraList.innerHTML = html;
 }
 
 document.getElementById('lora-btn')?.addEventListener('click', () => { renderLoras(); loraOverlay.classList.add('open'); });
 document.getElementById('lora-close')?.addEventListener('click', () => loraOverlay.classList.remove('open'));
 loraOverlay?.addEventListener('click', (e) => { if (e.target === loraOverlay) loraOverlay.classList.remove('open'); });
 
+// Filter tabs
+document.getElementById('lora-filter-row')?.addEventListener('click', (e) => {
+  const tab = e.target.closest('.lora-tab'); if (!tab) return;
+  loraFilter = tab.dataset.filter || 'all';
+  document.querySelectorAll('#lora-filter-row .lora-tab').forEach(t => t.classList.toggle('on', t === tab));
+  renderLoras();
+});
+
+// Active chips: tap ✕ to turn off
+document.getElementById('lora-active-chips')?.addEventListener('click', (e) => {
+  const x = e.target.closest('[data-off]'); if (!x) return;
+  const l = zaorLoras.find(z => String(z.id) === String(x.dataset.off));
+  if (!l) return;
+  l.active = false;
+  removeLoraTrigger(l);
+  saveZaorLoras(); renderLoras();
+});
+
+// Add a new LoRA
 document.getElementById('lora-add')?.addEventListener('click', () => {
   const url = document.getElementById('lora-url').value.trim();
   if (!url) { alert('Paste the LoRA file link first (from Hugging Face or Civitai).'); return; }
   const name = document.getElementById('lora-name').value.trim();
   const trigger = document.getElementById('lora-trigger').value.trim();
-  const scale = parseFloat(document.getElementById('lora-scale').value) || 1;
+  const scale = parseFloat(document.getElementById('lora-scale').value) || 0.85;
   const base = document.getElementById('lora-base')?.value || 'Other';
+  const category = document.getElementById('lora-category')?.value || 'style';
   const notes = document.getElementById('lora-notes')?.value.trim() || '';
-  zaorLoras.unshift({ id: Date.now(), name: name || 'Untitled', url, trigger, scale, base, notes, active: activeLoras().length < 3 });
+  zaorLoras.unshift({ id: Date.now(), name: name || 'Untitled', url, trigger, scale, base, category, notes, active: false });
   saveZaorLoras();
   ['lora-name','lora-url','lora-trigger','lora-notes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-  document.getElementById('lora-scale').value = '1';
+  document.getElementById('lora-scale').value = '0.85';
+  const det = document.getElementById('lora-add-details'); if (det) det.open = false;
   renderLoras();
 });
 
+// Card clicks: toggle on/off, expand edit, delete
 loraList?.addEventListener('click', (e) => {
-  const del = e.target.closest('.lib-del');
-  if (del) { zaorLoras = zaorLoras.filter(l => String(l.id) !== String(del.dataset.del)); saveZaorLoras(); renderLoras(); }
-});
-loraList?.addEventListener('change', (e) => {
-  const sc = e.target.closest('.lora-scale-edit');
-  if (sc) {
-    const l = zaorLoras.find(x => String(x.id) === String(sc.dataset.id));
-    if (l) { l.scale = parseFloat(sc.value) || 1; saveZaorLoras(); }
+  const del = e.target.closest('[data-del]');
+  if (del) {
+    const l = zaorLoras.find(z => String(z.id) === String(del.dataset.del));
+    if (l && l.active) removeLoraTrigger(l);
+    zaorLoras = zaorLoras.filter(z => String(z.id) !== String(del.dataset.del));
+    saveZaorLoras(); renderLoras(); return;
+  }
+  const editbtn = e.target.closest('[data-editbtn]');
+  if (editbtn) {
+    const panel = loraList.querySelector('.lora-edit-fields[data-edit="' + editbtn.dataset.editbtn + '"]');
+    if (panel) panel.style.display = (panel.style.display === 'none' ? 'flex' : 'none');
     return;
   }
-  const cb = e.target.closest('.lora-active');
-  if (!cb) return;
-  const l = zaorLoras.find(x => String(x.id) === String(cb.dataset.id));
-  if (!l) return;
-  if (cb.checked && activeLoras().length >= 3) { cb.checked = false; alert('You can apply up to 3 LoRAs at once. Untick one first.'); return; }
-  l.active = cb.checked;
-  saveZaorLoras();
-  renderLoras();
+  const tog = e.target.closest('.lora-tog');
+  if (tog) {
+    const l = zaorLoras.find(z => String(z.id) === String(tog.dataset.id));
+    if (!l) return;
+    if (!l.active && activeLoras().length >= 3) { alert('You can apply up to 3 LoRAs at once. Turn one off first.'); return; }
+    l.active = !l.active;
+    if (l.active) insertLoraTrigger(l); else removeLoraTrigger(l);
+    saveZaorLoras(); renderLoras();
+  }
+});
+
+// Card field edits (weight + expanded name/url/trigger/notes)
+loraList?.addEventListener('change', (e) => {
+  const sc = e.target.closest('.lora-scale-edit');
+  if (sc) { const l = zaorLoras.find(x => String(x.id) === String(sc.dataset.id)); if (l) { l.scale = parseFloat(sc.value) || 1; saveZaorLoras(); renderLoraActiveStrip(); } return; }
+  const map = [['.lora-f-name','name'], ['.lora-f-url','url'], ['.lora-f-trigger','trigger'], ['.lora-f-notes','notes']];
+  for (const [sel, field] of map) {
+    const f = e.target.closest(sel);
+    if (f) {
+      const l = zaorLoras.find(x => String(x.id) === String(f.dataset.id));
+      if (l) {
+        if (field === 'trigger' && l.active) removeLoraTrigger(l); // clear old trigger text first
+        l[field] = f.value.trim();
+        if (field === 'trigger' && l.active) insertLoraTrigger(l);
+        saveZaorLoras();
+        if (field === 'name') renderLoras();
+      }
+      return;
+    }
+  }
 });
 
 document.getElementById('lora-unload-all')?.addEventListener('click', () => {
-  zaorLoras.forEach(l => l.active = false);
+  zaorLoras.forEach(l => { if (l.active) { removeLoraTrigger(l); l.active = false; } });
   saveZaorLoras();
   renderLoras();
 });
+// ── CFG / Prompt-strength slider ──
+let loraCfg = parseFloat(localStorage.getItem('zaor_lora_cfg') || '3.5');
+if (isNaN(loraCfg)) loraCfg = 3.5;
+function syncLoraCfg(v) {
+  loraCfg = v;
+  try { localStorage.setItem('zaor_lora_cfg', String(v)); } catch(e) {}
+  const val = document.getElementById('lora-cfg-val'); if (val) val.textContent = Number(v).toFixed(1);
+  const sl = document.getElementById('lora-cfg'); if (sl && parseFloat(sl.value) !== v) sl.value = v;
+  // Keep the existing hidden Flux guidance input in sync so the Flux path uses the same number.
+  const fg = document.getElementById('flux-guidance'); if (fg) fg.value = v;
+}
+document.getElementById('lora-cfg')?.addEventListener('input', (e) => syncLoraCfg(parseFloat(e.target.value) || 3.5));
+syncLoraCfg(loraCfg);
+
 document.getElementById('lora-export')?.addEventListener('click', () => {
   if (!zaorLoras.length) { alert('No LoRAs to back up yet.'); return; }
   const data = JSON.stringify(zaorLoras);
@@ -4631,7 +4882,7 @@ document.getElementById('lora-import')?.addEventListener('click', () => {
   let added = 0;
   arr.forEach(l => {
     if (l && l.url && !have.has(l.url)) {
-      zaorLoras.push({ id: l.id || (Date.now() + Math.random()), name: l.name || 'Untitled', url: l.url, trigger: l.trigger || '', scale: l.scale || 1, base: l.base || 'Other', notes: l.notes || '', active: false });
+      zaorLoras.push({ id: l.id || (Date.now() + Math.random()), name: l.name || 'Untitled', url: l.url, trigger: l.trigger || '', scale: l.scale || 1, base: l.base || 'Other', category: l.category || (l.base === 'Z-Image' ? 'style' : 'realism'), notes: l.notes || '', active: false });
       have.add(l.url); added++;
     }
   });
