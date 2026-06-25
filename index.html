@@ -1267,7 +1267,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.14</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.15</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1377,7 +1377,6 @@
     <div id="input-area">
       <div id="mode-indicator"><span id="mode-label-text">Chat mode</span><span id="cost-estimate"></span></div>
       <div id="upload-edit-row" style="display:flex;gap:6px;margin-bottom:6px;padding:0 4px;flex-wrap:wrap;align-items:center;">
-        <button id="upload-img-btn" class="edit-img-btn visible" title="Upload an image to edit or animate">🖼 Upload Image</button>
         <button id="sb-frame-btn" class="edit-img-btn" style="display:none;" title="Generate a storyboard frame from the latest story beat">🎬 Generate Frame</button>
       </div>
       <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/webp" style="display:none;" />
@@ -1448,6 +1447,9 @@
         </div>
       </div>
       <div id="edit-mode-row">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:0 0 2px;">
+          <button id="upload-img-btn" class="edit-img-btn visible" title="Upload an image to edit">🖼 Upload Image</button>
+        </div>
         <div class="img-controls-row">
           <div class="img-control-group" style="flex:1;min-width:180px;">
             <span class="mode-label">Edit model</span>
@@ -2634,11 +2636,7 @@ function setEditMode(on)  { setMode(on ? 'edit'  : 'chat'); }
 imgToggle.addEventListener('click', () => setMode(imageMode ? 'chat' : 'image'));
 
 document.getElementById('edit-toggle')?.addEventListener('click', () => {
-  if (editMode) { setMode('chat'); return; }
-  setMode('edit');
-  if (!lastImageUrl && !(typeof activeEditTarget !== 'undefined' && activeEditTarget)) {
-    appendError('Pick an image to edit — tap 🖼 Upload Image, or generate one first.');
-  }
+  setMode(editMode ? 'chat' : 'edit');
 });
 
 // ── Upload image for editing/animating ──
