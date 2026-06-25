@@ -1267,7 +1267,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.13</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.14</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -4230,11 +4230,47 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
     }
   });
 
+  // Get Style — analyze THIS image and write a style prompt into Style Lock
+  const getStyleBtn = document.createElement('button');
+  getStyleBtn.className = 'animate-btn';
+  getStyleBtn.innerHTML = '🎨 Get Style';
+  getStyleBtn.title = 'Analyze this image and write a reusable style prompt into Style Lock';
+  getStyleBtn.addEventListener('click', async () => {
+    const imageTarget = hostedUrl || src;
+    if (!imageTarget) { appendError('No image to analyze.'); return; }
+    const prev = getStyleBtn.innerHTML;
+    getStyleBtn.disabled = true;
+    getStyleBtn.innerHTML = '… reading';
+    try {
+      const style = await extractStyleFromImage(imageTarget);
+      if (!style) throw new Error('No style came back — try again.');
+      // Drop it into the Style Lock box at the top, ready to lock
+      const input = document.getElementById('style-lock-input');
+      if (input) { input.value = style; input.dispatchEvent(new Event('input')); }
+      const panel = document.getElementById('style-lock-panel');
+      const slBtn = document.getElementById('style-lock-btn');
+      if (panel && !panel.classList.contains('open')) { panel.classList.add('open'); slBtn?.classList.add('open'); }
+      // Show it in chat (transient note — not saved to story history)
+      const note = document.createElement('div');
+      note.className = 'error-bubble';
+      note.style.cssText = 'background:rgba(201,184,232,0.12);border-color:rgba(201,184,232,0.4);color:var(--text);';
+      note.textContent = '🎨 Extracted style → ' + style + '  ·  filled into Style Lock at top; tap 🔒 Lock Style to use it.';
+      messagesEl.appendChild(note);
+      scrollToBottom();
+    } catch(e) {
+      appendError('Get Style failed: ' + e.message);
+    } finally {
+      getStyleBtn.disabled = false;
+      getStyleBtn.innerHTML = prev;
+    }
+  });
+
   btnBar.appendChild(saveBtn);
   btnBar.appendChild(cloudBtn);
   btnBar.appendChild(copyPromptBtn);
   btnBar.appendChild(pinPEBtn);
   btnBar.appendChild(setTargetBtn);
+  btnBar.appendChild(getStyleBtn);
   btnBar.appendChild(applyStyleBtn);
   btnBar.appendChild(retryImgBtn);
   btnBar.appendChild(animBtn);
@@ -5614,6 +5650,33 @@ function showEditButton() {
 }
 
 // ── Style Lock ──
+// Ask Zaor's vision model to describe ONLY the visual style of an image,
+// returning a comma-separated prompt fragment (no subject/content).
+async function extractStyleFromImage(imageUrl) {
+  if (!apiKey) throw new Error('Set your xAI key first (🔑 in the ⋯ menu).');
+  const sys = 'You are a visual-style analyst. Look at the image and output ONLY a concise, comma-separated style descriptor capturing its visual aesthetic: medium and technique, art style, linework, rendering, color palette, lighting, texture, grain, and mood. Describe ONLY the visual style — never the subject, characters, objects, or what is happening. No preamble, no explanation, no quotes, no sentences. Output a single line usable directly as a style-prompt fragment.';
+  const res = await fetch('https://api.x.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: modelSelect.value,
+      messages: [
+        { role: 'system', content: sys },
+        { role: 'user', content: [
+          { type: 'image_url', image_url: { url: imageUrl, detail: 'auto' } },
+          { type: 'text', text: 'Extract the visual style of this image as a comma-separated style prompt.' }
+        ] }
+      ],
+      max_tokens: 220,
+      temperature: 0.4
+    })
+  });
+  if (!res.ok) throw new Error('Vision request failed (' + res.status + ')');
+  const data = await res.json();
+  let txt = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+  return txt.trim().replace(/^["']+|["']+$/g, '').replace(/\s*\n+\s*/g, ', ').trim();
+}
+
 function applyStyleLock(prompt) {
   if (!styleLockActive || !lockedStyle.trim()) return prompt;
   return prompt + ', ' + lockedStyle.trim();
