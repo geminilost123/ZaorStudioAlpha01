@@ -1295,7 +1295,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.17</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.18</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1772,12 +1772,13 @@
 <div class="modal-overlay" id="cast-overlay">
   <div class="modal" style="max-width:520px;width:92%;max-height:85vh;overflow-y:auto;">
     <h2 style="margin-bottom:4px;">👥 Cast — this story</h2>
-    <p style="margin-bottom:12px;">Character sheets for the current game. New characters are added automatically as the story introduces them; the storyboard director reuses these to keep returning characters looking consistent. Edit any time — your edits stick.</p>
+    <p style="margin-bottom:12px;">Character sheets for the current game. You manage these manually — add a character, tap ✨ to write a physical description, and set a reference image (upload, generate, or use your last frame) to lock that character's look across storyboard frames. The director reuses these sheets to keep returning characters consistent.</p>
     <div id="cast-list"></div>
     <div style="border-top:1px solid rgba(255,255,255,0.1);margin-top:6px;padding-top:12px;">
       <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Add a character</label>
       <input type="text" id="cast-add-name" placeholder="Name" autocomplete="off" style="margin-bottom:6px;" />
-      <textarea id="cast-add-desc" placeholder="Physical description (or leave blank and tap ✦ Help write after adding)" style="width:100%;min-height:54px;margin-bottom:8px;"></textarea>
+      <textarea id="cast-add-desc" placeholder="Physical description (or leave blank, add, then tap ✨ on the character)" style="width:100%;min-height:54px;margin-bottom:6px;"></textarea>
+      <button type="button" class="btn-secondary sparkle-btn" id="cast-add-help" title="Write a description from the name + story" style="padding:3px 10px;font-size:12px;width:auto;margin-bottom:8px;">✨ Write description</button>
       <button class="btn-primary" id="cast-add-btn" style="width:100%;">+ Add character</button>
     </div>
     <div class="modal-btns" style="margin-top:12px;">
@@ -1790,15 +1791,22 @@
 <div class="modal-overlay" id="setup-overlay">
   <div class="modal" style="max-width:520px;width:92%;max-height:85vh;overflow-y:auto;">
     <h2 style="margin-bottom:4px;">📖 Story Setup</h2>
-    <p style="margin-bottom:12px;">Prime a new game. Premise &amp; tone steer the chat; visual style is applied to every storyboard frame; starting characters seed your cast. Per-story — reopen and tweak anytime.</p>
-    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Premise / themes</label>
-    <textarea id="setup-premise" placeholder="The germ of the idea — what's this story about?" style="width:100%;min-height:70px;margin-bottom:10px;"></textarea>
-    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Tone</label>
+    <p style="margin-bottom:12px;">Prime a new game. Premise &amp; tone steer the chat; visual style is applied to every storyboard frame. Manage characters in the 👥 Cast menu. Per-story — reopen and tweak anytime. Tap ✨ on any field to have the AI write or expand it from a rough idea.</p>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+      <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;">Premise / themes</label>
+      <button type="button" class="btn-secondary sparkle-btn" data-fill="premise" title="Write or expand this with AI" style="padding:2px 9px;font-size:11px;min-width:auto;width:auto;">✨ Write</button>
+    </div>
+    <textarea id="setup-premise" placeholder="The germ of the idea — e.g. type &quot;scary story&quot; then tap ✨" style="width:100%;min-height:70px;margin-bottom:10px;"></textarea>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+      <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;">Tone</label>
+      <button type="button" class="btn-secondary sparkle-btn" data-fill="tone" title="Write or expand this with AI" style="padding:2px 9px;font-size:11px;min-width:auto;width:auto;">✨ Write</button>
+    </div>
     <input type="text" id="setup-tone" placeholder="e.g. noir, cozy, erotic thriller, epic fantasy" autocomplete="off" style="margin-bottom:10px;" />
-    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Visual style (applied to all frames)</label>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+      <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;">Visual style (applied to all frames)</label>
+      <button type="button" class="btn-secondary sparkle-btn" data-fill="style" title="Write or expand this with AI" style="padding:2px 9px;font-size:11px;min-width:auto;width:auto;">✨ Write</button>
+    </div>
     <input type="text" id="setup-style" placeholder="e.g. grainy 35mm film, moody lighting, cinematic" autocomplete="off" style="margin-bottom:10px;" />
-    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Starting characters — one per line: Name — description</label>
-    <textarea id="setup-characters" placeholder="Maya — late 20s, long black hair, slim, scar on left cheek&#10;Detective Cole — 40s, broad, grey stubble, worn trench coat" style="width:100%;min-height:70px;margin-bottom:8px;"></textarea>
     <div class="modal-btns" style="margin-top:8px;">
       <button class="btn-primary" id="setup-save" style="width:100%;">Save setup</button>
       <button class="btn-secondary" id="setup-close" style="width:100%;margin-top:8px;">Close</button>
@@ -5215,7 +5223,7 @@ Set FRAME: yes if ANY of these just appeared in the beat — a NEW character, a 
 When multiple triggers occur, choose ONE subject by this strict priority: (1) a wardrobe change, (2) a new female character, (3) a new male character, (4) the current action happening.
 
 If FRAME: yes, write:
-- IMAGE_PROMPT: a vivid {MODEL} text-to-image prompt depicting that exact moment, grounded in the story (who is present and what they look like, wardrobe, setting, lighting, mood, camera framing). {MODELGUIDE}
+- IMAGE_PROMPT: a vivid {MODEL} text-to-image prompt depicting that exact moment, grounded in the story (who is present and what they look like, wardrobe, setting, lighting, mood, camera framing). CRITICAL: describe ONLY what is literally present in this beat. Do NOT invent characters, settings, objects, wardrobe, or themes the beat does not state, and do NOT summarize the wider story — write a strictly literal, visual description of this moment. {MODELGUIDE}
 - VIDEO_PROMPT: a short Wan 2.2 image-to-video prompt describing the MOTION to animate that image (subject motion first, then camera). Describe motion, not appearance.
 - CAST: for any NEW character or wardrobe change, one line each: "Name — sex, approx age, hair, build, distinguishing features | wardrobe: ...". Use "none" if nothing changed.
 
@@ -5283,7 +5291,7 @@ async function runStoryboardDirector(beatText, forceFrame) {
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content || '';
     const parsed = parseDirectorBlock(raw);
-    mergeCastFromDirector(parsed.cast);
+    // Cast is managed manually now — the director's CAST output is intentionally ignored (no auto-merge).
     if (parsed.frame && parsed.imagePrompt) {
       await addStoryboardFrame(parsed.imagePrompt, parsed.videoPrompt, parsed.reason);
     }
@@ -5327,9 +5335,22 @@ async function addStoryboardFrame(imagePrompt, videoPrompt, reason) {
   messagesEl.appendChild(card);
   scrollToBottom();
   try {
-    const src = await callModel(storyboardModel, buildStoryboardCallParams(imagePrompt));
+    // Likeness lock: if a cast member with a saved reference image is named in the prompt,
+    // route this frame through the image-edit model (using their canonical image) instead of plain t2img.
+    const ref = findCastReference(imagePrompt);
+    let src, modelLabel;
+    if (ref && ref.imageUrl) {
+      const editModel = document.getElementById('edit-model-select')?.value || 'wan27';
+      const setup = getStorySetup();
+      const editPrompt = imagePrompt + (setup && setup.style ? ', ' + setup.style : '');
+      const r = await runEdit(editPrompt, ref.imageUrl, editModel);
+      src = r.src;
+      modelLabel = (r.modelLabel || 'Edit') + ' · ' + ref.name;
+    } else {
+      src = await callModel(storyboardModel, buildStoryboardCallParams(imagePrompt));
+      modelLabel = (MODEL_REGISTRY[storyboardModel] && MODEL_REGISTRY[storyboardModel].label) || storyboardModel;
+    }
     if (!src) throw new Error('no image returned');
-    const modelLabel = (MODEL_REGISTRY[storyboardModel] && MODEL_REGISTRY[storyboardModel].label) || storyboardModel;
     fillStoryboardCard(card, src, videoPrompt, reason, frameId, modelLabel);
     addMessageToThread({ role: 'assistant', type: 'storyboard', src, alt: imagePrompt, videoPrompt: videoPrompt || '', reason: reason || '', frameId, modelLabel });
     // make the frame editable + reveal the edit menu (so the edit model is visible in story mode)
@@ -5531,7 +5552,7 @@ function renderCastPanel() {
   const cast = getCast();
   list.innerHTML = '';
   if (!cast.length) {
-    list.innerHTML = '<div class="lib-empty">No characters yet. They appear here automatically as your story introduces them — or add one below.</div>';
+    list.innerHTML = '<div class="lib-empty">No characters yet. Add one below, tap ✨ to write a description, then set a reference image to lock the look.</div>';
     return;
   }
   cast.forEach((c, i) => {
@@ -5546,11 +5567,55 @@ function renderCastPanel() {
     ta.value = c.desc || '';
     ta.addEventListener('change', () => { const cc = getCast(); if (cc[i]) { cc[i].desc = ta.value.trim(); saveCast(cc); } });
     row.appendChild(ta);
+
+    // ── Reference image slot (manual likeness lock) ──
+    const refWrap = document.createElement('div');
+    refWrap.className = 'cast-ref';
+    refWrap.style.cssText = 'display:flex;align-items:center;gap:8px;margin:6px 0;';
+    const thumb = document.createElement('img');
+    thumb.style.cssText = 'width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,0.14);flex:none;' + (c.imageUrl ? '' : 'display:none;');
+    if (c.imageUrl) { thumb.src = c.imageUrl; thumb.referrerPolicy = 'no-referrer'; }
+    const placeholder = document.createElement('div');
+    placeholder.style.cssText = 'width:52px;height:52px;border-radius:8px;border:1px dashed rgba(255,255,255,0.2);display:' + (c.imageUrl ? 'none' : 'flex') + ';align-items:center;justify-content:center;font-size:18px;opacity:0.5;flex:none;';
+    placeholder.textContent = '👤';
+    const refBtns = document.createElement('div');
+    refBtns.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;';
+    const mkRefBtn = (label, title, handler) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn-secondary';
+      b.textContent = label; b.title = title;
+      b.style.cssText = 'padding:3px 8px;font-size:11px;width:auto;min-width:auto;';
+      b.addEventListener('click', () => handler(b));
+      return b;
+    };
+    const fileIn = document.createElement('input');
+    fileIn.type = 'file'; fileIn.accept = 'image/*'; fileIn.style.display = 'none';
+    fileIn.addEventListener('change', ev => {
+      const f = ev.target.files && ev.target.files[0]; if (!f) return;
+      if (f.size > 8 * 1024 * 1024) { appendError('Image too large — keep under 8MB.'); ev.target.value = ''; return; }
+      const r = new FileReader(); r.onload = () => setCastImage(i, r.result); r.readAsDataURL(f); ev.target.value = '';
+    });
+    refBtns.appendChild(mkRefBtn('📤 Upload', 'Upload a reference image', () => fileIn.click()));
+    refBtns.appendChild(mkRefBtn('🎨 Generate', 'Generate a reference from the description', (b) => generateCastImage(i, b)));
+    refBtns.appendChild(mkRefBtn('🎬 Use last frame', 'Use your most recent image as this reference', () => {
+      if (!lastImageUrl) { appendError('No recent image yet — generate or make a frame first.'); return; }
+      setCastImage(i, lastImageUrl);
+    }));
+    if (c.imageUrl) {
+      refBtns.appendChild(mkRefBtn('✕ Clear', 'Remove this reference image', () => { const cc = getCast(); if (cc[i]) { delete cc[i].imageUrl; saveCast(cc); renderCastPanel(); } }));
+    }
+    refWrap.appendChild(thumb);
+    refWrap.appendChild(placeholder);
+    refWrap.appendChild(refBtns);
+    refWrap.appendChild(fileIn);
+    row.appendChild(refWrap);
+
     const btns = document.createElement('div');
     btns.className = 'cast-btns';
     const helpBtn = document.createElement('button');
-    helpBtn.className = 'btn-secondary';
-    helpBtn.textContent = '✦ Help write';
+    helpBtn.className = 'btn-secondary sparkle-btn';
+    helpBtn.textContent = '✨ Write';
+    helpBtn.title = 'Write/expand this description with AI';
     helpBtn.addEventListener('click', () => castHelpWrite(i, ta, helpBtn));
     const delBtn = document.createElement('button');
     delBtn.className = 'btn-secondary';
@@ -5586,6 +5651,87 @@ async function castHelpWrite(i, ta, btn) {
   finally { btn.textContent = orig; btn.disabled = false; }
 }
 
+// ── ✨ Auto-Fill: one generic field writer for Story Setup + Cast ──
+// Seed-expansion: builds on whatever the user already typed; invents from scratch if the field is empty.
+// Length/shape is tuned per field. Identity fields never emit art-style words (style is global).
+const FIELD_WRITER = {
+  premise:   { max: 220, sys: 'You help a writer set up an interactive story. Expand the user\'s rough idea into a vivid premise. If they gave a seed (even one or two words like "scary story"), build directly on it; if empty, invent something compelling. Output ONLY the premise as AT MOST 3 sentences — no title, no preamble, no quotes, no lists.' },
+  tone:      { max: 40,  sys: 'You suggest a story tone. Build on any seed the user gave; if empty, invent one that fits. Output ONLY a few comma-separated words (e.g. "noir, tense, rain-soaked") — no full sentence, no preamble, no quotes.' },
+  style:     { max: 60,  sys: 'You write a concise VISUAL STYLE directive for an image generator: medium, lighting, mood, lens/film stock. Build on any seed; if empty, invent one. Output ONLY a short directive of about ten words or fewer — no full sentence, no preamble, no quotes. Describe rendering/look only — never characters, plot, or scene.' },
+  character: { max: 300, sys: 'You write concise physical character sheets used for image prompts. Build on the character name, any existing notes, and recent story text. Output ONLY a vivid one-paragraph physical description (sex, approx age, hair, eyes, build, skin, distinguishing features, typical wardrobe). Identity and wardrobe ONLY — never art style, medium, or rendering words. No narrative, no name prefix, no quotes.' }
+};
+
+async function helpWriteField(kind, getVal, setVal, btn, extraContext) {
+  if (!apiKey) { appendError('xAI key required. Tap "Set API Key".'); return; }
+  const cfg = FIELD_WRITER[kind];
+  if (!cfg) return;
+  const orig = btn.textContent;
+  btn.textContent = '…'; btn.disabled = true;
+  try {
+    const seed = (getVal() || '').trim();
+    let userMsg = seed ? ('Seed to build on: ' + seed) : 'No seed provided — invent something fitting.';
+    if (extraContext) userMsg += '\n\n' + extraContext;
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: modelSelect.value, messages: [{ role: 'system', content: cfg.sys }, { role: 'user', content: userMsg }], max_tokens: cfg.max, temperature: 0.85 })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    let out = (data.choices?.[0]?.message?.content || '').trim().replace(/^["']+|["']+$/g, '').trim();
+    if (out) setVal(out);
+  } catch (e) { appendError('Write failed: ' + e.message); }
+  finally { btn.textContent = orig; btn.disabled = false; }
+}
+
+// ── Cast reference images (manual likeness lock) ──
+// Convert any image (remote URL or data URL) to a persistable data URL so the reference survives reloads.
+async function urlToDataUrl(url) {
+  if (!url) return url;
+  if (url.startsWith('data:')) return url;
+  try {
+    const resp = await fetch(url);
+    const blob = await resp.blob();
+    return await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
+  } catch (e) { return url; } // fall back to the raw URL if conversion fails
+}
+
+async function setCastImage(i, url) {
+  const cc = getCast();
+  if (!cc[i] || !url) return;
+  cc[i].imageUrl = await urlToDataUrl(url);
+  saveCast(cc);
+  if (castOverlay && castOverlay.classList.contains('open')) renderCastPanel();
+}
+
+// Generate a clean reference portrait from the character's description (uses the storyboard t2img model).
+async function generateCastImage(i, btn) {
+  if (!apiKey && !wavespeedKey && !atlasKey) { appendError('An image API key is required to generate a reference.'); return; }
+  const c = getCast()[i];
+  if (!c) return;
+  if (!c.desc) { appendError('Add a description first (tap ✨), then generate a reference image.'); return; }
+  const orig = btn.textContent; btn.textContent = '…'; btn.disabled = true;
+  try {
+    const prompt = c.desc + ', character reference portrait, neutral plain background, even soft lighting, head and upper body, looking at camera';
+    const src = await callModel(storyboardModel, buildStoryboardCallParams(prompt));
+    if (src) await setCastImage(i, src);
+  } catch (e) { appendError('Generate reference failed: ' + e.message); }
+  finally { btn.textContent = orig; btn.disabled = false; }
+}
+
+// If a cast member who has a saved reference image is named in a frame prompt, return them (first match only — one IP target per frame).
+function findCastReference(prompt) {
+  if (!prompt) return null;
+  const cast = getCast();
+  for (const c of cast) {
+    if (c.imageUrl && c.name) {
+      const re = new RegExp('\\b' + c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+      if (re.test(prompt)) return c;
+    }
+  }
+  return null;
+}
+
 const castOverlay = document.getElementById('cast-overlay');
 document.getElementById('cast-btn')?.addEventListener('click', () => {
   if (!currentThreadId || !getCurrentThread()) createThread('New Game');
@@ -5594,6 +5740,14 @@ document.getElementById('cast-btn')?.addEventListener('click', () => {
 });
 document.getElementById('cast-close')?.addEventListener('click', () => castOverlay.classList.remove('open'));
 castOverlay?.addEventListener('click', e => { if (e.target === castOverlay) castOverlay.classList.remove('open'); });
+document.getElementById('cast-add-help')?.addEventListener('click', (e) => {
+  const ta = document.getElementById('cast-add-desc');
+  if (!ta) return;
+  const nameVal = (document.getElementById('cast-add-name').value || '').trim();
+  const recent = getHistory().slice(-6).map(h => (typeof h.content === 'string' ? h.content : '')).join('\n').slice(-2000);
+  const ctx = 'Character: ' + (nameVal || '(unnamed)') + (recent ? '\n\nRecent story:\n' + recent : '');
+  helpWriteField('character', () => ta.value, v => { ta.value = v; }, e.currentTarget, ctx);
+});
 document.getElementById('cast-add-btn')?.addEventListener('click', () => {
   const name = document.getElementById('cast-add-name').value.trim();
   const desc = document.getElementById('cast-add-desc').value.trim();
@@ -5621,13 +5775,12 @@ function saveStorySetup(setup) {
   threads[idx].setup = setup;
   saveThreads(threads);
 }
-// System-prompt block that primes the chat (premise + tone + characters). Visual style is NOT included here — it's for frames only.
+// System-prompt block that primes the chat (premise + tone). Visual style is NOT included here — it's for frames only. Characters live in the Cast menu and are not injected here.
 function buildStorySetupSystem(setup) {
   if (!setup) return '';
   const parts = [];
   if (setup.premise) parts.push('PREMISE: ' + setup.premise);
   if (setup.tone) parts.push('TONE: ' + setup.tone);
-  if (setup.characters) parts.push('STARTING CHARACTERS:\n' + setup.characters);
   if (!parts.length) return '';
   return 'You are running an interactive story for the user. Stay consistent with this setup:\n\n' + parts.join('\n') + '\n\nPlay each scene vividly in the established tone. The user directs; you narrate what unfolds.';
 }
@@ -5639,7 +5792,6 @@ document.getElementById('setup-btn')?.addEventListener('click', () => {
   document.getElementById('setup-premise').value = s.premise || '';
   document.getElementById('setup-tone').value = s.tone || '';
   document.getElementById('setup-style').value = s.style || '';
-  document.getElementById('setup-characters').value = s.characters || '';
   setupOverlay.classList.add('open');
 });
 document.getElementById('setup-close')?.addEventListener('click', () => setupOverlay.classList.remove('open'));
@@ -5648,12 +5800,21 @@ document.getElementById('setup-save')?.addEventListener('click', () => {
   const setup = {
     premise: document.getElementById('setup-premise').value.trim(),
     tone: document.getElementById('setup-tone').value.trim(),
-    style: document.getElementById('setup-style').value.trim(),
-    characters: document.getElementById('setup-characters').value.trim()
+    style: document.getElementById('setup-style').value.trim()
   };
   saveStorySetup(setup);
-  if (setup.characters) mergeCastFromDirector(setup.characters); // seed cast (adds only new names)
   setupOverlay.classList.remove('open');
+});
+
+// ✨ Auto-Fill buttons in Story Setup (premise / tone / style)
+document.querySelectorAll('#setup-overlay .sparkle-btn[data-fill]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const kind = btn.dataset.fill;
+    const idMap = { premise: 'setup-premise', tone: 'setup-tone', style: 'setup-style' };
+    const el = document.getElementById(idMap[kind]);
+    if (!el) return;
+    helpWriteField(kind, () => el.value, v => { el.value = v; }, btn);
+  });
 });
 
 // ═══════════════════════════════════════════════════════
@@ -5666,7 +5827,8 @@ function serializeGame() {
     v: 1,
     name: t.name || 'Saved Game',
     history: t.history || [],
-    cast: t.cast || [],
+    // Strip reference images (data URLs) — like frames, media isn't bundled into the portable code; descriptions are kept.
+    cast: (t.cast || []).map(c => { const { imageUrl, ...rest } = c; return rest; }),
     setup: t.setup || {},
     sb: { model: storyboardModel, ratio: storyboardRatio, on: storyboardOn }
   };
