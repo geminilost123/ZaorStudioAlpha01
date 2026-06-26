@@ -1295,7 +1295,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.18</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.19</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -2536,7 +2536,9 @@ function loadThread(id) {
       } else if (m.type === 'video') {
         renderVideo(m.src, m.alt, false, m.engineLabel || 'Aurora', m.storedDuration || null, m.storedRes || null);
       } else if (m.type === 'storyboard') {
-        renderStoryboardFrameCard(m.src, m.alt, m.videoPrompt || '', m.reason || '', m.frameId, m.modelLabel);
+        const fLabel = '🎬 ' + (m.modelLabel || 'Storyboard') + (m.reason ? ' · ' + m.reason : '');
+        const fHosted = (typeof m.src === 'string' && m.src.startsWith('http')) ? m.src : null;
+        renderImage(m.src, m.alt || '', false, fHosted, fLabel, m.videoPrompt || '');
       } else if (m.type === 'error') {
         const div = document.createElement('div');
         div.className = 'error-bubble';
@@ -3855,6 +3857,7 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
   vidBtnBar.appendChild(saveBtn);
   vidBtnBar.appendChild(vidCloudBtn);
   vidBtnBar.appendChild(lastFrameBtn);
+  vidBtnBar.appendChild(makeDeleteBtn(() => div, src, null, 'vid-save-btn'));
   wrapper.appendChild(vidBtnBar);
   wrapper.appendChild(pinVidPEBtn);
   wrapper.appendChild(extendBtn);
@@ -4151,7 +4154,36 @@ function renderMessage(role, text, animate = true) {
   return div;
 }
 
-function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel = 'Aurora') {
+// Remove an image/video/storyboard message from this thread (local only — does NOT delete from the host that generated it).
+function deleteMediaMessage(containerEl, src, hostedUrl) {
+  try {
+    const threads = getThreads();
+    const idx = threads.findIndex(t => t.id === currentThreadId);
+    if (idx >= 0) {
+      const msgs = threads[idx].messages || [];
+      const pos = msgs.findIndex(m =>
+        (m.type === 'image' || m.type === 'video' || m.type === 'storyboard') &&
+        (m.src === src || (hostedUrl && (m.hostedUrl === hostedUrl || m.src === hostedUrl))));
+      if (pos >= 0) { msgs.splice(pos, 1); saveThreads(threads); }
+    }
+  } catch (e) { /* still remove from view even if persistence hiccups */ }
+  if (containerEl && containerEl.remove) containerEl.remove();
+}
+
+// Build a Delete button bound to a given media container + source.
+function makeDeleteBtn(getContainer, src, hostedUrl, cls) {
+  const b = document.createElement('button');
+  b.className = cls || 'save-btn';
+  b.innerHTML = '🗑 Delete';
+  b.title = 'Remove from this chat (does not delete it from the site that generated it)';
+  b.addEventListener('click', () => {
+    if (!confirm('Remove this from your chat? It stays on the site that generated it — this only clears it here.')) return;
+    deleteMediaMessage(getContainer(), src, hostedUrl);
+  });
+  return b;
+}
+
+function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel = 'Aurora', videoPromptPrefill = '') {
   const div = document.createElement('div');
   div.className = 'msg assistant' + (animate ? '' : ' no-anim');
 
@@ -4222,7 +4254,7 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
           animBtn.disabled = true;
           await generateVideo(prompt || 'cinematic motion, smooth camera movement', hostedUrl, engine, null, duration, resolution);
           animBtn.disabled = false;
-        });
+        }, false, videoPromptPrefill || '');
         panelOuter.innerHTML = '';
         panelOuter.appendChild(panel);
       } else {
@@ -4421,6 +4453,7 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   btnBar.appendChild(applyStyleBtn);
   btnBar.appendChild(retryImgBtn);
   btnBar.appendChild(animBtn);
+  btnBar.appendChild(makeDeleteBtn(() => div, src, hostedUrl, 'save-btn'));
 
   div.appendChild(label);
   div.appendChild(wrapper);
@@ -5351,10 +5384,15 @@ async function addStoryboardFrame(imagePrompt, videoPrompt, reason) {
       modelLabel = (MODEL_REGISTRY[storyboardModel] && MODEL_REGISTRY[storyboardModel].label) || storyboardModel;
     }
     if (!src) throw new Error('no image returned');
-    fillStoryboardCard(card, src, videoPrompt, reason, frameId, modelLabel);
+    // Render the frame with the SAME action bar as every other image (uniform controls).
+    card.remove();
+    const frameLabel = '🎬 ' + modelLabel + (reason ? ' · ' + reason : '');
+    const frameHosted = (typeof src === 'string' && src.startsWith('http')) ? src : null;
+    renderImage(src, imagePrompt, true, frameHosted, frameLabel, videoPrompt || '');
     addMessageToThread({ role: 'assistant', type: 'storyboard', src, alt: imagePrompt, videoPrompt: videoPrompt || '', reason: reason || '', frameId, modelLabel });
     // make the frame editable + reveal the edit menu (so the edit model is visible in story mode)
     lastImageUrl = src;
+    activeEditTarget = frameHosted || src;
     showEditButton();
   } catch (e) {
     card.innerHTML = '<div class="sb-frame-load" style="color:var(--text-dim);">🎬 Frame skipped — ' + (e.message || 'error').replace(/</g, '&lt;') + '</div>';
