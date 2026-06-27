@@ -1295,7 +1295,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.19</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.20</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -2783,6 +2783,11 @@ function setMode(mode) {
   const placeholders = { image: 'Describe an image…', edit: 'Describe your edit…', video: 'Describe a video…', enhance: '', chat: 'Say something…' };
   promptEl.placeholder = placeholders[mode] || 'Say something…';
 
+  // Visible style lock: seed the box when entering image mode, pull the lone
+  // seed back out when leaving it (never touches text the user typed).
+  if (mode === 'image') prefillStyleIntoPrompt();
+  else clearStylePrefillIfLone(lockedStyle);
+
   updateCostEstimate();
 }
 
@@ -2972,6 +2977,7 @@ async function handleSend() {
   }
 
   setLoading(false);
+  prefillStyleIntoPrompt(); // re-seed the style for the next image prompt (image mode only)
 }
 
 // ═══════════════════════════════════════════════════════
@@ -4128,6 +4134,17 @@ function renderMessage(role, text, animate = true) {
   div.appendChild(bubble);
   div.appendChild(copyBtn);
 
+  // Delete this chat message — simple confirm, scrubs from feed + sent history.
+  const delMsgBtn = document.createElement('button');
+  delMsgBtn.className = 'copy-btn';
+  delMsgBtn.textContent = '🗑';
+  delMsgBtn.title = 'Delete this message';
+  delMsgBtn.addEventListener('click', () => {
+    if (!confirm('Delete this message?')) return;
+    deleteChatMessage(div, role, text);
+  });
+  div.appendChild(delMsgBtn);
+
   // Retry button — re-runs this generation
   if (role === 'assistant' && text) {
     const retryBtn = document.createElement('button');
@@ -4167,6 +4184,18 @@ function deleteMediaMessage(containerEl, src, hostedUrl) {
       if (pos >= 0) { msgs.splice(pos, 1); saveThreads(threads); }
     }
   } catch (e) { /* still remove from view even if persistence hiccups */ }
+
+  // Scrub residual influence: if the deleted item was the current edit/animate
+  // target, clear the pointer so nothing keeps targeting a gone image.
+  const matchesTarget = u => u && (u === src || (hostedUrl && u === hostedUrl));
+  if (matchesTarget(lastImageUrl)) lastImageUrl = null;
+  if (matchesTarget(activeEditTarget)) activeEditTarget = null;
+  if (!lastImageUrl && !activeEditTarget) {
+    document.querySelectorAll('.set-target-btn').forEach(b => { b.classList.remove('is-target'); b.textContent = '🎯 Edit Target'; });
+    document.querySelectorAll('.img-wrapper.edit-target').forEach(w => w.classList.remove('edit-target'));
+    try { showEditButton(); } catch (e) {}
+  }
+
   if (containerEl && containerEl.remove) containerEl.remove();
 }
 
@@ -4181,6 +4210,29 @@ function makeDeleteBtn(getContainer, src, hostedUrl, cls) {
     deleteMediaMessage(getContainer(), src, hostedUrl);
   });
   return b;
+}
+
+// Delete a text chat message. Scrubs it from BOTH the visible feed (messages)
+// AND the history that gets sent to the model and the storyboard director, so a
+// deleted message is never silently re-sent anywhere.
+function deleteChatMessage(containerEl, role, text) {
+  try {
+    const threads = getThreads();
+    const idx = threads.findIndex(t => t.id === currentThreadId);
+    if (idx >= 0) {
+      const t = threads[idx];
+      if (Array.isArray(t.messages)) {
+        const p = t.messages.findIndex(m => m.type === 'text' && m.role === role && m.content === text);
+        if (p >= 0) t.messages.splice(p, 1);
+      }
+      if (Array.isArray(t.history)) {
+        const h = t.history.findIndex(m => m.role === role && m.content === text);
+        if (h >= 0) t.history.splice(h, 1);
+      }
+      saveThreads(threads);
+    }
+  } catch (e) { /* still remove from view even if persistence hiccups */ }
+  if (containerEl && containerEl.remove) containerEl.remove();
 }
 
 function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel = 'Aurora', videoPromptPrefill = '') {
@@ -6033,9 +6085,41 @@ async function extractStyleFromImage(imageUrl) {
   return txt.trim().replace(/^["']+|["']+$/g, '').replace(/\s*\n+\s*/g, ', ').trim();
 }
 
+// Style lock no longer appends invisibly. The locked style is shown in the
+// prompt box (see prefillStyleIntoPrompt) so the user always sees and can edit
+// exactly what's sent. Kept as a pass-through so existing call sites don't break.
 function applyStyleLock(prompt) {
-  if (!styleLockActive || !lockedStyle.trim()) return prompt;
-  return prompt + ', ' + lockedStyle.trim();
+  return prompt;
+}
+
+// The visible style prefix written into the prompt box when a lock is active.
+function styleLockPrefix() {
+  return (styleLockActive && lockedStyle.trim()) ? lockedStyle.trim() + ', ' : '';
+}
+
+// Seed the main prompt box with the locked style — only when in image mode and
+// the box is empty, so it never clobbers anything the user has typed.
+function prefillStyleIntoPrompt() {
+  if (!imageMode) return;
+  const pre = styleLockPrefix();
+  if (!pre) return;
+  if (!promptEl.value.trim()) {
+    promptEl.value = pre;
+    promptEl.style.height = 'auto';
+    promptEl.style.height = Math.min(promptEl.scrollHeight, 120) + 'px';
+  }
+}
+
+// Remove the auto-seeded style from the box ONLY if that's all the box contains.
+// Never eats text the user actually typed.
+function clearStylePrefillIfLone(prevStyle) {
+  const pre = (prevStyle || '').trim();
+  if (!pre) return;
+  const v = promptEl.value.trim().replace(/[,\s]+$/, '');
+  if (v === pre) {
+    promptEl.value = '';
+    promptEl.style.height = 'auto';
+  }
 }
 
 function updateStyleBadge() {
@@ -6068,10 +6152,12 @@ function updateStyleBadge() {
 
 document.getElementById('style-lock-set-btn')?.addEventListener('click', () => {
   const val = document.getElementById('style-lock-input')?.value.trim();
+  const prevStyle = lockedStyle;
   if (styleLockActive) {
     // Disengage without clearing text
     styleLockActive = false;
     localStorage.setItem('zaor_style_active', '0');
+    clearStylePrefillIfLone(prevStyle); // pull the seed back out of the box
   } else {
     // Engage — save current text and activate
     if (val) {
@@ -6084,15 +6170,18 @@ document.getElementById('style-lock-set-btn')?.addEventListener('click', () => {
     }
   }
   updateStyleBadge();
+  prefillStyleIntoPrompt(); // seed the prompt box when newly active (no-op otherwise)
 });
 
 document.getElementById('style-lock-clear-btn')?.addEventListener('click', () => {
+  const prevStyle = lockedStyle;
   lockedStyle = '';
   styleLockActive = false;
   localStorage.removeItem('zaor_style_lock');
   localStorage.setItem('zaor_style_active', '0');
   const input = document.getElementById('style-lock-input');
   if (input) input.value = '';
+  clearStylePrefillIfLone(prevStyle); // remove the seed from the prompt box too
   updateStyleBadge();
 });
 
