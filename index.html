@@ -1295,7 +1295,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.20</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.22</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1502,6 +1502,7 @@
               <option value="z-image-i2i">Z-Image i2i · WaveSpeed — $0.005</option>
               <option value="atlas-flux-kontext">Flux Kontext · Atlas · uncensored — $0.025</option>
               <option value="atlas-qwen-edit">Qwen Edit · Atlas — $0.02</option>
+              <option value="atlas-nano-banana-2-edit">Nano Banana 2 Edit · Atlas — $0.08</option>
               <option value="aurora-simple">Aurora Simple Edit · xAI — ~$0.02</option>
               <option value="aurora">Aurora Quality Edit · xAI — ~$0.04</option>
             </select>
@@ -1970,7 +1971,7 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
   'atlas-grok-simple':  { cat:'t2img', label:'Aurora Simple · Atlas', provider:'atlas', path:'xai/grok-imagine-image/text-to-image', price:0.02, verified:true,
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
-  'z-image-turbo':  { cat:'t2img', label:'Z-Image Turbo · Atlas', provider:'atlas', path:'z-image/turbo',  price:0.01, verified:true,
+  'z-image-turbo':  { cat:'t2img', label:'Z-Image Turbo · Atlas', provider:'atlas', path:'z-image/turbo/text-to-image',  price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
   'z-image-lora':   { cat:'t2img', label:'Z-Image Turbo · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/z-image/turbo-lora', price:0.01, verified:true, lora:true, loraBase:'Z-Image',
     buildBody:p=>{
@@ -1997,7 +1998,7 @@ const MODEL_REGISTRY = {
     } },
   'atlas-flux-dev': { cat:'t2img', label:'Flux Dev · Atlas', provider:'atlas', path:'black-forest-labs/flux-dev', price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
-  'atlas-z-image-lora': { cat:'t2img', label:'Z-Image Turbo · Atlas · LoRA (fallback)', provider:'atlas', path:'z-image/turbo-lora', price:0.01, verified:true, lora:true, loraBase:'Z-Image',
+  'atlas-z-image-lora': { cat:'t2img', label:'Z-Image Turbo · Atlas · LoRA (fallback)', provider:'atlas', path:'z-image/turbo-lora/text-to-image', price:0.01, verified:true, lora:true, loraBase:'Z-Image',
     buildBody:p=>{ const b={ prompt:p.prompt, enable_safety_checker:false }; if(p.loras&&p.loras.length) b.loras=p.loras.slice(0,3).map(l=>({path:l.path,scale:Number(l.scale)||1})); return b; } },
   'atlas-flux-dev-lora': { cat:'t2img', label:'Flux Dev · Atlas · LoRA (fallback)', provider:'atlas', path:'black-forest-labs/flux-dev-lora', price:0.015, verified:true, lora:true, loraBase:'Flux',
     buildBody:p=>{ const b={ prompt:p.prompt, num_images:1, enable_safety_checker:false }; if(p.loras&&p.loras.length) b.loras=p.loras.slice(0,3).map(l=>({path:l.path,scale:Number(l.scale)||1})); return b; } },
@@ -2007,10 +2008,17 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
   'atlas-wan27-img': { cat:'t2img', label:'Wan 2.7 Image · Atlas', provider:'atlas', path:'alibaba/wan-2.7/text-to-image', price:0.03, verified:true,
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
+  // Nano Banana 2 (Gemini 3.1 Flash Image) — strong character/style consistency. Gemini-based, so no seed param.
+  // Only pass aspect_ratio when NB2 supports it (it rejects 2:1 / 1:2); otherwise let it use its default.
+  'atlas-nano-banana-2': { cat:'t2img', label:'Nano Banana 2 · Atlas', provider:'atlas', path:'google/nano-banana-2/text-to-image', price:0.013, verified:true,
+    buildBody:p=>{ const ok=['1:1','3:2','2:3','3:4','4:3','4:5','5:4','9:16','16:9','21:9']; const b={ prompt:p.prompt, resolution:(p.resolution||'1k'), output_format:'png' }; if(ok.includes(p.aspectRatio)) b.aspect_ratio=p.aspectRatio; return b; } },
   'atlas-flux-kontext': { cat:'edit', label:'Flux Kontext · Atlas', provider:'atlas', path:'black-forest-labs/flux-kontext-dev', price:0.025, verified:true,
     buildBody:p=>({ prompt:p.prompt, image:p.image, guidance_scale:2.5, num_inference_steps:28, enable_base64_output:false, enable_safety_checker:false }) },
   'atlas-qwen-edit':   { cat:'edit', label:'Qwen Edit · Atlas', provider:'atlas', path:'atlascloud/qwen-image/edit', price:0.02, verified:true,
     buildBody:p=>({ prompt:p.prompt, image:p.image, enable_base64_output:false, enable_safety_checker:false }) },
+  // Nano Banana 2 Edit — identity/style-preserving i2i. Atlas edit endpoint takes an `images` array (up to 14 refs).
+  'atlas-nano-banana-2-edit': { cat:'edit', label:'Nano Banana 2 Edit · Atlas', provider:'atlas', path:'google/nano-banana-2/edit', price:0.08, verified:true,
+    buildBody:p=>({ prompt:p.prompt, images:[p.image], output_format:'png' }) },
 
   // ─────────── TEXT-TO-VIDEO ───────────
   // NOTE: Aurora video (T2V/I2V/extend/edit) is handled by generateVideoAurora via xAI DIRECT,
@@ -3045,13 +3053,14 @@ async function runEdit(fullPrompt, imageUrl, editModel) {
     if (!url) throw new Error('No image returned from Aurora edit');
     return { src: url, hostedUrl: url, modelLabel: editModel === 'aurora-simple' ? 'Aurora Simple Edit' : 'Aurora Quality Edit' };
 
-  } else if (editModel === 'atlas-flux-kontext' || editModel === 'atlas-qwen-edit') {
-    // ── Atlas uncensored edit ──
+  } else if (editModel === 'atlas-flux-kontext' || editModel === 'atlas-qwen-edit' || editModel === 'atlas-nano-banana-2-edit') {
+    // ── Atlas edit (Flux Kontext / Qwen / Nano Banana 2) ──
     if (!atlasKey) throw new Error('Atlas Cloud API key required. Tap "Set API Key" to add it.');
     const atlasImg = await atlasPrepareImage(imageUrl);
     const resultUrl = await callModel(editModel, { prompt: fullPrompt, image: atlasImg, isCancelled: () => false });
     if (!resultUrl) throw new Error('Atlas edit timed out');
-    return { src: resultUrl, hostedUrl: resultUrl, modelLabel: (editModel === 'atlas-flux-kontext') ? 'Flux Kontext Edit · Atlas' : 'Qwen Edit · Atlas' };
+    const atlasEditLabels = { 'atlas-flux-kontext': 'Flux Kontext Edit · Atlas', 'atlas-qwen-edit': 'Qwen Edit · Atlas', 'atlas-nano-banana-2-edit': 'Nano Banana 2 Edit · Atlas' };
+    return { src: resultUrl, hostedUrl: resultUrl, modelLabel: atlasEditLabels[editModel] || 'Atlas Edit' };
 
   } else {
     // ── WaveSpeed edits (Wan / Qwen / Flux Kontext / Klein 9B LoRA) ──
