@@ -1295,7 +1295,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.23</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.24</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1508,6 +1508,17 @@
               <option value="aurora">Aurora Quality Edit · xAI — ~$0.04</option>
             </select>
           </div>
+          <div class="img-control-group">
+            <span class="mode-label">Count</span>
+            <select id="edit-count-select" class="img-control-select" title="How many images to make from this edit. Or put a [comma list] in your prompt to make one image per item.">
+              <option value="1" selected>1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="6">6</option>
+              <option value="8">8</option>
+            </select>
+          </div>
           <div class="img-control-group" id="zimg-strength-wrap" style="display:none;">
             <span class="mode-label">Strength</span>
             <div style="display:flex;align-items:center;gap:6px;">
@@ -1526,7 +1537,7 @@
           </div>
           <div data-seedwarn style="display:none;font-size:11px;color:#d9a441;flex-basis:100%;line-height:1.4;padding-top:2px;"></div>
         </div>
-        <div style="font-size:11px;color:var(--text-dim);padding:2px 4px 0;line-height:1.45;">Pick an image (🖼 Upload, or generate one first), then describe your edit and hit send. Text-to-image models live in 🎨 Image mode.</div>
+        <div style="font-size:11px;color:var(--text-dim);padding:2px 4px 0;line-height:1.45;">Pick an image (🖼 Upload, or generate one first), then describe your edit and hit send. <b>Series:</b> set Count for variations, or put a comma list in brackets to get one image per item — e.g. <i>"…change only the expression to [joy, sadness, anger, contentment]"</i>. Text-to-image models live in 🎨 Image mode.</div>
       </div>
       <div id="vid-mode-row">
         <div class="img-controls-row">
@@ -2926,7 +2937,7 @@ document.getElementById('upscale-btn')?.addEventListener('click', async () => {
 
 // Update cost estimate when any selector changes + blur to remove focus ring
 ['vid-engine-select','vid-duration-select','vid-res-select',
- 'img-model-select','img-res-select','img-ratio-select','img-count-select','edit-model-select','upscale-model-select','clean-model-select'].forEach(id => {
+ 'img-model-select','img-res-select','img-ratio-select','img-count-select','edit-model-select','edit-count-select','upscale-model-select','clean-model-select'].forEach(id => {
   const el = document.getElementById(id);
   el?.addEventListener('change', () => { updateCostEstimate(); el.blur(); });
 });
@@ -2981,7 +2992,7 @@ async function handleSend() {
   setLoading(true);
 
   if (editMode && (activeEditTarget || lastImageUrl)) {
-    await editImage(text, activeEditTarget || lastImageUrl);
+    await editImage(text, activeEditTarget || lastImageUrl, false, null, true);
   } else if (imageMode) {
     await generateImage(text);
   } else if (videoMode) {
@@ -3020,22 +3031,72 @@ async function atlasPrepareImage(src) {
   return src;
 }
 
-async function editImage(prompt, imageUrl, skipStyleLock = false, modelOverride = null) {
-  const typingId = appendTyping();
+// Build the list of edit jobs from a prompt.
+//  • Bracketed list — "...expression to [joy, sadness, anger]" → ONE edit per item, substituting each
+//    item into the [...] slot, so a single prompt yields a labeled series.
+//  • Otherwise the Edit "Count" selector makes N variations of the same edit.
+// Only expands when seriesAllowed (the main user send); internal/retry calls stay single.
+function buildEditJobs(prompt, seriesAllowed) {
+  if (!seriesAllowed) return [{ prompt, label: null }];
+  const groups = prompt.match(/\[([^\[\]]+)\]/g);
+  if (groups && groups.length) {
+    const last = groups[groups.length - 1];
+    const items = last.slice(1, -1).split(',').map(s => s.trim()).filter(Boolean);
+    if (items.length >= 2) {
+      return items.map(item => ({
+        prompt: prompt.replace(last, item),
+        label: item.length > 24 ? item.slice(0, 22) + '…' : item
+      }));
+    }
+  }
+  const n = Math.max(1, Math.min(8, parseInt(document.getElementById('edit-count-select')?.value || '1') || 1));
+  return Array.from({ length: n }, () => ({ prompt, label: null }));
+}
+
+async function editImage(prompt, imageUrl, skipStyleLock = false, modelOverride = null, seriesAllowed = false) {
   const editModel = modelOverride || document.getElementById('edit-model-select')?.value || 'wan27';
-  const fullPrompt = skipStyleLock ? prompt : applyStyleLock(prompt);
-  try {
-    const { src, hostedUrl, modelLabel } = await runEdit(fullPrompt, imageUrl, editModel);
-    removeTyping(typingId);
-    lastImageUrl = hostedUrl || src;
-    activeEditTarget = hostedUrl || src;
+  const jobs = buildEditJobs(prompt, seriesAllowed);
+  const isSeries = jobs.length > 1;
+  const typingId = appendTyping();
+
+  // Run all jobs in parallel. Every job edits the SAME source image (never a previous result),
+  // which is what keeps a character/expression series consistent.
+  const results = await Promise.all(jobs.map(async (job) => {
+    const fullPrompt = skipStyleLock ? job.prompt : applyStyleLock(job.prompt);
+    try { return { ...(await runEdit(fullPrompt, imageUrl, editModel)), job }; }
+    catch (e) { return { error: e.message, job }; }
+  }));
+  removeTyping(typingId);
+
+  let lastGood = null;
+  const errors = [];
+  results.forEach((r, i) => {
+    if (r.error) { errors.push(`${r.job.label ? r.job.label + ': ' : ''}${r.error}`); return; }
+    const label = isSeries
+      ? `${r.modelLabel}${r.job.label ? ' · ' + r.job.label : ` (${i + 1}/${jobs.length})`}`
+      : r.modelLabel;
+    addMessageToThread({ role: 'assistant', type: 'image', src: r.src, hostedUrl: r.hostedUrl, alt: r.job.prompt, modelLabel: label });
+    renderImage(r.src, r.job.prompt, true, r.hostedUrl, label);
+    lastGood = r;
+  });
+
+  if (lastGood) {
+    if (isSeries) {
+      // Keep the original reference as the active target so re-runs edit the source, not a result.
+      lastImageUrl = imageUrl;
+      activeEditTarget = imageUrl;
+    } else {
+      lastImageUrl = lastGood.hostedUrl || lastGood.src;
+      activeEditTarget = lastGood.hostedUrl || lastGood.src;
+    }
     showEditButton();
-    addMessageToThread({ role: 'assistant', type: 'image', src, hostedUrl, alt: prompt, modelLabel });
-    renderImage(src, prompt, true, hostedUrl, modelLabel);
-  } catch(e) {
-    removeTyping(typingId);
-    addMessageToThread({ role: 'assistant', type: 'error', content: e.message });
-    appendError(e.message);
+  }
+  if (errors.length) {
+    const msg = errors.length === results.length
+      ? errors[0]
+      : `${errors.length} of ${results.length} edits failed — ${errors[0]}`;
+    addMessageToThread({ role: 'assistant', type: 'error', content: msg });
+    appendError(msg);
   }
 }
 
