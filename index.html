@@ -1295,7 +1295,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.24</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.25</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -3057,46 +3057,40 @@ async function editImage(prompt, imageUrl, skipStyleLock = false, modelOverride 
   const editModel = modelOverride || document.getElementById('edit-model-select')?.value || 'wan27';
   const jobs = buildEditJobs(prompt, seriesAllowed);
   const isSeries = jobs.length > 1;
-  const typingId = appendTyping();
 
-  // Run all jobs in parallel. Every job edits the SAME source image (never a previous result),
-  // which is what keeps a character/expression series consistent.
-  const results = await Promise.all(jobs.map(async (job) => {
-    const fullPrompt = skipStyleLock ? job.prompt : applyStyleLock(job.prompt);
-    try { return { ...(await runEdit(fullPrompt, imageUrl, editModel)), job }; }
-    catch (e) { return { error: e.message, job }; }
-  }));
-  removeTyping(typingId);
+  // Each job renders the moment IT finishes — independently. A rejected or slow image (e.g. one the
+  // model's content filter blocks) shows its own inline error and never hides or delays the others.
+  const typingId = appendTyping();
+  let typingCleared = false;
+  const clearTyping = () => { if (!typingCleared) { typingCleared = true; removeTyping(typingId); } };
 
   let lastGood = null;
-  const errors = [];
-  results.forEach((r, i) => {
-    if (r.error) { errors.push(`${r.job.label ? r.job.label + ': ' : ''}${r.error}`); return; }
-    const label = isSeries
-      ? `${r.modelLabel}${r.job.label ? ' · ' + r.job.label : ` (${i + 1}/${jobs.length})`}`
-      : r.modelLabel;
-    addMessageToThread({ role: 'assistant', type: 'image', src: r.src, hostedUrl: r.hostedUrl, alt: r.job.prompt, modelLabel: label });
-    renderImage(r.src, r.job.prompt, true, r.hostedUrl, label);
-    lastGood = r;
-  });
+  await Promise.all(jobs.map(async (job, i) => {
+    const fullPrompt = skipStyleLock ? job.prompt : applyStyleLock(job.prompt);
+    try {
+      const out = await runEdit(fullPrompt, imageUrl, editModel);
+      clearTyping();
+      const label = isSeries
+        ? `${out.modelLabel}${job.label ? ' · ' + job.label : ` (${i + 1}/${jobs.length})`}`
+        : out.modelLabel;
+      addMessageToThread({ role: 'assistant', type: 'image', src: out.src, hostedUrl: out.hostedUrl, alt: job.prompt, modelLabel: label });
+      renderImage(out.src, job.prompt, true, out.hostedUrl, label);
+      lastGood = out;
+    } catch (e) {
+      clearTyping();
+      const tag = job.label ? job.label + ': ' : (isSeries ? `(${i + 1}/${jobs.length}) ` : '');
+      const msg = `${tag}${e.message}`;
+      addMessageToThread({ role: 'assistant', type: 'error', content: msg });
+      appendError(msg);
+    }
+  }));
+  clearTyping();
 
   if (lastGood) {
-    if (isSeries) {
-      // Keep the original reference as the active target so re-runs edit the source, not a result.
-      lastImageUrl = imageUrl;
-      activeEditTarget = imageUrl;
-    } else {
-      lastImageUrl = lastGood.hostedUrl || lastGood.src;
-      activeEditTarget = lastGood.hostedUrl || lastGood.src;
-    }
+    // For a series, keep the ORIGINAL reference as the active target so re-runs edit the source, not a result.
+    if (isSeries) { lastImageUrl = imageUrl; activeEditTarget = imageUrl; }
+    else { lastImageUrl = lastGood.hostedUrl || lastGood.src; activeEditTarget = lastGood.hostedUrl || lastGood.src; }
     showEditButton();
-  }
-  if (errors.length) {
-    const msg = errors.length === results.length
-      ? errors[0]
-      : `${errors.length} of ${results.length} edits failed — ${errors[0]}`;
-    addMessageToThread({ role: 'assistant', type: 'error', content: msg });
-    appendError(msg);
   }
 }
 
