@@ -4718,33 +4718,45 @@ async function saveImageToFiles(src, altText) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     return true;
   };
-  // 1) Try to produce a genuine PNG via canvas (covers data: URLs and CORS-ok hosts).
-  try {
-    const pngBlob = await imageToPngBlob(src);
-    if (pngBlob) { await deliver(pngBlob, filename); return; }
-  } catch (e) {
-    if (e.name === 'AbortError') return;
-    // fall through to raw-bytes fallback
-  }
-  // 2) Fallback: save the original bytes, with an extension that matches the real type
-  //    (so we never mislabel a JPEG as .png).
-  try {
-    const res = await fetch(src, { referrerPolicy: 'no-referrer' });
-    if (!res.ok) throw new Error('fetch blocked');
+  const pickExt = t => (t || '').includes('jpeg') || (t || '').includes('jpg') ? 'jpg'
+                     : (t || '').includes('webp') ? 'webp' : 'png';
+  const blobFrom = async (url) => {
+    const res = await fetch(url, { referrerPolicy: 'no-referrer' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const blob = await res.blob();
-    const t = blob.type || '';
-    const ext = t.includes('jpeg') || t.includes('jpg') ? 'jpg' : t.includes('webp') ? 'webp' : 'png';
-    await deliver(blob, filename.replace(/\.png$/, '.' + ext));
-  } catch(e) {
-    if (e.name === 'AbortError') return;
-    // Cross-origin CDN blocks blob fetch — open the image WITHOUT a referer so the
-    // bucket's referer policy doesn't reject it; then long-press → Save to Files/Photos.
+    if (!blob || !blob.size) throw new Error('empty blob');
+    return blob;
+  };
+
+  // 1) data:/blob: URLs — re-encode to a clean PNG via canvas (no network needed).
+  if (src.startsWith('data:') || src.startsWith('blob:')) {
     try {
-      const a = document.createElement('a');
-      a.href = src; a.target = '_blank'; a.rel = 'noreferrer';
-      document.body.appendChild(a); a.click(); a.remove();
-    } catch(e2) { appendError('Save failed: ' + e.message); }
+      const pngBlob = await imageToPngBlob(src);
+      if (pngBlob) { await deliver(pngBlob, filename); return; }
+    } catch (e) { if (e.name === 'AbortError') return; }
   }
+
+  // 2) Direct fetch with no referer — works for CORS-enabled hosts.
+  try {
+    const blob = await blobFrom(src);
+    await deliver(blob, filename.replace(/\.png$/, '.' + pickExt(blob.type)));
+    return;
+  } catch (e) { if (e.name === 'AbortError') return; }
+
+  // 3) Referer-locked / no-CORS hosts (Atlas → Aliyun OSS): the browser can't read
+  //    these bytes directly, so pull them through a CORS image proxy that fetches
+  //    server-side, then hand the blob straight to Save to Files. No tab is ever opened.
+  if (/^https?:/i.test(src)) {
+    try {
+      const proxied = 'https://wsrv.nl/?url=' + encodeURIComponent(src) + '&output=png';
+      const blob = await blobFrom(proxied);
+      await deliver(blob, filename.replace(/\.png$/, '.' + pickExt(blob.type)));
+      return;
+    } catch (e) { if (e.name === 'AbortError') return; }
+  }
+
+  // 4) Everything failed — do NOT open a link. Just tell the user.
+  appendError('Couldn’t save this image automatically. Long-press the image itself and choose Save.');
 }
 
 // ═══════════════════════════════════════════════════════
