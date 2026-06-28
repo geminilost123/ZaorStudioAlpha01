@@ -1295,7 +1295,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.26</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.27</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -4729,7 +4729,7 @@ async function saveImageToFiles(src, altText) {
   // 2) Fallback: save the original bytes, with an extension that matches the real type
   //    (so we never mislabel a JPEG as .png).
   try {
-    const res = await fetch(src);
+    const res = await fetch(src, { referrerPolicy: 'no-referrer' });
     if (!res.ok) throw new Error('fetch blocked');
     const blob = await res.blob();
     const t = blob.type || '';
@@ -4737,9 +4737,13 @@ async function saveImageToFiles(src, altText) {
     await deliver(blob, filename.replace(/\.png$/, '.' + ext));
   } catch(e) {
     if (e.name === 'AbortError') return;
-    // Cross-origin CDN blocks blob fetch — open the image so the user can long-press → Save to Photos
-    try { window.open(src, '_blank'); }
-    catch(e2) { appendError('Save failed: ' + e.message); }
+    // Cross-origin CDN blocks blob fetch — open the image WITHOUT a referer so the
+    // bucket's referer policy doesn't reject it; then long-press → Save to Files/Photos.
+    try {
+      const a = document.createElement('a');
+      a.href = src; a.target = '_blank'; a.rel = 'noreferrer';
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch(e2) { appendError('Save failed: ' + e.message); }
   }
 }
 
