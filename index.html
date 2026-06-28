@@ -1295,7 +1295,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.25</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.26</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1537,7 +1537,7 @@
           </div>
           <div data-seedwarn style="display:none;font-size:11px;color:#d9a441;flex-basis:100%;line-height:1.4;padding-top:2px;"></div>
         </div>
-        <div style="font-size:11px;color:var(--text-dim);padding:2px 4px 0;line-height:1.45;">Pick an image (🖼 Upload, or generate one first), then describe your edit and hit send. <b>Series:</b> set Count for variations, or put a comma list in brackets to get one image per item — e.g. <i>"…change only the expression to [joy, sadness, anger, contentment]"</i>. Text-to-image models live in 🎨 Image mode.</div>
+        <div style="font-size:11px;color:var(--text-dim);padding:2px 4px 0;line-height:1.45;">Pick an image (🖼 Upload, or generate one first), then describe your edit and hit send. <b>Series:</b> set Count for variations, or put a bracketed list in your prompt to get one image per item — separate items with commas (<i>[joy, sadness, anger]</i>), or with semicolons if an item needs its own commas (<i>[front 0° — …; profile 90° — …]</i>). Text-to-image models live in 🎨 Image mode.</div>
       </div>
       <div id="vid-mode-row">
         <div class="img-controls-row">
@@ -3041,12 +3041,16 @@ function buildEditJobs(prompt, seriesAllowed) {
   const groups = prompt.match(/\[([^\[\]]+)\]/g);
   if (groups && groups.length) {
     const last = groups[groups.length - 1];
-    const items = last.slice(1, -1).split(',').map(s => s.trim()).filter(Boolean);
+    const inner = last.slice(1, -1);
+    // Separator: use ';' when present so each item may contain its own commas; otherwise split on ','.
+    const sep = inner.includes(';') ? ';' : ',';
+    const items = inner.split(sep).map(s => s.trim()).filter(Boolean);
     if (items.length >= 2) {
-      return items.map(item => ({
-        prompt: prompt.replace(last, item),
-        label: item.length > 24 ? item.slice(0, 22) + '…' : item
-      }));
+      return items.map(item => {
+        // Label = the short name before a dash if the item is "name — long description", else the item.
+        const name = (item.split(/\s[—–-]\s/)[0] || item).trim() || item;
+        return { prompt: prompt.replace(last, item), label: name.length > 24 ? name.slice(0, 22) + '…' : name };
+      });
     }
   }
   const n = Math.max(1, Math.min(8, parseInt(document.getElementById('edit-count-select')?.value || '1') || 1));
