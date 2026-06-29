@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio v1.29" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio v1.30" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio v1.29</title>
+  <title>Zaor Studio v1.30</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -2369,7 +2369,7 @@ function getThreads() {
 function saveThreads(threads) {
   threadsCache = Array.isArray(threads) ? threads : [];
   if (idbReady) {
-    idbKV.set(THREADS_KEY, threadsCache).catch(e => {
+    return idbKV.set(THREADS_KEY, threadsCache).catch(e => {
       console.error('[Zaor storage save]', e && (e.stack || e.message));
       appendError('Could not save locally — your latest changes may not persist.');
     });
@@ -2379,6 +2379,7 @@ function saveThreads(threads) {
     catch (e) {
       if (e.name === 'QuotaExceededError') appendError('Storage full — save images to Files to free space.');
     }
+    return Promise.resolve();
   }
 }
 
@@ -2408,29 +2409,27 @@ function updateStorageInfo() {
     const mEl = document.getElementById('storage-usage-modal');
     if (mEl) mEl.textContent = txt;
   };
-  // Prefer the browser's own estimate of on-device usage (covers IndexedDB).
+  // Headline = size of YOUR saved chats + media (exactly what the clear buttons affect).
+  // We size the in-memory thread cache because it reflects deletions INSTANTLY — unlike
+  // navigator.storage.estimate(), which is padded, lags badly on iOS, and also counts the
+  // app's own offline cache (so it never reads ~0 even after everything is cleared).
+  let dataMb = 0;
+  try { dataMb = JSON.stringify(threadsCache).length * 2 / 1024 / 1024; } catch (e) {}
+  const base = `${dataMb.toFixed(1)} MB in saved chats & media`;
+  setText(base);
+  // Append the total on-device footprint, clearly labelled so leftover MB from the offline
+  // app cache isn't mistaken for "still storing media".
   if (navigator.storage && navigator.storage.estimate) {
     navigator.storage.estimate().then(est => {
-      const mb = ((est.usage || 0) / 1024 / 1024).toFixed(1);
-      setText(`${mb} MB used locally`);
-    }).catch(() => {
-      // Fallback: size the in-memory thread cache.
-      try {
-        const mb = (JSON.stringify(threadsCache).length * 2 / 1024 / 1024).toFixed(1);
-        setText(`${mb} MB used locally`);
-      } catch (e) { setText(''); }
-    });
-  } else {
-    try {
-      const mb = (JSON.stringify(threadsCache).length * 2 / 1024 / 1024).toFixed(1);
-      setText(`${mb} MB used locally`);
-    } catch (e) { setText(''); }
+      const totalMb = ((est.usage || 0) / 1024 / 1024).toFixed(1);
+      setText(`${base}  ·  ${totalMb} MB total on device (incl. app cache)`);
+    }).catch(() => {});
   }
 }
 
 // Strip heavy media (image/video messages + base64 vision frames) from saved threads.
 // Keeps text, conversation structure, LoRAs, prompts, and keys intact.
-function clearStoredMedia() {
+async function clearStoredMedia() {
   const threads = getThreads();
   let removed = 0;
   threads.forEach(t => {
@@ -2451,13 +2450,13 @@ function clearStoredMedia() {
       });
     }
   });
-  saveThreads(threads);
+  await saveThreads(threads);
   return removed;
 }
 
-function clearAllChats() {
+async function clearAllChats() {
   threadsCache = [];
-  if (idbReady) { idbKV.del(THREADS_KEY).catch(e => console.error('[Zaor clearAll]', e)); }
+  try { if (idbReady) await idbKV.del(THREADS_KEY); } catch(e) { console.error('[Zaor clearAll]', e); }
   try { localStorage.removeItem('gs_threads'); } catch(e) {}
 }
 
@@ -4768,17 +4767,18 @@ const keyInput     = document.getElementById('key-input');
 
 apiKeyBtn.addEventListener('click', () => openModal('api'));
 
-document.getElementById('clear-media-btn')?.addEventListener('click', () => {
+document.getElementById('clear-media-btn')?.addEventListener('click', async () => {
   if (!confirm('Remove stored images & videos from your saved chats? Text is kept. Your LoRAs, prompts, and keys are not touched.')) return;
-  const n = clearStoredMedia();
+  const n = await clearStoredMedia();
   updateStorageInfo();
-  alert(n + ' media item(s) cleared. Reload the app to see the freed space.');
+  alert(n + ' media item(s) cleared.');
 });
-document.getElementById('clear-chats-btn')?.addEventListener('click', () => {
+document.getElementById('clear-chats-btn')?.addEventListener('click', async () => {
   if (!confirm('Delete ALL conversations? This cannot be undone. Your LoRAs, saved prompts, and keys are kept.')) return;
-  clearAllChats();
+  await clearAllChats();
+  renderThreadList();
   updateStorageInfo();
-  alert('All conversations cleared. Reload the app.');
+  alert('All conversations cleared.');
 });
 
 // ═══════════════════════════════════════════════════════
@@ -6457,10 +6457,12 @@ document.getElementById('refresh-btn')?.addEventListener('click', async () => {
       const keys = await caches.keys();
       await Promise.all(keys.map(k => caches.delete(k)));
     }
-    // Hard reload
-    window.location.reload(true);
+    // Hard reload that actually bypasses the HTTP/CDN cache. reload(true) is a no-op in
+    // modern browsers, so navigate to a unique URL — this forces a fresh network fetch of
+    // the shell (and a byte-check of sw.js) instead of re-serving the stale cached copy.
+    location.replace(location.pathname + '?fresh=' + Date.now());
   } catch(e) {
-    window.location.reload(true);
+    location.replace(location.pathname + '?fresh=' + Date.now());
   }
 });
 
