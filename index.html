@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio 1.00" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio v1.28" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio 1.00</title>
+  <title>Zaor Studio v1.28</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1295,7 +1295,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.27</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.28</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1948,9 +1948,6 @@ let imageMode = false;
 let videoMode = false;
 let lastImageUrl = null; // tracks most recently generated image for editing
 let activeEditTarget = null;
-let secondEditTarget = null; // optional 2nd reference image for multi-image merge (Nano Banana 2 / Wan / Qwen 2.0 / Klein 9B)
-// Edit models whose API accepts an `images` array, so a 2nd reference can be merged in.
-const MERGE_CAPABLE_EDIT = ['atlas-nano-banana-2-edit', 'atlas-nano-banana-2-edit-dev', 'wan27', 'wan27pro', 'qwen2', 'klein9b-edit-lora'];
 let enhanceMode = false; // manually selected edit target (null = use lastImageUrl)
 let lockedStyle = localStorage.getItem('zaor_style_lock') || ''; // persisted style text
 let styleLockActive = localStorage.getItem('zaor_style_active') === '1'; // whether lock is engaged
@@ -1986,7 +1983,7 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
   'atlas-grok-simple':  { cat:'t2img', label:'Aurora Simple · Atlas', provider:'atlas', path:'xai/grok-imagine-image/text-to-image', price:0.02, verified:true,
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
-  'z-image-turbo':  { cat:'t2img', label:'Z-Image Turbo · Atlas', provider:'atlas', path:'z-image/turbo',  price:0.01, verified:true,
+  'z-image-turbo':  { cat:'t2img', label:'Z-Image Turbo · Atlas', provider:'atlas', path:'z-image/turbo/text-to-image',  price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
   'z-image-lora':   { cat:'t2img', label:'Z-Image Turbo · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/z-image/turbo-lora', price:0.01, verified:true, lora:true, loraBase:'Z-Image',
     buildBody:p=>{
@@ -2013,7 +2010,7 @@ const MODEL_REGISTRY = {
     } },
   'atlas-flux-dev': { cat:'t2img', label:'Flux Dev · Atlas', provider:'atlas', path:'black-forest-labs/flux-dev', price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
-  'atlas-z-image-lora': { cat:'t2img', label:'Z-Image Turbo · Atlas · LoRA (fallback)', provider:'atlas', path:'z-image/turbo-lora', price:0.01, verified:true, lora:true, loraBase:'Z-Image',
+  'atlas-z-image-lora': { cat:'t2img', label:'Z-Image Turbo · Atlas · LoRA (fallback)', provider:'atlas', path:'z-image/turbo-lora/text-to-image', price:0.01, verified:true, lora:true, loraBase:'Z-Image',
     buildBody:p=>{ const b={ prompt:p.prompt, enable_safety_checker:false }; if(p.loras&&p.loras.length) b.loras=p.loras.slice(0,3).map(l=>({path:l.path,scale:Number(l.scale)||1})); return b; } },
   'atlas-flux-dev-lora': { cat:'t2img', label:'Flux Dev · Atlas · LoRA (fallback)', provider:'atlas', path:'black-forest-labs/flux-dev-lora', price:0.015, verified:true, lora:true, loraBase:'Flux',
     buildBody:p=>{ const b={ prompt:p.prompt, num_images:1, enable_safety_checker:false }; if(p.loras&&p.loras.length) b.loras=p.loras.slice(0,3).map(l=>({path:l.path,scale:Number(l.scale)||1})); return b; } },
@@ -2036,10 +2033,10 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ prompt:p.prompt, image:p.image, enable_base64_output:false, enable_safety_checker:false }) },
   // Nano Banana 2 Edit — identity/style-preserving i2i. Atlas edit endpoint takes an `images` array (up to 14 refs).
   'atlas-nano-banana-2-edit': { cat:'edit', label:'Nano Banana 2 Edit · Atlas · Standard', provider:'atlas', path:'google/nano-banana-2/edit', price:0.08, verified:true,
-    buildBody:p=>({ prompt:p.prompt, images:(p.images && p.images.length ? p.images : [p.image]), output_format:'png' }) },
+    buildBody:p=>({ prompt:p.prompt, images:[p.image], output_format:'png' }) },
   // Developer tier: same edit model, ~half price, lower stability/priority. Identical call shape (images array).
   'atlas-nano-banana-2-edit-dev': { cat:'edit', label:'Nano Banana 2 Edit · Atlas · Developer (½-price)', provider:'atlas', path:'google/nano-banana-2/edit-developer', price:0.04, verified:true,
-    buildBody:p=>({ prompt:p.prompt, images:(p.images && p.images.length ? p.images : [p.image]), output_format:'png' }) },
+    buildBody:p=>({ prompt:p.prompt, images:[p.image], output_format:'png' }) },
 
   // ─────────── TEXT-TO-VIDEO ───────────
   // NOTE: Aurora video (T2V/I2V/extend/edit) is handled by generateVideoAurora via xAI DIRECT,
@@ -3062,12 +3059,6 @@ function buildEditJobs(prompt, seriesAllowed) {
 
 async function editImage(prompt, imageUrl, skipStyleLock = false, modelOverride = null, seriesAllowed = false) {
   const editModel = modelOverride || document.getElementById('edit-model-select')?.value || 'wan27';
-  // 2nd reference: only merge it in for models whose API takes an images array.
-  const secondImg = (secondEditTarget && secondEditTarget !== imageUrl) ? secondEditTarget : null;
-  if (secondImg && !MERGE_CAPABLE_EDIT.includes(editModel)) {
-    appendError('A 2nd reference is set, but "' + editModel + '" only takes one image. Pick Nano Banana 2, Wan 2.7/Pro, Qwen 2.0, or Klein 9B to merge two characters — using the main image only for now.');
-  }
-  const mergeImg = (secondImg && MERGE_CAPABLE_EDIT.includes(editModel)) ? secondImg : null;
   const jobs = buildEditJobs(prompt, seriesAllowed);
   const isSeries = jobs.length > 1;
 
@@ -3081,7 +3072,7 @@ async function editImage(prompt, imageUrl, skipStyleLock = false, modelOverride 
   await Promise.all(jobs.map(async (job, i) => {
     const fullPrompt = skipStyleLock ? job.prompt : applyStyleLock(job.prompt);
     try {
-      const out = await runEdit(fullPrompt, imageUrl, editModel, mergeImg);
+      const out = await runEdit(fullPrompt, imageUrl, editModel);
       clearTyping();
       const label = isSeries
         ? `${out.modelLabel}${job.label ? ' · ' + job.label : ` (${i + 1}/${jobs.length})`}`
@@ -3108,7 +3099,7 @@ async function editImage(prompt, imageUrl, skipStyleLock = false, modelOverride 
 }
 
 // Core edit routine — returns { src, hostedUrl, modelLabel } or throws. No UI side effects (reused by storyboard frame editing).
-async function runEdit(fullPrompt, imageUrl, editModel, secondImageUrl = null) {
+async function runEdit(fullPrompt, imageUrl, editModel) {
   if (editModel === 'aurora' || editModel === 'aurora-simple') {
     // ── Aurora edit via xAI (simple vs quality) ──
     const model = editModel === 'aurora-simple' ? 'grok-imagine-image' : 'grok-imagine-image-quality';
@@ -3132,11 +3123,7 @@ async function runEdit(fullPrompt, imageUrl, editModel, secondImageUrl = null) {
     // ── Atlas edit (Flux Kontext / Qwen / Nano Banana 2 standard + developer) ──
     if (!atlasKey) throw new Error('Atlas Cloud API key required. Tap "Set API Key" to add it.');
     const atlasImg = await atlasPrepareImage(imageUrl);
-    const atlasImgs = [atlasImg];
-    if (secondImageUrl && (editModel === 'atlas-nano-banana-2-edit' || editModel === 'atlas-nano-banana-2-edit-dev')) {
-      atlasImgs.push(await atlasPrepareImage(secondImageUrl));
-    }
-    const resultUrl = await callModel(editModel, { prompt: fullPrompt, image: atlasImg, images: atlasImgs, isCancelled: () => false });
+    const resultUrl = await callModel(editModel, { prompt: fullPrompt, image: atlasImg, isCancelled: () => false });
     if (!resultUrl) throw new Error('Atlas edit timed out');
     const atlasEditLabels = { 'atlas-flux-kontext': 'Flux Kontext Edit · Atlas', 'atlas-qwen-edit': 'Qwen Edit · Atlas', 'atlas-nano-banana-2-edit': 'Nano Banana 2 Edit · Atlas', 'atlas-nano-banana-2-edit-dev': 'Nano Banana 2 Edit · Atlas · DEV' };
     return { src: resultUrl, hostedUrl: resultUrl, modelLabel: atlasEditLabels[editModel] || 'Atlas Edit' };
@@ -3173,7 +3160,6 @@ async function runEdit(fullPrompt, imageUrl, editModel, secondImageUrl = null) {
     };
     const wsModel = wsModels[editModel] || wsModels.qwen;
     const { path: wsPath, body: wsBody, timeout: wsTimeout = 120000 } = wsModel;
-    if (secondImageUrl && Array.isArray(wsBody.images)) wsBody.images.push(secondImageUrl);
     applyLockedSeed(wsBody);  // seed-lock override for edits (no-op if unsupported)
     const resultUrl = await callWaveSpeed(wsPath, wsBody, wsTimeout, 3000);
     if (!resultUrl) throw new Error('Edit timed out');
@@ -4279,10 +4265,6 @@ function deleteMediaMessage(containerEl, src, hostedUrl) {
   const matchesTarget = u => u && (u === src || (hostedUrl && u === hostedUrl));
   if (matchesTarget(lastImageUrl)) lastImageUrl = null;
   if (matchesTarget(activeEditTarget)) activeEditTarget = null;
-  if (matchesTarget(secondEditTarget)) {
-    secondEditTarget = null;
-    document.querySelectorAll('.second-ref-btn').forEach(b => { b.classList.remove('is-target'); b.textContent = '🎭 2nd Ref'; });
-  }
   if (!lastImageUrl && !activeEditTarget) {
     document.querySelectorAll('.set-target-btn').forEach(b => { b.classList.remove('is-target'); b.textContent = '🎯 Edit Target'; });
     document.querySelectorAll('.img-wrapper.edit-target').forEach(w => w.classList.remove('edit-target'));
@@ -4450,26 +4432,6 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
     if (!editMode && !enhanceMode) setEditMode(true);
   });
 
-  // Set as 2nd reference button (for merging two characters into one image)
-  const secondRefBtn = document.createElement('button');
-  secondRefBtn.className = 'set-target-btn second-ref-btn';
-  secondRefBtn.title = 'Use this image as a 2nd reference, then edit your main target — merges both (Nano Banana 2, Wan, Qwen 2.0, Klein 9B)';
-  const refKey = hostedUrl || src;
-  const syncSecondRefBtn = () => {
-    if (refKey === secondEditTarget) { secondRefBtn.classList.add('is-target'); secondRefBtn.textContent = '🎭 2nd Set'; }
-    else { secondRefBtn.classList.remove('is-target'); secondRefBtn.textContent = '🎭 2nd Ref'; }
-  };
-  syncSecondRefBtn();
-  secondRefBtn.addEventListener('click', () => {
-    if (refKey === secondEditTarget) {
-      secondEditTarget = null; // tap again to clear
-    } else {
-      secondEditTarget = refKey;
-      document.querySelectorAll('.second-ref-btn').forEach(b => { b.classList.remove('is-target'); b.textContent = '🎭 2nd Ref'; });
-    }
-    syncSecondRefBtn();
-  });
-
   // Retry button
   const retryImgBtn = document.createElement('button');
   retryImgBtn.className = 'retry-btn';
@@ -4614,7 +4576,6 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   btnBar.appendChild(copyPromptBtn);
   btnBar.appendChild(pinPEBtn);
   btnBar.appendChild(setTargetBtn);
-  btnBar.appendChild(secondRefBtn);
   btnBar.appendChild(getStyleBtn);
   btnBar.appendChild(applyStyleBtn);
   btnBar.appendChild(retryImgBtn);
