@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio v1.28" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio v1.29" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio v1.28</title>
+  <title>Zaor Studio v1.29</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1983,8 +1983,8 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
   'atlas-grok-simple':  { cat:'t2img', label:'Aurora Simple · Atlas', provider:'atlas', path:'xai/grok-imagine-image/text-to-image', price:0.02, verified:true,
     buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
-  'z-image-turbo':  { cat:'t2img', label:'Z-Image Turbo · Atlas', provider:'atlas', path:'z-image/turbo/text-to-image',  price:0.01, verified:true,
-    buildBody:p=>({ prompt:p.prompt, enable_safety_checker:false }) },
+  'z-image-turbo':  { cat:'t2img', label:'Z-Image Turbo · Atlas', provider:'atlas', path:'z-image/turbo',  price:0.01, verified:true,
+    buildBody:p=>({ prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1 }) },
   'z-image-lora':   { cat:'t2img', label:'Z-Image Turbo · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/z-image/turbo-lora', price:0.01, verified:true, lora:true, loraBase:'Z-Image',
     buildBody:p=>{
       const b = { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, enable_base64_output:false, enable_safety_checker:false };
@@ -2010,8 +2010,9 @@ const MODEL_REGISTRY = {
     } },
   'atlas-flux-dev': { cat:'t2img', label:'Flux Dev · Atlas', provider:'atlas', path:'black-forest-labs/flux-dev', price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
-  'atlas-z-image-lora': { cat:'t2img', label:'Z-Image Turbo · Atlas · LoRA (fallback)', provider:'atlas', path:'z-image/turbo-lora/text-to-image', price:0.01, verified:true, lora:true, loraBase:'Z-Image',
-    buildBody:p=>{ const b={ prompt:p.prompt, enable_safety_checker:false }; if(p.loras&&p.loras.length) b.loras=p.loras.slice(0,3).map(l=>({path:l.path,scale:Number(l.scale)||1})); return b; } },
+  // NOTE: No Atlas-hosted Z-Image LoRA model exists — Atlas offers z-image/turbo (non-LoRA) only,
+  // and reserves server-side LoRA for the Flux Dev base. The old 'atlas-z-image-lora' entry pointed
+  // at a non-existent model and always 400'd. Z-Image LoRA runs through WaveSpeed ('z-image-lora').
   'atlas-flux-dev-lora': { cat:'t2img', label:'Flux Dev · Atlas · LoRA (fallback)', provider:'atlas', path:'black-forest-labs/flux-dev-lora', price:0.015, verified:true, lora:true, loraBase:'Flux',
     buildBody:p=>{ const b={ prompt:p.prompt, num_images:1, enable_safety_checker:false }; if(p.loras&&p.loras.length) b.loras=p.loras.slice(0,3).map(l=>({path:l.path,scale:Number(l.scale)||1})); return b; } },
   'atlas-flux-schnell': { cat:'t2img', label:'Flux Schnell · Atlas', provider:'atlas', path:'black-forest-labs/flux-schnell', price:0.003, verified:true,
