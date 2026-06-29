@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio v1.30" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio v1.31" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio v1.30</title>
+  <title>Zaor Studio v1.31</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1295,7 +1295,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span style="font-size:10px;opacity:0.5;font-weight:400;">v1.28</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span id="app-version-badge" style="font-size:10px;opacity:0.5;font-weight:400;">v1.31</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1839,6 +1839,7 @@
   </div>
 </div>
 
+  <div class="modal-overlay" id="rename-overlay">
   <div class="modal">
     <h2>Rename Game</h2>
     <p>Give this game a name.</p>
@@ -1877,6 +1878,13 @@ window.addEventListener('unhandledrejection', (e) => {
   const r = e.reason;
   console.error('[Zaor async error] ' + (r && (r.stack || r.message) ? (r.stack || r.message) : JSON.stringify(r)));
 });
+
+// ═══════════════════════════════════════════════════════
+// APP VERSION — single source of truth. Bump this AND sw.js CACHE_VERSION
+// together on each deploy. The sidebar badge + tab title are stamped from
+// this at boot, so the version display can never silently go stale again.
+// ═══════════════════════════════════════════════════════
+const APP_VERSION = '1.31';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2369,7 +2377,7 @@ function getThreads() {
 function saveThreads(threads) {
   threadsCache = Array.isArray(threads) ? threads : [];
   if (idbReady) {
-    return idbKV.set(THREADS_KEY, threadsCache).catch(e => {
+    idbKV.set(THREADS_KEY, threadsCache).catch(e => {
       console.error('[Zaor storage save]', e && (e.stack || e.message));
       appendError('Could not save locally — your latest changes may not persist.');
     });
@@ -2379,7 +2387,6 @@ function saveThreads(threads) {
     catch (e) {
       if (e.name === 'QuotaExceededError') appendError('Storage full — save images to Files to free space.');
     }
-    return Promise.resolve();
   }
 }
 
@@ -2429,7 +2436,7 @@ function updateStorageInfo() {
 
 // Strip heavy media (image/video messages + base64 vision frames) from saved threads.
 // Keeps text, conversation structure, LoRAs, prompts, and keys intact.
-async function clearStoredMedia() {
+function clearStoredMedia() {
   const threads = getThreads();
   let removed = 0;
   threads.forEach(t => {
@@ -2450,13 +2457,13 @@ async function clearStoredMedia() {
       });
     }
   });
-  await saveThreads(threads);
+  saveThreads(threads);
   return removed;
 }
 
-async function clearAllChats() {
+function clearAllChats() {
   threadsCache = [];
-  try { if (idbReady) await idbKV.del(THREADS_KEY); } catch(e) { console.error('[Zaor clearAll]', e); }
+  if (idbReady) { idbKV.del(THREADS_KEY).catch(e => console.error('[Zaor clearAll]', e)); }
   try { localStorage.removeItem('gs_threads'); } catch(e) {}
 }
 
@@ -2652,6 +2659,13 @@ document.getElementById('new-thread-btn').addEventListener('click', () => {
 // INIT  — each step isolated so one failure can't kill the app
 // ═══════════════════════════════════════════════════════
 try { updateKeyBtn(); } catch (e) { console.error('[Zaor INIT updateKeyBtn]', e && (e.stack || e.message)); }
+
+// Stamp the version everywhere from the single APP_VERSION constant
+try {
+  const _vb = document.getElementById('app-version-badge');
+  if (_vb) _vb.textContent = 'v' + APP_VERSION;
+  document.title = 'Zaor Studio v' + APP_VERSION;
+} catch (e) { console.error('[Zaor INIT version stamp]', e && (e.stack || e.message)); }
 
 // Generate model dropdowns from the registry (single source of truth)
 try { populateModelDropdown('img-model-select', 't2img'); } catch (e) { console.error('[Zaor INIT populateDropdown]', e && (e.stack || e.message)); }
@@ -4767,18 +4781,17 @@ const keyInput     = document.getElementById('key-input');
 
 apiKeyBtn.addEventListener('click', () => openModal('api'));
 
-document.getElementById('clear-media-btn')?.addEventListener('click', async () => {
+document.getElementById('clear-media-btn')?.addEventListener('click', () => {
   if (!confirm('Remove stored images & videos from your saved chats? Text is kept. Your LoRAs, prompts, and keys are not touched.')) return;
-  const n = await clearStoredMedia();
+  const n = clearStoredMedia();
   updateStorageInfo();
-  alert(n + ' media item(s) cleared.');
+  alert(n + ' media item(s) cleared. Reload the app to see the freed space.');
 });
-document.getElementById('clear-chats-btn')?.addEventListener('click', async () => {
+document.getElementById('clear-chats-btn')?.addEventListener('click', () => {
   if (!confirm('Delete ALL conversations? This cannot be undone. Your LoRAs, saved prompts, and keys are kept.')) return;
-  await clearAllChats();
-  renderThreadList();
+  clearAllChats();
   updateStorageInfo();
-  alert('All conversations cleared.');
+  alert('All conversations cleared. Reload the app.');
 });
 
 // ═══════════════════════════════════════════════════════
@@ -6458,8 +6471,7 @@ document.getElementById('refresh-btn')?.addEventListener('click', async () => {
       await Promise.all(keys.map(k => caches.delete(k)));
     }
     // Hard reload that actually bypasses the HTTP/CDN cache. reload(true) is a no-op in
-    // modern browsers, so navigate to a unique URL — this forces a fresh network fetch of
-    // the shell (and a byte-check of sw.js) instead of re-serving the stale cached copy.
+    // modern browsers, so navigate to a unique URL — this forces a fresh network fetch.
     location.replace(location.pathname + '?fresh=' + Date.now());
   } catch(e) {
     location.replace(location.pathname + '?fresh=' + Date.now());
