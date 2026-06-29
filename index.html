@@ -6649,9 +6649,28 @@ document.addEventListener('visibilitychange', () => {
 // ═══════════════════════════════════════════════════════
 // PWA SERVICE WORKER
 // ═══════════════════════════════════════════════════════
-// Service worker registered via sw.js file for GitHub Pages compatibility
+// Service worker registered via sw.js file for GitHub Pages compatibility.
+// updateViaCache:'none' forces the browser to byte-check sw.js on every update
+// instead of trusting GitHub Pages' 10-min HTTP cache — so new deploys are seen promptly.
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/ZaorStudioAlpha01/sw.js').catch(() => {});
+  navigator.serviceWorker.register('/ZaorStudioAlpha01/sw.js', { updateViaCache: 'none' })
+    .then(reg => {
+      reg.update(); // check immediately on load
+      // Re-check whenever the app regains focus (covers resumed iOS home-screen launches)
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update(); });
+    })
+    .catch(() => {});
+
+  // The SW calls skipWaiting() on install, so a new version activates right away and fires
+  // controllerchange. Reload ONCE when that happens so the open page shows the fresh build.
+  // Guard with hadController so a brand-new (uncontrolled) first visit doesn't self-reload.
+  const _hadController = !!navigator.serviceWorker.controller;
+  let _swReloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!_hadController || _swReloading) return;
+    _swReloading = true;
+    location.reload();
+  });
 }
 </script>
 </body>
