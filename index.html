@@ -1915,7 +1915,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.40';
+const APP_VERSION = '1.41';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2084,26 +2084,31 @@ function populateTextModelSelect(sel, selectedId) {
 
 // Unified dispatcher: route a chat-completion to the right backend by model id.
 // Returns content string, or '' on any failure/timeout (so callers can fall back).
+// Records why the most recent callTextModel() returned empty (HTTP status, abort,
+// missing key, etc.) so the chat flow can surface a real reason instead of a silent fallback.
+let lastTextModelError = '';
 async function callTextModel(modelId, messages, maxTokens, temperature) {
   const m = TEXT_MODELS[modelId];
-  if (!m) return '';
+  if (!m) { lastTextModelError = 'Unknown model: ' + modelId; return ''; }
   const maxTok = maxTokens || 1024;
   const temp = (temperature == null) ? 0.8 : temperature;
+  const label = m.label || modelId;
   try {
     if (m.source === 'grok') {
-      if (!apiKey) return '';
+      if (!apiKey) { lastTextModelError = label + ': no xAI key set'; return ''; }
       const res = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({ model: modelSelect.value, messages, max_tokens: maxTok, temperature: temp })
       });
-      if (!res.ok) return '';
+      if (!res.ok) { lastTextModelError = label + ': HTTP ' + res.status + ' ' + res.statusText; return ''; }
       const data = await res.json();
       try { addTextSpend(data.usage); } catch (e) {}
+      lastTextModelError = '';
       return data.choices?.[0]?.message?.content || '';
     }
     if (m.source === 'openrouter') {
-      if (!openrouterKey) return '';
+      if (!openrouterKey) { lastTextModelError = label + ': no OpenRouter key set'; return ''; }
       const ctrl = new AbortController();
       const to = setTimeout(() => ctrl.abort(), 60000);
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -2118,12 +2123,18 @@ async function callTextModel(modelId, messages, maxTokens, temperature) {
         signal: ctrl.signal
       });
       clearTimeout(to);
-      if (!res.ok) return '';
+      if (!res.ok) {
+        let detail = '';
+        try { const ej = await res.json(); detail = ej?.error?.message ? ' — ' + ej.error.message : ''; } catch (e) {}
+        lastTextModelError = label + ': HTTP ' + res.status + detail;
+        return '';
+      }
       const data = await res.json();
+      lastTextModelError = '';
       return data.choices?.[0]?.message?.content || '';
     }
     if (m.source === 'hf') {
-      if (!hfKey) return '';
+      if (!hfKey) { lastTextModelError = label + ': no Hugging Face token set'; return ''; }
       const ctrl = new AbortController();
       const to = setTimeout(() => ctrl.abort(), 60000);
       const res = await fetch('https://router.huggingface.co/v1/chat/completions', {
@@ -2133,11 +2144,16 @@ async function callTextModel(modelId, messages, maxTokens, temperature) {
         signal: ctrl.signal
       });
       clearTimeout(to);
-      if (!res.ok) return '';
+      if (!res.ok) { lastTextModelError = label + ': HTTP ' + res.status + ' ' + res.statusText; return ''; }
       const data = await res.json();
+      lastTextModelError = '';
       return data.choices?.[0]?.message?.content || '';
     }
-  } catch (e) { return ''; }
+  } catch (e) {
+    lastTextModelError = label + ': ' + (e.name === 'AbortError' ? 'timed out after 60s' : (e.message || 'network error'));
+    return '';
+  }
+  lastTextModelError = label + ': no route for source ' + m.source;
   return '';
 }
 
@@ -3624,6 +3640,7 @@ async function generateText(userText) {
     let reply = '';
     // Try the selected (or vision-forced) chat model first.
     reply = await callTextModel(effectiveChatModel, apiMessages, 2048, 0.9);
+    const primaryFailReason = reply ? '' : lastTextModelError;
     // Fall back to the user-chosen fallback model if the primary returned nothing.
     if (!reply && fallbackModelId && fallbackModelId !== effectiveChatModel) {
       const fbInfo = TEXT_MODELS[fallbackModelId];
@@ -3640,7 +3657,12 @@ async function generateText(userText) {
     }
     removeTyping(typingId);
     if (!reply) {
-      throw new Error('No model returned a reply. Check that the selected model and its fallback have a valid API key set.');
+      throw new Error('No model returned a reply. ' + (lastTextModelError ? '(' + lastTextModelError + ') ' : '') + 'Check that the selected model and its fallback have a valid API key set.');
+    }
+    // If the primary model failed but something else rescued the turn, tell the user
+    // why — so a silent fall-through to grok is never mistaken for the chosen model working.
+    if (primaryFailReason) {
+      appendError(primaryFailReason + ' — used a fallback model for this reply.');
     }
     addToHistory('assistant', reply);
     addMessageToThread({ role: 'assistant', type: 'text', content: reply });
@@ -4934,9 +4956,20 @@ function removeTyping(id) { document.getElementById(id)?.remove(); }
 function appendError(msg) {
   const div = document.createElement('div');
   div.className = 'error-bubble';
-  div.textContent = '⚠ ' + msg;
+  div.style.position = 'relative';
+  div.style.paddingRight = '34px';
+  const text = document.createElement('span');
+  text.textContent = '⚠ ' + msg;
+  div.appendChild(text);
+  const x = document.createElement('button');
+  x.textContent = '✕';
+  x.setAttribute('aria-label', 'Dismiss');
+  x.style.cssText = 'position:absolute;top:50%;right:8px;transform:translateY(-50%);background:none;border:none;color:var(--rose);font-size:13px;cursor:pointer;padding:4px 6px;line-height:1;opacity:0.7;';
+  x.addEventListener('click', () => div.remove());
+  div.appendChild(x);
   messagesEl.appendChild(div);
   scrollToBottom();
+  return div;
 }
 
 function scrollToBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
