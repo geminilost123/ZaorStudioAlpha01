@@ -1641,7 +1641,7 @@
 </div>
 
 <div class="modal-overlay" id="modal-overlay">
-  <div class="modal">
+  <div class="modal" style="max-width:560px;width:92%;max-height:85vh;overflow-y:auto;display:flex;flex-direction:column;">
     <h2>API Keys</h2>
     <p>Stored only in this browser. Sent directly to each provider — never logged here.</p>
     <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">xAI Key (chat + Aurora video)</label>
@@ -1667,7 +1667,7 @@
       </div>
       <div style="font-size:11px;color:var(--text-dim);margin-top:6px;">Frees space if the app slows down. Your LoRAs, saved prompts, and keys are kept.</div>
     </div>
-    <div class="modal-btns">
+    <div class="modal-btns" style="flex-shrink:0;">
       <button class="btn-secondary" id="modal-cancel">Cancel</button>
       <button class="btn-primary" id="modal-save">Save</button>
     </div>
@@ -1768,10 +1768,10 @@
 
 <!-- Storyboard Settings Modal -->
 <div class="modal-overlay" id="storyboard-overlay">
-  <div class="modal" style="max-width:480px;width:92%;">
+  <div class="modal" style="max-width:480px;width:92%;max-height:85vh;overflow-y:auto;display:flex;flex-direction:column;">
     <h2 style="margin-bottom:4px;">🎬 Storyboard director</h2>
     <p style="margin-bottom:14px;">Turn this on to show a <b>🎬 Generate Frame</b> button by the message bar. Tap it whenever you want a storyboard frame from the latest story moment — nothing generates automatically, so you only spend when you choose to. Each frame also drafts a Wan 2.2 video prompt you can copy. Returning characters reuse their saved looks from your cast.</p>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 14px;margin-bottom:14px;flex-shrink:0;">
       <div style="min-width:0;">
         <div style="font-size:14px;color:var(--text);">Storyboard mode</div>
         <div style="font-size:11px;color:var(--text-dim);">Auto-generate frames as you play</div>
@@ -1789,11 +1789,11 @@
     <select id="director-model-select" class="img-control-select" style="width:100%;margin-bottom:10px;"></select>
     <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Fallback model (used if the above fails)</label>
     <select id="fallback-model-select" class="img-control-select" style="width:100%;margin-bottom:4px;"></select>
-    <div style="font-size:11px;color:var(--text-dim);padding:0 2px 14px;line-height:1.4;">HF models route through your Hugging Face token; OpenRouter free models through your OpenRouter key; Zaor through xAI. Vision turns (PE mode / pinned images) always use Zaor since the others are text-only — you'll get a notice when that happens.</div>
     <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Style extraction model (for 🔒 Extract Style button)</label>
     <select id="style-extractor-model-select" class="img-control-select" style="width:100%;margin-bottom:10px;"></select>
     <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">PE-with-image model (for ✦ PE mode with pinned image)</label>
     <select id="pe-image-model-select" class="img-control-select" style="width:100%;margin-bottom:14px;"></select>
+    <div style="font-size:11px;color:var(--text-dim);padding:0 2px 14px;line-height:1.4;">HF models route through your Hugging Face token; OpenRouter free models through your OpenRouter key; Zaor (grok) through xAI. Text-only models used in vision turns (style extraction, PE with image) will auto-fall back to an available vision model.</div>
     <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Frame aspect ratio</label>
     <select id="sb-ratio-select" class="img-control-select" style="width:100%;margin-bottom:6px;">
       <option value="16:9">16:9 — cinematic</option>
@@ -1802,7 +1802,7 @@
       <option value="4:3">4:3</option>
       <option value="3:4">3:4 — portrait</option>
     </select>
-    <div class="modal-btns" style="margin-top:12px;">
+    <div class="modal-btns" style="margin-top:12px;flex-shrink:0;">
       <button class="btn-primary" id="sb-close" style="width:100%;">Done</button>
     </div>
   </div>
