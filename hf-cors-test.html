@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HF Router CORS Test</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; background:#1a1a2e; color:#f0ece4; margin:0; padding:20px; line-height:1.5; }
+  h1 { font-size:18px; color:#c9b8e8; }
+  input, button { font-size:16px; }
+  input { width:100%; padding:10px; margin:8px 0; border-radius:8px; border:1px solid #444; background:#252538; color:#f0ece4; box-sizing:border-box; }
+  button { padding:12px 18px; border:none; border-radius:8px; background:#c9b8e8; color:#1a1a2e; font-weight:600; cursor:pointer; width:100%; margin-top:6px; }
+  button:disabled { opacity:0.5; }
+  .test { background:#252538; border:1px solid #333; border-radius:10px; padding:14px; margin:14px 0; }
+  .test h2 { font-size:14px; margin:0 0 8px; color:#c9b8e8; }
+  pre { white-space:pre-wrap; word-break:break-word; font-size:12px; background:#14142a; padding:10px; border-radius:8px; margin:8px 0 0; max-height:240px; overflow:auto; }
+  .ok { color:#7ee0a8; } .bad { color:#c47a8a; } .pending { color:#f4d03f; }
+  label { font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:#9a96a8; }
+</style>
+</head>
+<body>
+  <h1>Hugging Face Router — Browser CORS Test</h1>
+  <p style="font-size:13px;color:#9a96a8;">Paste your HF token, then run each test. This page makes <b>direct browser fetch()</b> calls from this origin — exactly like the Zaor app would. If a test shows a CORS / "Failed to fetch" error, that path won't work from the phone app.</p>
+
+  <label>HF Token (hf_…)</label>
+  <input type="password" id="tok" placeholder="hf_xxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false" />
+
+  <div class="test">
+    <h2>Test 1 — Raw fetch to router /v1/chat/completions (the plan's main path)</h2>
+    <button id="b1">Run Test 1</button>
+    <pre id="r1">Not run yet.</pre>
+  </div>
+
+  <div class="test">
+    <h2>Test 2 — Same call but with provider-suffixed model (:novita)</h2>
+    <button id="b2">Run Test 2</button>
+    <pre id="r2">Not run yet.</pre>
+  </div>
+
+  <div class="test">
+    <h2>Test 3 — Official @huggingface/inference JS SDK via CDN (CORS fallback path)</h2>
+    <button id="b3">Run Test 3</button>
+    <pre id="r3">Not run yet.</pre>
+  </div>
+
+  <div class="test">
+    <h2>Test 4 — Whoami (simple GET, sanity check token + basic CORS)</h2>
+    <button id="b4">Run Test 4</button>
+    <pre id="r4">Not run yet.</pre>
+  </div>
+
+<script type="module">
+const tokEl = document.getElementById('tok');
+const getTok = () => tokEl.value.trim();
+
+function show(id, cls, msg) {
+  const el = document.getElementById(id);
+  el.className = cls;
+  el.textContent = msg;
+}
+
+// ── Test 1: raw fetch, plain model id ──
+document.getElementById('b1').onclick = async () => {
+  if (!getTok()) return show('r1','bad','Enter your HF token first.');
+  show('r1','pending','Running…');
+  const t0 = performance.now();
+  try {
+    const res = await fetch('https://router.huggingface.co/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${getTok()}` },
+      body: JSON.stringify({
+        model: 'meta-llama/Llama-3.3-70B-Instruct',
+        messages: [{ role:'user', content:'Reply with exactly the word: PONG' }],
+        max_tokens: 16
+      })
+    });
+    const ms = Math.round(performance.now()-t0);
+    const text = await res.text();
+    let parsed=''; try { parsed = JSON.parse(text).choices?.[0]?.message?.content || ''; } catch(e){}
+    if (res.ok) show('r1','ok',`✅ SUCCESS (${res.status}, ${ms}ms)\nReply: ${parsed}\n\nRaw:\n${text.slice(0,500)}`);
+    else show('r1','bad',`⚠️ HTTP ${res.status} (${ms}ms) — request REACHED the server (CORS OK) but was rejected.\n\n${text.slice(0,500)}`);
+  } catch (e) {
+    show('r1','bad',`❌ FETCH FAILED — this is almost certainly CORS (browser blocked it).\n\n${e.name}: ${e.message}\n\nIf this is "Failed to fetch" / "Load failed", the router does NOT allow browser-origin calls. The raw-fetch plan won't work from the app.`);
+  }
+};
+
+// ── Test 2: provider-suffixed model id ──
+document.getElementById('b2').onclick = async () => {
+  if (!getTok()) return show('r2','bad','Enter your HF token first.');
+  show('r2','pending','Running…');
+  const t0 = performance.now();
+  try {
+    const res = await fetch('https://router.huggingface.co/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${getTok()}` },
+      body: JSON.stringify({
+        model: 'meta-llama/Llama-3.3-70B-Instruct:novita',
+        messages: [{ role:'user', content:'Reply with exactly the word: PONG' }],
+        max_tokens: 16
+      })
+    });
+    const ms = Math.round(performance.now()-t0);
+    const text = await res.text();
+    let parsed=''; try { parsed = JSON.parse(text).choices?.[0]?.message?.content || ''; } catch(e){}
+    if (res.ok) show('r2','ok',`✅ SUCCESS (${res.status}, ${ms}ms)\nReply: ${parsed}\n\nRaw:\n${text.slice(0,500)}`);
+    else show('r2','bad',`⚠️ HTTP ${res.status} (${ms}ms) — reached server, rejected.\n\n${text.slice(0,500)}`);
+  } catch (e) {
+    show('r2','bad',`❌ FETCH FAILED (likely CORS).\n\n${e.name}: ${e.message}`);
+  }
+};
+
+// ── Test 3: official JS SDK via CDN ──
+document.getElementById('b3').onclick = async () => {
+  if (!getTok()) return show('r3','bad','Enter your HF token first.');
+  show('r3','pending','Loading SDK from CDN…');
+  const t0 = performance.now();
+  try {
+    const { InferenceClient } = await import('https://cdn.jsdelivr.net/npm/@huggingface/inference@4.13.21/+esm');
+    show('r3','pending','SDK loaded. Calling…');
+    const client = new InferenceClient(getTok());
+    const out = await client.chatCompletion({
+      model: 'meta-llama/Llama-3.3-70B-Instruct',
+      messages: [{ role:'user', content:'Reply with exactly the word: PONG' }],
+      max_tokens: 16
+    });
+    const ms = Math.round(performance.now()-t0);
+    show('r3','ok',`✅ SUCCESS (${ms}ms)\nReply: ${out.choices?.[0]?.message?.content || '(empty)'}\n\nThe SDK path works in-browser. If Test 1 failed but this passed, we'd integrate via the CDN SDK instead of raw fetch.`);
+  } catch (e) {
+    show('r3','bad',`❌ SDK CALL FAILED.\n\n${e.name}: ${e.message}\n\nIf this also fails with a network/CORS error, browser-direct HF calls are not viable at all and we'd need a different approach.`);
+  }
+};
+
+// ── Test 4: whoami GET ──
+document.getElementById('b4').onclick = async () => {
+  if (!getTok()) return show('r4','bad','Enter your HF token first.');
+  show('r4','pending','Running…');
+  try {
+    const res = await fetch('https://huggingface.co/api/whoami-v2', {
+      headers: { 'Authorization':`Bearer ${getTok()}` }
+    });
+    const text = await res.text();
+    if (res.ok) {
+      let name=''; try { name = JSON.parse(text).name || ''; } catch(e){}
+      show('r4','ok',`✅ SUCCESS (${res.status})\nAuthenticated as: ${name}\n\n(Confirms token is valid + this host allows browser CORS. Note: huggingface.co and router.huggingface.co may have different CORS rules, so this passing does NOT guarantee Test 1 passes.)`);
+    } else {
+      show('r4','bad',`⚠️ HTTP ${res.status} — token may be invalid or lack permissions.\n\n${text.slice(0,400)}`);
+    }
+  } catch (e) {
+    show('r4','bad',`❌ FETCH FAILED (CORS or network).\n\n${e.name}: ${e.message}`);
+  }
+};
+</script>
+</body>
+</html>
