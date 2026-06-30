@@ -1915,7 +1915,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.41';
+const APP_VERSION = '1.42';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2087,6 +2087,7 @@ function populateTextModelSelect(sel, selectedId) {
 // Records why the most recent callTextModel() returned empty (HTTP status, abort,
 // missing key, etc.) so the chat flow can surface a real reason instead of a silent fallback.
 let lastTextModelError = '';
+let lastVisionModelError = '';
 async function callTextModel(modelId, messages, maxTokens, temperature) {
   const m = TEXT_MODELS[modelId];
   if (!m) { lastTextModelError = 'Unknown model: ' + modelId; return ''; }
@@ -2160,26 +2161,29 @@ async function callTextModel(modelId, messages, maxTokens, temperature) {
 // Unified dispatcher for vision calls (image understanding: style extraction, PE-with-image, etc.)
 // Takes messages array with image_url content blocks, returns content string or '' on failure.
 // grok routes via xAI; hf routes via HF Inference Providers chat-completions (image_url supported).
+// Sets lastVisionModelError on failure for real-time error display.
 async function callVisionModel(modelId, messages, maxTokens, temperature) {
   const m = VISION_MODELS[modelId];
-  if (!m) return '';
+  if (!m) { lastVisionModelError = 'Unknown model: ' + modelId; return ''; }
   const maxTok = maxTokens || 220;
   const temp = (temperature == null) ? 0.4 : temperature;
+  const label = m.label || modelId;
   try {
     if (m.source === 'grok') {
-      if (!apiKey) return '';
+      if (!apiKey) { lastVisionModelError = label + ': no xAI key set'; return ''; }
       const res = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({ model: 'grok-4.3', messages, max_tokens: maxTok, temperature: temp })
       });
-      if (!res.ok) return '';
+      if (!res.ok) { lastVisionModelError = label + ': HTTP ' + res.status + ' ' + res.statusText; return ''; }
       const data = await res.json();
       try { addTextSpend(data.usage); } catch (e) {}
+      lastVisionModelError = '';
       return data.choices?.[0]?.message?.content || '';
     }
     if (m.source === 'hf') {
-      if (!hfKey) return '';
+      if (!hfKey) { lastVisionModelError = label + ': no Hugging Face token set'; return ''; }
       const ctrl = new AbortController();
       const to = setTimeout(() => ctrl.abort(), 60000);
       // HF router supports vision via standard chat completions API (messages can include image_url)
@@ -2190,11 +2194,16 @@ async function callVisionModel(modelId, messages, maxTokens, temperature) {
         signal: ctrl.signal
       });
       clearTimeout(to);
-      if (!res.ok) return '';
+      if (!res.ok) { lastVisionModelError = label + ': HTTP ' + res.status + ' ' + res.statusText; return ''; }
       const data = await res.json();
+      lastVisionModelError = '';
       return data.choices?.[0]?.message?.content || '';
     }
-  } catch (e) { return ''; }
+  } catch (e) {
+    lastVisionModelError = label + ': ' + (e.name === 'AbortError' ? 'timed out after 60s' : (e.message || 'network error'));
+    return '';
+  }
+  lastVisionModelError = label + ': no route for source ' + m.source;
   return '';
 }
 let imageMode = false;
@@ -6682,7 +6691,10 @@ async function extractStyleFromImage(imageUrl) {
     ] }
   ];
   const txt = await callVisionModel(styleExtractorModelId, messages, 220, 0.4);
-  if (!txt) throw new Error('Style extraction failed — check your API key for the selected vision model.');
+  if (!txt) {
+    const detail = lastVisionModelError ? ': ' + lastVisionModelError : '';
+    throw new Error('Style extraction failed' + detail);
+  }
   return txt.trim().replace(/^["']+|["']+$/g, '').replace(/\s*\n+\s*/g, ', ').trim();
 }
 
