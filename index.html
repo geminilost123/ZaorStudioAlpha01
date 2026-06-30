@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio v1.32" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio v1.33" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio v1.32</title>
+  <title>Zaor Studio v1.33</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1303,7 +1303,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span id="app-version-badge" style="font-size:10px;opacity:0.5;font-weight:400;">v1.32</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span id="app-version-badge" style="font-size:10px;opacity:0.5;font-weight:400;">v1.33</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1650,6 +1650,8 @@
     <input type="password" id="wavespeed-key-input" placeholder="ws-…" autocomplete="off" spellcheck="false" />
     <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Atlas Cloud Key (cheap video — optional)</label>
     <input type="password" id="atlas-key-input" placeholder="atlas-…" autocomplete="off" spellcheck="false" />
+    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">OpenRouter Key (free director models — optional)</label>
+    <input type="password" id="openrouter-key-input" placeholder="sk-or-…" autocomplete="off" spellcheck="false" />
     <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Cloudinary — cloud name (for ☁ Cloud save)</label>
     <input type="text" id="cloudinary-cloud-input" placeholder="your-cloud-name" autocomplete="off" spellcheck="false" />
     <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Cloudinary — unsigned upload preset</label>
@@ -1779,6 +1781,13 @@
       <option value="chroma">Chroma uncensored · WaveSpeed — $0.015</option>
       <option value="z-image-turbo">Z-Image Turbo · Atlas — $0.01</option>
     </select>
+    <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Director model (writes the frame prompt)</label>
+    <select id="sb-director-select" class="img-control-select" style="width:100%;margin-bottom:4px;">
+      <option value="grok">Zaor (grok-4.3) — reliable, paid</option>
+      <option value="venice">Venice Uncensored — free, unmoderated</option>
+      <option value="gptoss">gpt-oss-120b — free, strict format</option>
+    </select>
+    <div style="font-size:11px;color:var(--text-dim);padding:0 2px 14px;line-height:1.4;">Free models route through your OpenRouter key. If one fails or returns a malformed frame, it falls back to Zaor automatically.</div>
     <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Frame aspect ratio</label>
     <select id="sb-ratio-select" class="img-control-select" style="width:100%;margin-bottom:6px;">
       <option value="16:9">16:9 — cinematic</option>
@@ -1896,7 +1905,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.32';
+const APP_VERSION = '1.33';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -1964,6 +1973,13 @@ checkPinSession();
 // ═══════════════════════════════════════════════════════
 let apiKey = localStorage.getItem('xai_key') || '';
 let wavespeedKey = localStorage.getItem('ws_key') || '';
+let openrouterKey = localStorage.getItem('openrouter_key') || '';
+// Free OpenRouter-hosted models selectable for the director role. Slugs may change as
+// OpenRouter's free tier churns — if one 404s, the director auto-falls back to grok.
+const OPENROUTER_DIRECTORS = {
+  venice: { slug: 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free', label: 'Venice Uncensored (free)' },
+  gptoss: { slug: 'openai/gpt-oss-120b:free', label: 'gpt-oss-120b (free)' }
+};
 let imageMode = false;
 let videoMode = false;
 let lastImageUrl = null; // tracks most recently generated image for editing
@@ -5436,6 +5452,7 @@ document.getElementById('lora-import')?.addEventListener('click', () => {
 // ═══════════════════════════════════════════════════════
 let storyboardOn = localStorage.getItem('zaor_sb_on') === '1';
 let storyboardModel = localStorage.getItem('zaor_sb_model') || 'chroma';
+let directorEngine = localStorage.getItem('zaor_director_engine') || 'grok';
 let storyboardRatio = localStorage.getItem('zaor_sb_ratio') || '16:9';
 
 function updateStoryboardBtn() {
@@ -5450,7 +5467,15 @@ document.getElementById('storyboard-btn')?.addEventListener('click', () => {
   document.getElementById('sb-on-toggle').checked = storyboardOn;
   populateModelDropdown('sb-model-select', 't2img', storyboardModel);
   document.getElementById('sb-ratio-select').value = storyboardRatio;
+  document.getElementById('sb-director-select').value = directorEngine;
   storyboardOverlay.classList.add('open');
+});
+document.getElementById('sb-director-select')?.addEventListener('change', e => {
+  directorEngine = e.target.value;
+  localStorage.setItem('zaor_director_engine', directorEngine);
+  if (directorEngine !== 'grok' && !openrouterKey) {
+    appendError('Heads up: free director models need an OpenRouter key. Add it under 🔑 Set API Keys, or frames will fall back to Zaor.');
+  }
 });
 document.getElementById('sb-close')?.addEventListener('click', () => storyboardOverlay.classList.remove('open'));
 storyboardOverlay?.addEventListener('click', e => { if (e.target === storyboardOverlay) storyboardOverlay.classList.remove('open'); });
@@ -5535,8 +5560,49 @@ function parseDirectorBlock(text) {
   };
 }
 
+// Director call via OpenRouter (free models). Returns content string, or '' on any failure/timeout.
+async function callDirectorOpenRouter(slug, messages) {
+  try {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 30000);
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openrouterKey}`,
+        'HTTP-Referer': location.origin,
+        'X-Title': 'Zaor Studio'
+      },
+      body: JSON.stringify({ model: slug, messages, max_tokens: 700, temperature: 0.7 }),
+      signal: ctrl.signal
+    });
+    clearTimeout(to);
+    if (!res.ok) return '';
+    const data = await res.json();
+    // Free OpenRouter models cost $0 — nothing added to the spend meter.
+    return data.choices?.[0]?.message?.content || '';
+  } catch (e) { return ''; }
+}
+// Director call via xAI grok — the reliable fallback. Returns content string, or '' on failure.
+async function callDirectorXAI(messages) {
+  try {
+    if (!apiKey) return '';
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: modelSelect.value, messages, max_tokens: 700, temperature: 0.7 })
+    });
+    if (!res.ok) return '';
+    const data = await res.json();
+    try { addTextSpend(data.usage); } catch (e) {}
+    return data.choices?.[0]?.message?.content || '';
+  } catch (e) { return ''; }
+}
+
 async function runStoryboardDirector(beatText, forceFrame) {
-  if (!beatText || !apiKey) return;
+  if (!beatText) return;
+  // Need a usable key for the chosen route (free models still fall back to grok).
+  if (!apiKey && !(OPENROUTER_DIRECTORS[directorEngine] && openrouterKey)) return;
   try {
     const mInfo = MODEL_REGISTRY[storyboardModel];
     const modelName = mInfo ? mInfo.label.split('·')[0].trim() : 'image';
@@ -5549,15 +5615,18 @@ async function runStoryboardDirector(beatText, forceFrame) {
       user += '\n\nKNOWN CAST (reuse these exact looks for any returning character — do not redesign them):\n' + cast.map(c => '- ' + c.name + ': ' + (c.desc || '')).join('\n');
     }
     if (forceFrame) user += '\n\n[The director used the manual trigger — you MUST output FRAME: yes for the most recent vivid visual moment.]';
-    const res = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: modelSelect.value, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }], max_tokens: 700, temperature: 0.7 })
-    });
-    if (!res.ok) return; // silently skip — never break the story
-    const data = await res.json();
-    const raw = data.choices?.[0]?.message?.content || '';
-    try { addTextSpend(data.usage); } catch(e) {}
+    const messages = [{ role: 'system', content: sys }, { role: 'user', content: user }];
+
+    let raw = '';
+    // Selected free model first (when one is chosen and a key exists)…
+    const orDir = OPENROUTER_DIRECTORS[directorEngine];
+    if (orDir && openrouterKey) raw = await callDirectorOpenRouter(orDir.slug, messages);
+    // …then fall back to grok if it failed or returned an unusable frame block.
+    if (!parseDirectorBlock(raw).imagePrompt) {
+      const grokRaw = await callDirectorXAI(messages);
+      if (grokRaw) raw = grokRaw;
+    }
+    if (!raw) return;
     const parsed = parseDirectorBlock(raw);
     // Cast is managed manually now — the director's CAST output is intentionally ignored (no auto-merge).
     if (parsed.frame && parsed.imagePrompt) {
@@ -6228,6 +6297,7 @@ function openModal(type) {
     keyInput.value = apiKey;
     document.getElementById('wavespeed-key-input').value = wavespeedKey;
     document.getElementById('atlas-key-input').value = atlasKey;
+    document.getElementById('openrouter-key-input').value = openrouterKey;
     document.getElementById('cloudinary-cloud-input').value = cloudinaryCloud;
     document.getElementById('cloudinary-preset-input').value = cloudinaryPreset;
     modalOverlay.classList.add('open');
@@ -6254,6 +6324,9 @@ document.getElementById('modal-save').addEventListener('click', () => {
     atlasKey = atlasVal;
     localStorage.setItem('atlas_key', atlasVal);
   }
+  // OpenRouter key (optional) — saved as-is so it can be updated or cleared.
+  openrouterKey = document.getElementById('openrouter-key-input').value.trim();
+  localStorage.setItem('openrouter_key', openrouterKey);
   // Cloudinary (not secret — saved as-is so they can be updated or cleared)
   cloudinaryCloud = document.getElementById('cloudinary-cloud-input').value.trim();
   localStorage.setItem('cloudinary_cloud', cloudinaryCloud);
