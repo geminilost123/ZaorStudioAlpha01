@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio v1.34" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio v1.36" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio v1.34</title>
+  <title>Zaor Studio v1.36</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1303,7 +1303,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span id="app-version-badge" style="font-size:10px;opacity:0.5;font-weight:400;">v1.34</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span id="app-version-badge" style="font-size:10px;opacity:0.5;font-weight:400;">v1.36</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1652,6 +1652,8 @@
     <input type="password" id="atlas-key-input" placeholder="atlas-…" autocomplete="off" spellcheck="false" />
     <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">OpenRouter Key (free director models — optional)</label>
     <input type="password" id="openrouter-key-input" placeholder="sk-or-…" autocomplete="off" spellcheck="false" />
+    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Hugging Face Token (cheap chat/director models — optional)</label>
+    <input type="password" id="hf-key-input" placeholder="hf_…" autocomplete="off" spellcheck="false" />
     <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Cloudinary — cloud name (for ☁ Cloud save)</label>
     <input type="text" id="cloudinary-cloud-input" placeholder="your-cloud-name" autocomplete="off" spellcheck="false" />
     <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Cloudinary — unsigned upload preset</label>
@@ -1781,20 +1783,17 @@
       <option value="chroma">Chroma uncensored · WaveSpeed — $0.015</option>
       <option value="z-image-turbo">Z-Image Turbo · Atlas — $0.01</option>
     </select>
-    <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Director model (writes the frame prompt)</label>
-    <select id="sb-director-select" class="img-control-select" style="width:100%;margin-bottom:4px;">
-      <option value="grok">Zaor (grok-4.3) — reliable, paid</option>
-      <option value="venice">Venice Uncensored — free, unmoderated</option>
-      <option value="gptoss">gpt-oss-120b — free, strict format</option>
-    </select>
-    <div style="font-size:11px;color:var(--text-dim);padding:0 2px 14px;line-height:1.4;">Free models route through your OpenRouter key. If one fails or returns a malformed frame, it falls back to Zaor automatically.</div>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
-      <div style="min-width:0;">
-        <div style="font-size:14px;color:var(--text);">Use it for the main chat too</div>
-        <div style="font-size:11px;color:var(--text-dim);">Routes story replies through the free model. Lower quality than Zaor; PE mode stays on Zaor; falls back if it fails.</div>
-      </div>
-      <label class="sb-switch"><input type="checkbox" id="sb-chat-free-toggle" /><span class="sb-slider"></span></label>
-    </div>
+    <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Main chat model (Zaor's story replies)</label>
+    <select id="chat-model-select" class="img-control-select" style="width:100%;margin-bottom:10px;"></select>
+    <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Director model (writes the hidden frame prompt)</label>
+    <select id="director-model-select" class="img-control-select" style="width:100%;margin-bottom:10px;"></select>
+    <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Fallback model (used if the above fails)</label>
+    <select id="fallback-model-select" class="img-control-select" style="width:100%;margin-bottom:4px;"></select>
+    <div style="font-size:11px;color:var(--text-dim);padding:0 2px 14px;line-height:1.4;">HF models route through your Hugging Face token; OpenRouter free models through your OpenRouter key; Zaor through xAI. Vision turns (PE mode / pinned images) always use Zaor since the others are text-only — you'll get a notice when that happens.</div>
+    <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Style extraction model (for 🔒 Extract Style button)</label>
+    <select id="style-extractor-model-select" class="img-control-select" style="width:100%;margin-bottom:10px;"></select>
+    <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">PE-with-image model (for ✦ PE mode with pinned image)</label>
+    <select id="pe-image-model-select" class="img-control-select" style="width:100%;margin-bottom:14px;"></select>
     <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Frame aspect ratio</label>
     <select id="sb-ratio-select" class="img-control-select" style="width:100%;margin-bottom:6px;">
       <option value="16:9">16:9 — cinematic</option>
@@ -1912,7 +1911,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.34';
+const APP_VERSION = '1.36';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -1981,12 +1980,202 @@ checkPinSession();
 let apiKey = localStorage.getItem('xai_key') || '';
 let wavespeedKey = localStorage.getItem('ws_key') || '';
 let openrouterKey = localStorage.getItem('openrouter_key') || '';
+let hfKey = localStorage.getItem('hf_key') || '';
 // Free OpenRouter-hosted models selectable for the director role. Slugs may change as
-// OpenRouter's free tier churns — if one 404s, the director auto-falls back to grok.
+// OpenRouter's free tier churns — if one 404s, callers auto-fall back to the chosen fallback model.
 const OPENROUTER_DIRECTORS = {
   venice: { slug: 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free', label: 'Venice Uncensored (free)' },
   gptoss: { slug: 'openai/gpt-oss-120b:free', label: 'gpt-oss-120b (free)' }
 };
+
+// ── Unified text-model registry ──────────────────────────────────────────────
+// Single source of truth for every selectable text model. Each entry declares a
+// `source` (grok | openrouter | hf), an optional `slug`, a `label`, and whether it
+// can do `vision`. The three role dropdowns (chat / director / fallback) are all
+// populated from this object and grouped by source, so adding a model later =
+// adding one entry here (the same pattern can host image models down the road).
+const TEXT_MODELS = {
+  // xAI (paid, vision-capable — the reliable default + the only vision route for now)
+  'grok':        { source: 'grok',       label: 'Zaor (grok-4.3) · paid', vision: true },
+  // OpenRouter free tier (routes through openrouterKey; $0 but churns)
+  'or-venice':   { source: 'openrouter', slug: 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free', label: 'Venice Uncensored · OpenRouter free' },
+  'or-gptoss':   { source: 'openrouter', slug: 'openai/gpt-oss-120b:free', label: 'gpt-oss-120b · OpenRouter free' },
+  // Hugging Face router (routes through hfKey; cheap, verified browser-callable)
+  'hf-gptoss':   { source: 'hf', slug: 'openai/gpt-oss-120b', label: 'gpt-oss-120b · HF' },
+  'hf-llama70':  { source: 'hf', slug: 'meta-llama/Llama-3.3-70B-Instruct', label: 'Llama 3.3 70B · HF' },
+  'hf-kimi':     { source: 'hf', slug: 'moonshotai/Kimi-K2-Instruct-0905', label: 'Kimi K2 · HF' },
+  'hf-deepseek': { source: 'hf', slug: 'deepseek-ai/DeepSeek-V3-0324', label: 'DeepSeek V3 · HF' },
+  'hf-qwen4b':   { source: 'hf', slug: 'Qwen/Qwen3-4B-Instruct-2507', label: 'Qwen3 4B · HF cheap' }
+};
+const TEXT_MODEL_SOURCE_LABELS = { grok: 'xAI (paid)', openrouter: 'OpenRouter (free)', hf: 'Hugging Face' };
+
+// ── TIER 2: VISION MODELS ──
+// Vision models for style extraction + PE-with-image tasks.
+// Currently only grok has native vision; HF vision models (Qwen3-VL, GLM-4.5V) will route via Chat API for now.
+const VISION_MODELS = {
+  'grok':        { source: 'grok',       label: 'Zaor (grok-4.3) · paid' },
+  // Future: add HF vision models here as we test them:
+  // 'hf-qwen-vl': { source: 'hf', slug: 'Qwen/Qwen3-Vision-7B-Instruct', label: 'Qwen3-VL · HF cheap' },
+  // 'hf-glm45v':  { source: 'hf', slug: 'google/glm-4.5v-2024-11-01', label: 'GLM-4.5V · HF' }
+};
+const VISION_MODEL_SOURCE_LABELS = { grok: 'xAI (paid)', hf: 'Hugging Face' };
+
+// Independent per-role vision selections (each persists separately).
+let styleExtractorModelId = localStorage.getItem('zaor_style_extractor_model') || 'grok';
+let peImageModelId = localStorage.getItem('zaor_pe_image_model') || 'grok';
+
+// Populate vision model dropdowns, grouped by source.
+function populateVisionModelSelect(sel, selectedId) {
+  if (!sel) return;
+  sel.innerHTML = '';
+  const bySource = {};
+  for (const [id, m] of Object.entries(VISION_MODELS)) {
+    (bySource[m.source] = bySource[m.source] || []).push([id, m]);
+  }
+  for (const source of ['grok', 'hf']) {
+    const entries = bySource[source];
+    if (!entries) continue;
+    const og = document.createElement('optgroup');
+    og.label = VISION_MODEL_SOURCE_LABELS[source] || source;
+    for (const [id, m] of entries) {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = m.label;
+      if (id === selectedId) opt.selected = true;
+      og.appendChild(opt);
+    }
+    sel.appendChild(og);
+  }
+}
+
+// Independent per-role selections (each persists separately).
+let chatModelId     = localStorage.getItem('zaor_chat_model')     || 'grok';
+let directorModelId = localStorage.getItem('zaor_director_model') || 'grok';
+let fallbackModelId = localStorage.getItem('zaor_fallback_model') || 'grok';
+
+// Build <optgroup>-grouped <option>s for a role <select>, marking the saved value selected.
+function populateTextModelSelect(sel, selectedId) {
+  if (!sel) return;
+  sel.innerHTML = '';
+  const bySource = {};
+  for (const [id, m] of Object.entries(TEXT_MODELS)) {
+    (bySource[m.source] = bySource[m.source] || []).push([id, m]);
+  }
+  for (const source of ['grok', 'hf', 'openrouter']) {
+    const entries = bySource[source];
+    if (!entries) continue;
+    const og = document.createElement('optgroup');
+    og.label = TEXT_MODEL_SOURCE_LABELS[source] || source;
+    for (const [id, m] of entries) {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = m.label;
+      if (id === selectedId) opt.selected = true;
+      og.appendChild(opt);
+    }
+    sel.appendChild(og);
+  }
+}
+
+// Unified dispatcher: route a chat-completion to the right backend by model id.
+// Returns content string, or '' on any failure/timeout (so callers can fall back).
+async function callTextModel(modelId, messages, maxTokens, temperature) {
+  const m = TEXT_MODELS[modelId];
+  if (!m) return '';
+  const maxTok = maxTokens || 1024;
+  const temp = (temperature == null) ? 0.8 : temperature;
+  try {
+    if (m.source === 'grok') {
+      if (!apiKey) return '';
+      const res = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({ model: modelSelect.value, messages, max_tokens: maxTok, temperature: temp })
+      });
+      if (!res.ok) return '';
+      const data = await res.json();
+      try { addTextSpend(data.usage); } catch (e) {}
+      return data.choices?.[0]?.message?.content || '';
+    }
+    if (m.source === 'openrouter') {
+      if (!openrouterKey) return '';
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 60000);
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openrouterKey}`,
+          'HTTP-Referer': location.origin,
+          'X-Title': 'Zaor Studio'
+        },
+        body: JSON.stringify({ model: m.slug, messages, max_tokens: maxTok, temperature: temp }),
+        signal: ctrl.signal
+      });
+      clearTimeout(to);
+      if (!res.ok) return '';
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content || '';
+    }
+    if (m.source === 'hf') {
+      if (!hfKey) return '';
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 60000);
+      const res = await fetch('https://router.huggingface.co/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${hfKey}` },
+        body: JSON.stringify({ model: m.slug, messages, max_tokens: maxTok, temperature: temp }),
+        signal: ctrl.signal
+      });
+      clearTimeout(to);
+      if (!res.ok) return '';
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content || '';
+    }
+  } catch (e) { return ''; }
+  return '';
+}
+
+// Unified dispatcher for vision calls (image understanding: style extraction, PE-with-image, etc.)
+// Takes messages array with image_url content blocks, returns content string or '' on failure.
+// Currently only grok is fully supported; HF vision models will be added as we test them.
+async function callVisionModel(modelId, messages, maxTokens, temperature) {
+  const m = VISION_MODELS[modelId];
+  if (!m) return '';
+  const maxTok = maxTokens || 220;
+  const temp = (temperature == null) ? 0.4 : temperature;
+  try {
+    if (m.source === 'grok') {
+      if (!apiKey) return '';
+      const res = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({ model: 'grok-4.3', messages, max_tokens: maxTok, temperature: temp })
+      });
+      if (!res.ok) return '';
+      const data = await res.json();
+      try { addTextSpend(data.usage); } catch (e) {}
+      return data.choices?.[0]?.message?.content || '';
+    }
+    if (m.source === 'hf') {
+      if (!hfKey) return '';
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 60000);
+      // HF router supports vision via standard chat completions API (messages can include image_url)
+      const res = await fetch('https://router.huggingface.co/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${hfKey}` },
+        body: JSON.stringify({ model: m.slug, messages, max_tokens: maxTok, temperature: temp }),
+        signal: ctrl.signal
+      });
+      clearTimeout(to);
+      if (!res.ok) return '';
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content || '';
+    }
+  } catch (e) { return ''; }
+  return '';
+}
 let imageMode = false;
 let videoMode = false;
 let lastImageUrl = null; // tracks most recently generated image for editing
@@ -3410,35 +3599,43 @@ async function generateText(userText) {
       }
     }
 
-    // Chat routing: when the "use free model for chat" toggle is on (and not in PE mode,
-    // which needs grok's vision), try the selected free model first, then fall back to grok.
-    const orChat = OPENROUTER_DIRECTORS[directorEngine];
-    let reply = '';
-    if (chatUseFreeModel && orChat && openrouterKey && !promptEngineerMode) {
-      const freeReply = await callChatOpenRouter(orChat.slug, apiMessages, 2048);
-      if (freeReply) reply = freeReply;
-    }
-    if (reply) {
-      removeTyping(typingId);
-    } else {
-      const res = await fetch('https://api.x.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: modelSelect.value,
-          messages: apiMessages,
-          max_tokens: 2048
-        })
-      });
-      removeTyping(typingId);
-      if (!res.ok) {
-        const errData = await res.json().catch(()=>({}));
-        const errMsg = errData.error?.message || errData.error || errData.message || JSON.stringify(errData);
-        throw new Error(`Chat error ${res.status}: ${errMsg}`);
+    // ── Chat routing with independent model selection ──────────────────────────
+    // Determine whether this turn needs vision: PE mode with a pinned image, or any
+    // message carrying an image_url content block. Text-only models can't see images,
+    // so for vision turns we force grok and warn the user it happened.
+    const turnNeedsVision = apiMessages.some(msg =>
+      Array.isArray(msg.content) && msg.content.some(part => part && part.type === 'image_url')
+    ) || promptEngineerMode;
+
+    let effectiveChatModel = chatModelId;
+    const chatModelInfo = TEXT_MODELS[chatModelId];
+    if (turnNeedsVision && (!chatModelInfo || !chatModelInfo.vision)) {
+      if (chatModelId !== 'grok') {
+        appendError('This turn needs image understanding, but “' + (chatModelInfo ? chatModelInfo.label : chatModelId) + '” is text-only — used Zaor (grok) for this turn instead.');
       }
-      const data = await res.json();
-      reply = data.choices?.[0]?.message?.content || '(no response)';
-      try { addTextSpend(data.usage); } catch(e) {}
+      effectiveChatModel = 'grok';
+    }
+
+    let reply = '';
+    // Try the selected (or vision-forced) chat model first.
+    reply = await callTextModel(effectiveChatModel, apiMessages, 2048, 0.9);
+    // Fall back to the user-chosen fallback model if the primary returned nothing.
+    if (!reply && fallbackModelId && fallbackModelId !== effectiveChatModel) {
+      const fbInfo = TEXT_MODELS[fallbackModelId];
+      // Don't fall back to a text-only model on a vision turn.
+      if (!(turnNeedsVision && (!fbInfo || !fbInfo.vision))) {
+        const fb = await callTextModel(fallbackModelId, apiMessages, 2048, 0.9);
+        if (fb) reply = fb;
+      }
+    }
+    // Last-resort safety net: grok directly, so chat never silently dies.
+    if (!reply && effectiveChatModel !== 'grok' && fallbackModelId !== 'grok') {
+      const last = await callTextModel('grok', apiMessages, 2048, 0.9);
+      if (last) reply = last;
+    }
+    removeTyping(typingId);
+    if (!reply) {
+      throw new Error('No model returned a reply. Check that the selected model and its fallback have a valid API key set.');
     }
     addToHistory('assistant', reply);
     addMessageToThread({ role: 'assistant', type: 'text', content: reply });
@@ -5471,8 +5668,6 @@ document.getElementById('lora-import')?.addEventListener('click', () => {
 // ═══════════════════════════════════════════════════════
 let storyboardOn = localStorage.getItem('zaor_sb_on') === '1';
 let storyboardModel = localStorage.getItem('zaor_sb_model') || 'chroma';
-let directorEngine = localStorage.getItem('zaor_director_engine') || 'grok';
-let chatUseFreeModel = localStorage.getItem('zaor_chat_free') === '1';
 let storyboardRatio = localStorage.getItem('zaor_sb_ratio') || '16:9';
 
 function updateStoryboardBtn() {
@@ -5487,22 +5682,46 @@ document.getElementById('storyboard-btn')?.addEventListener('click', () => {
   document.getElementById('sb-on-toggle').checked = storyboardOn;
   populateModelDropdown('sb-model-select', 't2img', storyboardModel);
   document.getElementById('sb-ratio-select').value = storyboardRatio;
-  document.getElementById('sb-director-select').value = directorEngine;
-  document.getElementById('sb-chat-free-toggle').checked = chatUseFreeModel;
+  populateTextModelSelect(document.getElementById('chat-model-select'), chatModelId);
+  populateTextModelSelect(document.getElementById('director-model-select'), directorModelId);
+  populateTextModelSelect(document.getElementById('fallback-model-select'), fallbackModelId);
+  populateVisionModelSelect(document.getElementById('style-extractor-model-select'), styleExtractorModelId);
+  populateVisionModelSelect(document.getElementById('pe-image-model-select'), peImageModelId);
   storyboardOverlay.classList.add('open');
 });
-document.getElementById('sb-director-select')?.addEventListener('change', e => {
-  directorEngine = e.target.value;
-  localStorage.setItem('zaor_director_engine', directorEngine);
-  if (directorEngine !== 'grok' && !openrouterKey) {
-    appendError('Heads up: free director models need an OpenRouter key. Add it under 🔑 Set API Keys, or frames will fall back to Zaor.');
+// Warn if a chosen model's source has no key set (it'll fall back, but the user should know).
+function warnIfNoKeyFor(modelId) {
+  const src = (TEXT_MODELS[modelId] || {}).source;
+  if (src === 'hf' && !hfKey) appendError('Heads up: HF models need a Hugging Face token. Add it under 🔑 Set API Keys, or this will fall back.');
+  else if (src === 'openrouter' && !openrouterKey) appendError('Heads up: OpenRouter free models need an OpenRouter key. Add it under 🔑 Set API Keys, or this will fall back.');
+}
+document.getElementById('chat-model-select')?.addEventListener('change', e => {
+  chatModelId = e.target.value;
+  localStorage.setItem('zaor_chat_model', chatModelId);
+  warnIfNoKeyFor(chatModelId);
+});
+document.getElementById('director-model-select')?.addEventListener('change', e => {
+  directorModelId = e.target.value;
+  localStorage.setItem('zaor_director_model', directorModelId);
+  warnIfNoKeyFor(directorModelId);
+});
+document.getElementById('fallback-model-select')?.addEventListener('change', e => {
+  fallbackModelId = e.target.value;
+  localStorage.setItem('zaor_fallback_model', fallbackModelId);
+  warnIfNoKeyFor(fallbackModelId);
+});
+document.getElementById('style-extractor-model-select')?.addEventListener('change', e => {
+  styleExtractorModelId = e.target.value;
+  localStorage.setItem('zaor_style_extractor_model', styleExtractorModelId);
+  if ((VISION_MODELS[styleExtractorModelId] || {}).source === 'hf' && !hfKey) {
+    appendError('Heads up: HF vision models need a Hugging Face token. Add it under 🔑 Set API Keys.');
   }
 });
-document.getElementById('sb-chat-free-toggle')?.addEventListener('change', e => {
-  chatUseFreeModel = e.target.checked;
-  localStorage.setItem('zaor_chat_free', chatUseFreeModel ? '1' : '0');
-  if (chatUseFreeModel && (directorEngine === 'grok' || !openrouterKey)) {
-    appendError('To run chat on a free model, pick a free Director model above and add an OpenRouter key — otherwise chat stays on Zaor.');
+document.getElementById('pe-image-model-select')?.addEventListener('change', e => {
+  peImageModelId = e.target.value;
+  localStorage.setItem('zaor_pe_image_model', peImageModelId);
+  if ((VISION_MODELS[peImageModelId] || {}).source === 'hf' && !hfKey) {
+    appendError('Heads up: HF vision models need a Hugging Face token. Add it under 🔑 Set API Keys.');
   }
 });
 document.getElementById('sb-close')?.addEventListener('click', () => storyboardOverlay.classList.remove('open'));
@@ -5588,6 +5807,8 @@ function parseDirectorBlock(text) {
   };
 }
 
+// DEPRECATED (kept for safety, no longer called): superseded by callTextModel() +
+// the unified TEXT_MODELS registry. Left in place intentionally to avoid risky deletions.
 // Main story chat via OpenRouter (free models), longer timeout + creative temp.
 // Returns content string, or '' on any failure/timeout so the caller can fall back to grok.
 async function callChatOpenRouter(slug, messages, maxTokens) {
@@ -5653,8 +5874,11 @@ async function callDirectorXAI(messages) {
 
 async function runStoryboardDirector(beatText, forceFrame) {
   if (!beatText) return;
-  // Need a usable key for the chosen route (free models still fall back to grok).
-  if (!apiKey && !(OPENROUTER_DIRECTORS[directorEngine] && openrouterKey)) return;
+  // Need a usable key for at least one of the chosen routes (selected director or fallback).
+  const _dSrc = (TEXT_MODELS[directorModelId] || {}).source;
+  const _fSrc = (TEXT_MODELS[fallbackModelId] || {}).source;
+  const _haveKeyFor = s => (s === 'grok' && apiKey) || (s === 'openrouter' && openrouterKey) || (s === 'hf' && hfKey);
+  if (!_haveKeyFor(_dSrc) && !_haveKeyFor(_fSrc) && !apiKey) return;
   try {
     const mInfo = MODEL_REGISTRY[storyboardModel];
     const modelName = mInfo ? mInfo.label.split('·')[0].trim() : 'image';
@@ -5670,13 +5894,17 @@ async function runStoryboardDirector(beatText, forceFrame) {
     const messages = [{ role: 'system', content: sys }, { role: 'user', content: user }];
 
     let raw = '';
-    // Selected free model first (when one is chosen and a key exists)…
-    const orDir = OPENROUTER_DIRECTORS[directorEngine];
-    if (orDir && openrouterKey) raw = await callDirectorOpenRouter(orDir.slug, messages);
-    // …then fall back to grok if it failed or returned an unusable frame block.
-    if (!parseDirectorBlock(raw).imagePrompt) {
-      const grokRaw = await callDirectorXAI(messages);
-      if (grokRaw) raw = grokRaw;
+    // Selected director model first…
+    raw = await callTextModel(directorModelId, messages, 700, 0.7);
+    // …then the user-chosen fallback if it failed or returned an unusable frame block.
+    if (!parseDirectorBlock(raw).imagePrompt && fallbackModelId && fallbackModelId !== directorModelId) {
+      const fb = await callTextModel(fallbackModelId, messages, 700, 0.7);
+      if (parseDirectorBlock(fb).imagePrompt) raw = fb;
+    }
+    // Last-resort grok safety net so the director never silently no-ops.
+    if (!parseDirectorBlock(raw).imagePrompt && directorModelId !== 'grok' && fallbackModelId !== 'grok') {
+      const last = await callTextModel('grok', messages, 700, 0.7);
+      if (last) raw = last;
     }
     if (!raw) return;
     const parsed = parseDirectorBlock(raw);
@@ -6350,6 +6578,7 @@ function openModal(type) {
     document.getElementById('wavespeed-key-input').value = wavespeedKey;
     document.getElementById('atlas-key-input').value = atlasKey;
     document.getElementById('openrouter-key-input').value = openrouterKey;
+    document.getElementById('hf-key-input').value = hfKey;
     document.getElementById('cloudinary-cloud-input').value = cloudinaryCloud;
     document.getElementById('cloudinary-preset-input').value = cloudinaryPreset;
     modalOverlay.classList.add('open');
@@ -6379,6 +6608,9 @@ document.getElementById('modal-save').addEventListener('click', () => {
   // OpenRouter key (optional) — saved as-is so it can be updated or cleared.
   openrouterKey = document.getElementById('openrouter-key-input').value.trim();
   localStorage.setItem('openrouter_key', openrouterKey);
+  // Hugging Face token (optional) — saved as-is so it can be updated or cleared.
+  hfKey = document.getElementById('hf-key-input').value.trim();
+  localStorage.setItem('hf_key', hfKey);
   // Cloudinary (not secret — saved as-is so they can be updated or cleared)
   cloudinaryCloud = document.getElementById('cloudinary-cloud-input').value.trim();
   localStorage.setItem('cloudinary_cloud', cloudinaryCloud);
@@ -6400,27 +6632,19 @@ function showEditButton() {
 // Ask Zaor's vision model to describe ONLY the visual style of an image,
 // returning a comma-separated prompt fragment (no subject/content).
 async function extractStyleFromImage(imageUrl) {
-  if (!apiKey) throw new Error('Set your xAI key first (🔑 in the ⋯ menu).');
+  if (!styleExtractorModelId || !VISION_MODELS[styleExtractorModelId]) {
+    throw new Error('Select a style extraction model first (🎬 Storyboard → Style extraction model).');
+  }
   const sys = 'You are a visual-style analyst. Look at the image and output ONLY a concise, comma-separated style descriptor capturing its visual aesthetic: medium and technique, art style, linework, rendering, color palette, lighting, texture, grain, and mood. Describe ONLY the visual style — never the subject, characters, objects, or what is happening. No preamble, no explanation, no quotes, no sentences. Output a single line usable directly as a style-prompt fragment.';
-  const res = await fetch('https://api.x.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: modelSelect.value,
-      messages: [
-        { role: 'system', content: sys },
-        { role: 'user', content: [
-          { type: 'image_url', image_url: { url: imageUrl, detail: 'auto' } },
-          { type: 'text', text: 'Extract the visual style of this image as a comma-separated style prompt.' }
-        ] }
-      ],
-      max_tokens: 220,
-      temperature: 0.4
-    })
-  });
-  if (!res.ok) throw new Error('Vision request failed (' + res.status + ')');
-  const data = await res.json();
-  let txt = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+  const messages = [
+    { role: 'system', content: sys },
+    { role: 'user', content: [
+      { type: 'image_url', image_url: { url: imageUrl, detail: 'auto' } },
+      { type: 'text', text: 'Extract the visual style of this image as a comma-separated style prompt.' }
+    ] }
+  ];
+  const txt = await callVisionModel(styleExtractorModelId, messages, 220, 0.4);
+  if (!txt) throw new Error('Style extraction failed — check your API key for the selected vision model.');
   return txt.trim().replace(/^["']+|["']+$/g, '').replace(/\s*\n+\s*/g, ', ').trim();
 }
 
