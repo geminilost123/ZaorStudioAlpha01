@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio v1.31" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio v1.32" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio v1.31</title>
+  <title>Zaor Studio v1.32</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -166,6 +166,14 @@
       font-size: 10px;
       color: var(--text-dim);
       flex-shrink: 0;
+    }
+
+    .thread-spend {
+      font-size: 10px;
+      color: #7ee0a8;
+      font-family: ui-monospace, monospace;
+      flex-shrink: 0;
+      opacity: 0.85;
     }
 
     .thread-del {
@@ -1295,7 +1303,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span id="app-version-badge" style="font-size:10px;opacity:0.5;font-weight:400;">v1.31</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span id="app-version-badge" style="font-size:10px;opacity:0.5;font-weight:400;">v1.32</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1406,6 +1414,10 @@
       <div id="mode-indicator"><span id="mode-label-text">Chat mode</span><span id="cost-estimate"></span></div>
       <div id="upload-edit-row" style="display:flex;gap:6px;margin-bottom:6px;padding:0 4px;flex-wrap:wrap;align-items:center;">
         <button id="sb-frame-btn" class="edit-img-btn" style="display:none;" title="Generate a storyboard frame from the latest story beat">🎬 Generate Frame</button>
+        <select id="sb-cast-lock" class="img-control-select" style="display:none;" title="Which character the next frame should depict. Locking one stops the director from guessing — it uses that character's saved look and description every time.">
+          <option value="auto">🎭 Auto-detect</option>
+          <option value="none">🎭 No character</option>
+        </select>
       </div>
       <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/webp" style="display:none;" />
       <div class="input-row">
@@ -1537,7 +1549,7 @@
           </div>
           <div data-seedwarn style="display:none;font-size:11px;color:#d9a441;flex-basis:100%;line-height:1.4;padding-top:2px;"></div>
         </div>
-        <div style="font-size:11px;color:var(--text-dim);padding:2px 4px 0;line-height:1.45;">Pick an image (🖼 Upload, or generate one first), then describe your edit and hit send. <b>Series:</b> set Count for variations, or put a bracketed list in your prompt to get one image per item — separate items with commas (<i>[joy, sadness, anger]</i>), or with semicolons if an item needs its own commas (<i>[front 0° — …; profile 90° — …]</i>). Text-to-image models live in 🎨 Image mode.</div>
+        <details style="font-size:11px;color:var(--text-dim);padding:2px 4px 0;line-height:1.45;"><summary style="cursor:pointer;color:var(--lavender);list-style:none;">ℹ️ How edit &amp; series work</summary><div style="padding-top:5px;">Pick an image (🖼 Upload, or generate one first), then describe your edit and hit send. <b>Series:</b> set Count for variations, or put a bracketed list in your prompt to get one image per item — separate items with commas (<i>[joy, sadness, anger]</i>), or with semicolons if an item needs its own commas (<i>[front 0° — …; profile 90° — …]</i>). Series are capped at 12. Text-to-image models live in 🎨 Image mode.</div></details>
       </div>
       <div id="vid-mode-row">
         <div class="img-controls-row">
@@ -1884,7 +1896,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.31';
+const APP_VERSION = '1.32';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2194,7 +2206,9 @@ async function callModel(modelId, params){
   applyLockedSeed(body, params && params._seedOffset);  // seed-lock override (no-op if model has no seed)
 
   if(m.provider==='wavespeed'){
-    return await callWaveSpeed(m.path, body, m.timeout||120000);
+    const _wsOut = await callWaveSpeed(m.path, body, m.timeout||120000);
+    addSpend(modelCost(m, params));
+    return _wsOut;
   }
 
   if(m.provider==='atlas'){
@@ -2237,6 +2251,7 @@ async function callModel(modelId, params){
         }
         lastAtlasRaw = JSON.stringify(pd).slice(0, 400); // truncated (base64 payloads are huge)
         if(!out) throw new Error('Atlas completed but no usable output: '+JSON.stringify(pd).slice(0,300));
+        addSpend(modelCost(m, params));
         return out;
       }
       if(st==='failed') throw new Error('Atlas generation failed: '+(pd.data?.error||pd.error||'unknown'));
@@ -2257,6 +2272,7 @@ async function callModel(modelId, params){
     const item = d.data?.[0] || {};
     const out = item.url || (item.b64_json ? b64ToDataUrl(item.b64_json) : null);
     if(!out) throw new Error('xAI returned no image: '+JSON.stringify(d).slice(0,200));
+    addSpend(modelCost(m, params));
     return out;
   }
 
@@ -2410,6 +2426,48 @@ function newThreadId() {
   return 'th_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
 }
 
+// ═══════════════════════════════════════════════════════
+// SPEND METER — running per-thread $ tally shown next to each thread in the
+// sidebar. Every paid call funnels a best-effort cost through addSpend(). The
+// figure is approximate (video especially) but tracks real usage closely.
+// ═══════════════════════════════════════════════════════
+function addSpend(usd) {
+  const n = Number(usd);
+  if (!n || isNaN(n) || n <= 0) return;
+  const threads = getThreads();
+  const idx = threads.findIndex(t => t.id === currentThreadId);
+  if (idx < 0) return;
+  threads[idx].spend = (Number(threads[idx].spend) || 0) + n;
+  saveThreads(threads);
+  try { renderThreadSpend(); } catch (e) {}
+}
+// grok-4.3 token pricing: $1.25/M input, $2.50/M output.
+function addTextSpend(usage) {
+  if (!usage) return;
+  addSpend((usage.prompt_tokens || 0) * 1.25e-6 + (usage.completion_tokens || 0) * 2.5e-6);
+}
+// Cost of a registry model call (image flat price, or video per-second).
+function modelCost(m, params) {
+  if (!m) return 0;
+  if (m.price != null) return m.price;
+  if (m.pricePerS) return m.pricePerS * ((params && params.duration) || 0);
+  return 0;
+}
+// Per-edit-model price (USD), mirrors the edit cost estimator.
+const EDIT_PRICE = { aurora: 0.04, 'aurora-simple': 0.02, wan27pro: 0.06, wan27: 0.03, fluxkontext: 0.02, qwen2: 0.03, qwen: 0.02, 'klein9b-edit-lora': 0.021, 'z-image-i2i': 0.005, 'z-image-i2i-lora': 0.01 };
+// Numeric video cost (strips the "~$"/"+" from the human estimate).
+function videoCostNum(engine, duration, res) {
+  try { return parseFloat(String(estimateVideoCost(engine, duration, res)).replace(/[^0-9.]/g, '')) || 0; } catch (e) { return 0; }
+}
+// Live-refresh only the spend chips (avoids a full list rebuild mid-generation).
+function renderThreadSpend() {
+  document.querySelectorAll('.thread-item[data-id]').forEach(el => {
+    const t = getThread(el.dataset.id);
+    const chip = el.querySelector('.thread-spend');
+    if (chip) chip.textContent = (t && t.spend) ? '$' + Number(t.spend).toFixed(2) : '';
+  });
+}
+
 function updateStorageInfo() {
   const setText = (txt) => {
     try { storageInfo.textContent = txt; } catch (e) {}
@@ -2500,6 +2558,10 @@ function renderThreadList() {
     date.className = 'thread-date';
     date.textContent = formatDate(t.createdAt);
 
+    const spend = document.createElement('span');
+    spend.className = 'thread-spend';
+    spend.textContent = t.spend ? '$' + Number(t.spend).toFixed(2) : '';
+
     const del = document.createElement('button');
     del.className = 'thread-del';
     del.textContent = '✕';
@@ -2512,6 +2574,7 @@ function renderThreadList() {
     item.appendChild(icon);
     item.appendChild(name);
     item.appendChild(date);
+    item.appendChild(spend);
     item.appendChild(del);
 
     // Single tap = open; double tap = rename
@@ -3060,7 +3123,13 @@ function buildEditJobs(prompt, seriesAllowed) {
     const sep = inner.includes(';') ? ';' : ',';
     const items = inner.split(sep).map(s => s.trim()).filter(Boolean);
     if (items.length >= 2) {
-      return items.map(item => {
+      const MAX_SERIES = 12;
+      let capped = items;
+      if (items.length > MAX_SERIES) {
+        capped = items.slice(0, MAX_SERIES);
+        appendError('Series capped at ' + MAX_SERIES + ' images (you listed ' + items.length + ') to avoid a surprise bill. Generating the first ' + MAX_SERIES + '.');
+      }
+      return capped.map(item => {
         // Label = the short name before a dash if the item is "name — long description", else the item.
         const name = (item.split(/\s[—–-]\s/)[0] || item).trim() || item;
         return { prompt: prompt.replace(last, item), label: name.length > 24 ? name.slice(0, 22) + '…' : name };
@@ -3131,6 +3200,7 @@ async function runEdit(fullPrompt, imageUrl, editModel) {
     const item = data.data?.[0] || {};
     const url = item.url || (item.b64_json ? b64ToDataUrl(item.b64_json) : null);
     if (!url) throw new Error('No image returned from Aurora edit');
+    addSpend(EDIT_PRICE[editModel] || 0.04);
     return { src: url, hostedUrl: url, modelLabel: editModel === 'aurora-simple' ? 'Aurora Simple Edit' : 'Aurora Quality Edit' };
 
   } else if (editModel === 'atlas-flux-kontext' || editModel === 'atlas-qwen-edit' || editModel === 'atlas-nano-banana-2-edit' || editModel === 'atlas-nano-banana-2-edit-dev') {
@@ -3177,6 +3247,7 @@ async function runEdit(fullPrompt, imageUrl, editModel) {
     applyLockedSeed(wsBody);  // seed-lock override for edits (no-op if unsupported)
     const resultUrl = await callWaveSpeed(wsPath, wsBody, wsTimeout, 3000);
     if (!resultUrl) throw new Error('Edit timed out');
+    addSpend(EDIT_PRICE[editModel] || 0.03);
     const editLabels = { wan27pro: 'Wan 2.7 Pro Edit', wan27: 'Wan 2.7 Edit', fluxkontext: 'Flux Kontext Edit', qwen2: 'Qwen 2.0 Edit', qwen: 'Qwen Edit', 'klein9b-edit-lora': 'Flux.2 Klein 9B Edit · LoRA', 'z-image-i2i': 'Z-Image i2i', 'z-image-i2i-lora': 'Z-Image i2i · LoRA' };
     return { src: resultUrl, hostedUrl: resultUrl, modelLabel: editLabels[editModel] || 'Qwen Edit' };
   }
@@ -3198,6 +3269,7 @@ async function upscaleImage(imageUrl) {
     const resultUrl = await callWaveSpeed(modelPaths[modelChoice], body);
     removeTyping(typingId);
     if (!resultUrl) throw new Error('Upscale timed out');
+    addSpend({ standard: 0.01, precision: 0.03, premium: 0.06 }[modelChoice] || 0.01);
 
     const label = { standard: 'Upscaled (Standard)', precision: 'Upscaled (Precision)', premium: 'Upscaled (Premium)' }[modelChoice];
     lastImageUrl = resultUrl;
@@ -3332,6 +3404,7 @@ async function generateText(userText) {
     }
     const data = await res.json();
     const reply = data.choices?.[0]?.message?.content || '(no response)';
+    try { addTextSpend(data.usage); } catch(e) {}
     addToHistory('assistant', reply);
     addMessageToThread({ role: 'assistant', type: 'text', content: reply });
     renderMessage('assistant', reply);
@@ -3562,6 +3635,7 @@ async function generateVideoAurora(prompt, imageDataUrl, extendVideoUrl, progres
   );
 
   if (videoUrl) {
+    addSpend(videoCostNum('aurora', duration, res));
     addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: label, storedDuration: duration, storedRes: res });
     renderVideo(videoUrl, prompt, true, label, duration, res);
   }
@@ -3650,6 +3724,7 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   );
 
   if (videoUrl) {
+    addSpend(videoCostNum(engine, duration, res));
     const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan22spicylora: 'Wan 2.2 Spicy LoRA', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', seedance15spicy: 'Seedance 1.5 Spicy', seedance15t2v: 'Seedance 1.5 T2V', ltx23spicy: 'LTX 2.3 Spicy', aurora: 'Aurora', 'aurora_extend': 'Aurora Extend' };
     const vidLabel = engineLabels[engine] || engine;
     addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: vidLabel, storedDuration: duration, storedRes: res });
@@ -5049,6 +5124,7 @@ async function finalizePromptPE() {
     }
     const data = await res.json();
     const text = data.choices?.[0]?.message?.content || '';
+    try { addTextSpend(data.usage); } catch(e) {}
     const { best, runner } = parseFinalPrompts(text);
     if (!best && !runner) { appendError('Could not read a final prompt from the reply. Keep refining or try again.'); return; }
     renderFinalPromptCards(best, runner);
@@ -5367,6 +5443,7 @@ function updateStoryboardBtn() {
   if (b) b.classList.toggle('active', storyboardOn);
   const fb = document.getElementById('sb-frame-btn');
   if (fb) fb.style.display = storyboardOn ? 'inline-flex' : 'none';
+  try { renderFrameCastLock(); } catch (e) {}
 }
 const storyboardOverlay = document.getElementById('storyboard-overlay');
 document.getElementById('storyboard-btn')?.addEventListener('click', () => {
@@ -5480,6 +5557,7 @@ async function runStoryboardDirector(beatText, forceFrame) {
     if (!res.ok) return; // silently skip — never break the story
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content || '';
+    try { addTextSpend(data.usage); } catch(e) {}
     const parsed = parseDirectorBlock(raw);
     // Cast is managed manually now — the director's CAST output is intentionally ignored (no auto-merge).
     if (parsed.frame && parsed.imagePrompt) {
@@ -5525,20 +5603,24 @@ async function addStoryboardFrame(imagePrompt, videoPrompt, reason) {
   messagesEl.appendChild(card);
   scrollToBottom();
   try {
-    // Likeness lock: if a cast member with a saved reference image is named in the prompt,
-    // route this frame through the image-edit model (using their canonical image) instead of plain t2img.
-    const ref = findCastReference(imagePrompt);
+    // Likeness lock: the 🎭 selector (or auto name-match) picks the character. When one is
+    // locked we inject their name + description so the frame can't drift to a different person,
+    // and route through the edit model on their reference image when they have one.
+    const ref = resolveFrameCast(imagePrompt);
+    const idAnchor = (ref && ref.desc) ? (' The character "' + ref.name + '" looks exactly like: ' + ref.desc + '.') : '';
     let src, modelLabel;
     if (ref && ref.imageUrl) {
       const editModel = document.getElementById('edit-model-select')?.value || 'wan27';
       const setup = getStorySetup();
-      const editPrompt = imagePrompt + (setup && setup.style ? ', ' + setup.style : '');
+      const editPrompt = imagePrompt + idAnchor + (setup && setup.style ? ', ' + setup.style : '');
       const r = await runEdit(editPrompt, ref.imageUrl, editModel);
       src = r.src;
-      modelLabel = (r.modelLabel || 'Edit') + ' · ' + ref.name;
+      modelLabel = (r.modelLabel || 'Edit') + ' · 🎭 ' + ref.name;
     } else {
-      src = await callModel(storyboardModel, buildStoryboardCallParams(imagePrompt));
-      modelLabel = (MODEL_REGISTRY[storyboardModel] && MODEL_REGISTRY[storyboardModel].label) || storyboardModel;
+      const params = buildStoryboardCallParams(imagePrompt);
+      if (idAnchor) params.prompt = params.prompt + idAnchor;
+      src = await callModel(storyboardModel, params);
+      modelLabel = ((MODEL_REGISTRY[storyboardModel] && MODEL_REGISTRY[storyboardModel].label) || storyboardModel) + (ref ? ' · 🎭 ' + ref.name : '');
     }
     if (!src) throw new Error('no image returned');
     // Render the frame with the SAME action bar as every other image (uniform controls).
@@ -5821,6 +5903,7 @@ function renderCastPanel() {
     row.appendChild(btns);
     list.appendChild(row);
   });
+  try { renderFrameCastLock(); } catch (e) {}
 }
 
 async function castHelpWrite(i, ta, btn) {
@@ -5925,6 +6008,32 @@ function findCastReference(prompt) {
     }
   }
   return null;
+}
+
+// Decide which cast member the NEXT frame depicts. The 🎭 selector by the Generate
+// Frame button overrides the director's guesswork: 'auto' = name-match (old behaviour),
+// 'none' = no character lock, or a specific name = always that character.
+function resolveFrameCast(imagePrompt) {
+  const sel = document.getElementById('sb-cast-lock');
+  const v = sel ? sel.value : 'auto';
+  if (v === 'none') return null;
+  if (v && v !== 'auto') {
+    const c = getCast().find(m => m.name === v);
+    if (c) return c; // forced — used even if they have no reference image yet
+  }
+  return findCastReference(imagePrompt);
+}
+
+// Populate the 🎭 character-lock selector from the current cast; visible only with storyboard on.
+function renderFrameCastLock() {
+  const sel = document.getElementById('sb-cast-lock');
+  if (!sel) return;
+  sel.style.display = storyboardOn ? 'inline-flex' : 'none';
+  const cur = sel.value;
+  const cast = getCast();
+  sel.innerHTML = '<option value="auto">🎭 Auto-detect</option><option value="none">🎭 No character</option>' +
+    cast.map(c => '<option value="' + esc(c.name) + '">🎭 ' + esc(c.name) + (c.imageUrl ? ' 📌' : '') + '</option>').join('');
+  if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
 }
 
 const castOverlay = document.getElementById('cast-overlay');
