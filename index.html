@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Zaor Studio v1.33" />
+  <meta name="apple-mobile-web-app-title" content="Zaor Studio v1.34" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="/ZaorStudioAlpha01/manifest.json" />
-  <title>Zaor Studio v1.33</title>
+  <title>Zaor Studio v1.34</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1303,7 +1303,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">✦ Zaor Studio <span id="app-version-badge" style="font-size:10px;opacity:0.5;font-weight:400;">v1.33</span></span>
+      <span class="sidebar-title">✦ Zaor Studio <span id="app-version-badge" style="font-size:10px;opacity:0.5;font-weight:400;">v1.34</span></span>
       <button id="new-thread-btn" title="New game">+</button>
     </div>
     <div id="thread-list"></div>
@@ -1788,6 +1788,13 @@
       <option value="gptoss">gpt-oss-120b — free, strict format</option>
     </select>
     <div style="font-size:11px;color:var(--text-dim);padding:0 2px 14px;line-height:1.4;">Free models route through your OpenRouter key. If one fails or returns a malformed frame, it falls back to Zaor automatically.</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+      <div style="min-width:0;">
+        <div style="font-size:14px;color:var(--text);">Use it for the main chat too</div>
+        <div style="font-size:11px;color:var(--text-dim);">Routes story replies through the free model. Lower quality than Zaor; PE mode stays on Zaor; falls back if it fails.</div>
+      </div>
+      <label class="sb-switch"><input type="checkbox" id="sb-chat-free-toggle" /><span class="sb-slider"></span></label>
+    </div>
     <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Frame aspect ratio</label>
     <select id="sb-ratio-select" class="img-control-select" style="width:100%;margin-bottom:6px;">
       <option value="16:9">16:9 — cinematic</option>
@@ -1905,7 +1912,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.33';
+const APP_VERSION = '1.34';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -3403,24 +3410,36 @@ async function generateText(userText) {
       }
     }
 
-    const res = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: modelSelect.value,
-        messages: apiMessages,
-        max_tokens: 2048
-      })
-    });
-    removeTyping(typingId);
-    if (!res.ok) {
-      const errData = await res.json().catch(()=>({}));
-      const errMsg = errData.error?.message || errData.error || errData.message || JSON.stringify(errData);
-      throw new Error(`Chat error ${res.status}: ${errMsg}`);
+    // Chat routing: when the "use free model for chat" toggle is on (and not in PE mode,
+    // which needs grok's vision), try the selected free model first, then fall back to grok.
+    const orChat = OPENROUTER_DIRECTORS[directorEngine];
+    let reply = '';
+    if (chatUseFreeModel && orChat && openrouterKey && !promptEngineerMode) {
+      const freeReply = await callChatOpenRouter(orChat.slug, apiMessages, 2048);
+      if (freeReply) reply = freeReply;
     }
-    const data = await res.json();
-    const reply = data.choices?.[0]?.message?.content || '(no response)';
-    try { addTextSpend(data.usage); } catch(e) {}
+    if (reply) {
+      removeTyping(typingId);
+    } else {
+      const res = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: modelSelect.value,
+          messages: apiMessages,
+          max_tokens: 2048
+        })
+      });
+      removeTyping(typingId);
+      if (!res.ok) {
+        const errData = await res.json().catch(()=>({}));
+        const errMsg = errData.error?.message || errData.error || errData.message || JSON.stringify(errData);
+        throw new Error(`Chat error ${res.status}: ${errMsg}`);
+      }
+      const data = await res.json();
+      reply = data.choices?.[0]?.message?.content || '(no response)';
+      try { addTextSpend(data.usage); } catch(e) {}
+    }
     addToHistory('assistant', reply);
     addMessageToThread({ role: 'assistant', type: 'text', content: reply });
     renderMessage('assistant', reply);
@@ -5453,6 +5472,7 @@ document.getElementById('lora-import')?.addEventListener('click', () => {
 let storyboardOn = localStorage.getItem('zaor_sb_on') === '1';
 let storyboardModel = localStorage.getItem('zaor_sb_model') || 'chroma';
 let directorEngine = localStorage.getItem('zaor_director_engine') || 'grok';
+let chatUseFreeModel = localStorage.getItem('zaor_chat_free') === '1';
 let storyboardRatio = localStorage.getItem('zaor_sb_ratio') || '16:9';
 
 function updateStoryboardBtn() {
@@ -5468,6 +5488,7 @@ document.getElementById('storyboard-btn')?.addEventListener('click', () => {
   populateModelDropdown('sb-model-select', 't2img', storyboardModel);
   document.getElementById('sb-ratio-select').value = storyboardRatio;
   document.getElementById('sb-director-select').value = directorEngine;
+  document.getElementById('sb-chat-free-toggle').checked = chatUseFreeModel;
   storyboardOverlay.classList.add('open');
 });
 document.getElementById('sb-director-select')?.addEventListener('change', e => {
@@ -5475,6 +5496,13 @@ document.getElementById('sb-director-select')?.addEventListener('change', e => {
   localStorage.setItem('zaor_director_engine', directorEngine);
   if (directorEngine !== 'grok' && !openrouterKey) {
     appendError('Heads up: free director models need an OpenRouter key. Add it under 🔑 Set API Keys, or frames will fall back to Zaor.');
+  }
+});
+document.getElementById('sb-chat-free-toggle')?.addEventListener('change', e => {
+  chatUseFreeModel = e.target.checked;
+  localStorage.setItem('zaor_chat_free', chatUseFreeModel ? '1' : '0');
+  if (chatUseFreeModel && (directorEngine === 'grok' || !openrouterKey)) {
+    appendError('To run chat on a free model, pick a free Director model above and add an OpenRouter key — otherwise chat stays on Zaor.');
   }
 });
 document.getElementById('sb-close')?.addEventListener('click', () => storyboardOverlay.classList.remove('open'));
@@ -5558,6 +5586,30 @@ function parseDirectorBlock(text) {
     videoPrompt: sec('VIDEO_PROMPT'),
     cast: sec('CAST')
   };
+}
+
+// Main story chat via OpenRouter (free models), longer timeout + creative temp.
+// Returns content string, or '' on any failure/timeout so the caller can fall back to grok.
+async function callChatOpenRouter(slug, messages, maxTokens) {
+  try {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 60000);
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openrouterKey}`,
+        'HTTP-Referer': location.origin,
+        'X-Title': 'Zaor Studio'
+      },
+      body: JSON.stringify({ model: slug, messages, max_tokens: maxTokens || 1024, temperature: 0.9 }),
+      signal: ctrl.signal
+    });
+    clearTimeout(to);
+    if (!res.ok) return '';
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || '';
+  } catch (e) { return ''; }
 }
 
 // Director call via OpenRouter (free models). Returns content string, or '' on any failure/timeout.
