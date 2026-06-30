@@ -1,7 +1,7 @@
 // ── Service worker: network-first for the app shell ──
 // Deploys are picked up immediately. Cache is only an offline fallback.
 // Bump CACHE_VERSION on each deploy to purge old caches.
-const CACHE_VERSION = 'zaor-studio-v1-37';
+const CACHE_VERSION = 'zaor-studio-v1-38';
 const CACHE = CACHE_VERSION;
 
 self.addEventListener('install', e => {
@@ -20,11 +20,21 @@ self.addEventListener('fetch', e => {
   // Let cross-origin requests (fonts, APIs) pass straight through
   if (!e.request.url.startsWith(self.location.origin)) return;
 
+  const url = e.request.url;
+
+  // NEVER cache the service worker script or manifest — if sw.js itself gets
+  // cache-first served, the browser checks for updates against a stale copy
+  // of itself and skipWaiting() never fires on new deploys. Always go to network.
+  if (url.endsWith('/sw.js') || url.endsWith('/manifest.json')) {
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    return;
+  }
+
   const isShell =
     e.request.mode === 'navigate' ||
     e.request.destination === 'document' ||
-    e.request.url.endsWith('.html') ||
-    e.request.url.endsWith('/');
+    url.endsWith('.html') ||
+    url.endsWith('/');
 
   if (isShell) {
     // NETWORK-FIRST: always try fresh, fall back to cache only when offline
