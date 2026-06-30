@@ -1770,9 +1770,10 @@
 
 <!-- Storyboard Settings Modal -->
 <div class="modal-overlay" id="storyboard-overlay">
-  <div class="modal" style="max-width:480px;width:92%;">
-    <h2 style="margin-bottom:4px;">🎬 Storyboard director</h2>
-    <p style="margin-bottom:14px;">Turn this on to show a <b>🎬 Generate Frame</b> button by the message bar. Tap it whenever you want a storyboard frame from the latest story moment — nothing generates automatically, so you only spend when you choose to. Each frame also drafts a Wan 2.2 video prompt you can copy. Returning characters reuse their saved looks from your cast.</p>
+  <div class="modal" style="max-width:480px;width:92%;max-height:88vh;display:flex;flex-direction:column;">
+    <h2 style="margin-bottom:4px;flex-shrink:0;">🎬 Storyboard director</h2>
+    <p style="margin-bottom:14px;flex-shrink:0;">Turn this on to show a <b>🎬 Generate Frame</b> button by the message bar. Tap it whenever you want a storyboard frame from the latest story moment — nothing generates automatically, so you only spend when you choose to. Each frame also drafts a Wan 2.2 video prompt you can copy. Returning characters reuse their saved looks from your cast.</p>
+    <div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:0 4px;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
       <div style="min-width:0;">
         <div style="font-size:14px;color:var(--text);">Storyboard mode</div>
@@ -1804,7 +1805,8 @@
       <option value="4:3">4:3</option>
       <option value="3:4">3:4 — portrait</option>
     </select>
-    <div class="modal-btns" style="margin-top:12px;">
+    </div>
+    <div class="modal-btns" style="margin-top:12px;flex-shrink:0;">
       <button class="btn-primary" id="sb-close" style="width:100%;">Done</button>
     </div>
   </div>
@@ -1913,7 +1915,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.39';
+const APP_VERSION = '1.40';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
