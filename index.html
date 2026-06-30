@@ -1641,9 +1641,10 @@
 </div>
 
 <div class="modal-overlay" id="modal-overlay">
-  <div class="modal">
-    <h2>API Keys</h2>
-    <p>Stored only in this browser. Sent directly to each provider — never logged here.</p>
+  <div class="modal" style="max-height:88vh;display:flex;flex-direction:column;">
+    <h2 style="flex-shrink:0;">API Keys</h2>
+    <p style="flex-shrink:0;">Stored only in this browser. Sent directly to each provider — never logged here.</p>
+    <div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:0 4px;">
     <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">xAI Key (chat + Aurora video)</label>
     <input type="password" id="key-input" placeholder="xai-…" autocomplete="off" spellcheck="false" />
     <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">WaveSpeed Key (Wan image + video)</label>
@@ -1667,7 +1668,8 @@
       </div>
       <div style="font-size:11px;color:var(--text-dim);margin-top:6px;">Frees space if the app slows down. Your LoRAs, saved prompts, and keys are kept.</div>
     </div>
-    <div class="modal-btns">
+    </div>
+    <div class="modal-btns" style="flex-shrink:0;margin-top:14px;">
       <button class="btn-secondary" id="modal-cancel">Cancel</button>
       <button class="btn-primary" id="modal-save">Save</button>
     </div>
@@ -1911,7 +1913,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.38';
+const APP_VERSION = '1.39';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
