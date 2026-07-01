@@ -1792,7 +1792,7 @@
     <select id="director-model-select" class="img-control-select" style="width:100%;margin-bottom:10px;"></select>
     <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Fallback model (used if the above fails)</label>
     <select id="fallback-model-select" class="img-control-select" style="width:100%;margin-bottom:4px;"></select>
-    <div style="font-size:11px;color:var(--text-dim);padding:0 2px 14px;line-height:1.4;">HF models route through your Hugging Face token; OpenRouter free models through your OpenRouter key; Zaor through xAI. Vision turns (PE mode / pinned images) always use Zaor since the others are text-only — you'll get a notice when that happens.</div>
+    <div style="font-size:11px;color:var(--text-dim);padding:0 2px 14px;line-height:1.4;">HF models route through your Hugging Face token; OpenRouter free models through your OpenRouter key; Zaor through xAI. Vision turns (PE mode / pinned images) use the "PE-with-image model" below, falling back to Zaor if it fails — you'll get a notice when that happens.</div>
     <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Style extraction model (for 🔒 Extract Style button)</label>
     <select id="style-extractor-model-select" class="img-control-select" style="width:100%;margin-bottom:10px;"></select>
     <label style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">PE-with-image model (for ✦ PE mode with pinned image)</label>
@@ -1915,7 +1915,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.42';
+const APP_VERSION = '1.44';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2021,7 +2021,12 @@ const VISION_MODELS = {
   'grok':        { source: 'grok', label: 'Zaor (grok-4.3) · paid' },
   // HF vision (verified servable image-text-to-text models via HF Inference Providers):
   'hf-glm45v':   { source: 'hf', slug: 'zai-org/GLM-4.5V', label: 'GLM-4.5V · HF' },
-  'hf-glm41v9b': { source: 'hf', slug: 'zai-org/GLM-4.1V-9B-Thinking', label: 'GLM-4.1V 9B · HF cheap' }
+  'hf-glm41v9b': { source: 'hf', slug: 'zai-org/GLM-4.1V-9B-Thinking', label: 'GLM-4.1V 9B · HF cheap' },
+  // No provider suffix — router auto-selects the fastest live provider for each model.
+  // Kimi K2.5 only (K2.6/K2.7 dropped exposed image input); strong at structured/technical output.
+  'hf-kimi25':   { source: 'hf', slug: 'moonshotai/Kimi-K2.5', label: 'Kimi K2.5 · HF' },
+  // Top-tier open VLM, rivals Gemini 2.5 Pro on perception benchmarks.
+  'hf-qwen3vl':  { source: 'hf', slug: 'Qwen/Qwen3-VL-235B-A22B-Instruct', label: 'Qwen3-VL 235B · HF' }
 };
 const VISION_MODEL_SOURCE_LABELS = { grok: 'xAI (paid)', hf: 'Hugging Face' };
 
@@ -2865,7 +2870,7 @@ function loadThread(id) {
   } else {
     thread.messages.forEach(m => {
       if (m.type === 'text') {
-        renderMessage(m.role, m.content, false);
+        renderMessage(m.role, m.content, false, m.modelLabel || '');
       } else if (m.type === 'image') {
         renderImage(m.src, m.alt, false, m.hostedUrl || null, m.modelLabel || 'Aurora');
       } else if (m.type === 'video') {
@@ -3628,51 +3633,63 @@ async function generateText(userText) {
 
     // ── Chat routing with independent model selection ──────────────────────────
     // Determine whether this turn needs vision: PE mode with a pinned image, or any
-    // message carrying an image_url content block. Text-only models can't see images,
-    // so for vision turns we force grok and warn the user it happened.
+    // message carrying an image_url content block.
     const turnNeedsVision = apiMessages.some(msg =>
       Array.isArray(msg.content) && msg.content.some(part => part && part.type === 'image_url')
     ) || promptEngineerMode;
 
-    let effectiveChatModel = chatModelId;
-    const chatModelInfo = TEXT_MODELS[chatModelId];
-    if (turnNeedsVision && (!chatModelInfo || !chatModelInfo.vision)) {
-      if (chatModelId !== 'grok') {
-        appendError('This turn needs image understanding, but “' + (chatModelInfo ? chatModelInfo.label : chatModelId) + '” is text-only — used Zaor (grok) for this turn instead.');
-      }
-      effectiveChatModel = 'grok';
-    }
-
     let reply = '';
-    // Try the selected (or vision-forced) chat model first.
-    reply = await callTextModel(effectiveChatModel, apiMessages, 2048, 0.9);
-    const primaryFailReason = reply ? '' : lastTextModelError;
-    // Fall back to the user-chosen fallback model if the primary returned nothing.
-    if (!reply && fallbackModelId && fallbackModelId !== effectiveChatModel) {
-      const fbInfo = TEXT_MODELS[fallbackModelId];
-      // Don't fall back to a text-only model on a vision turn.
-      if (!(turnNeedsVision && (!fbInfo || !fbInfo.vision))) {
+    let usedModelLabel = ''; // whichever model actually produced the reply — shown in the UI instead of a hardcoded "Zaor"
+
+    if (turnNeedsVision) {
+      // ── VISION PATH: route through the user's selected vision model (peImageModelId), not the text chat model. ──
+      const visionInfo = VISION_MODELS[peImageModelId] || VISION_MODELS['grok'];
+      try {
+        reply = await callVisionModel(peImageModelId, apiMessages, 2048, 0.9);
+        usedModelLabel = visionInfo.label;
+      } catch (e) {
+        // Selected vision model failed (no key, HTTP error, timeout, etc). Fall back to grok vision,
+        // and only bother the user if grok wasn't already the selection.
+        if (peImageModelId !== 'grok') {
+          appendError('Vision model "' + visionInfo.label + '" failed (' + e.message + ') — used Zaor (grok) for this turn instead.');
+        }
+        try {
+          reply = await callVisionModel('grok', apiMessages, 2048, 0.9);
+          usedModelLabel = VISION_MODELS['grok'].label;
+        } catch (e2) {
+          removeTyping(typingId);
+          throw new Error('Vision reply failed on both the selected model and the grok fallback: ' + e2.message);
+        }
+      }
+    } else {
+      // ── TEXT PATH: unchanged fallback ladder (chat model → fallback model → grok), now tracking which one replied. ──
+      reply = await callTextModel(chatModelId, apiMessages, 2048, 0.9);
+      const primaryFailReason = reply ? '' : lastTextModelError;
+      if (reply) {
+        usedModelLabel = (TEXT_MODELS[chatModelId] || {}).label || chatModelId;
+      } else if (fallbackModelId && fallbackModelId !== chatModelId) {
         const fb = await callTextModel(fallbackModelId, apiMessages, 2048, 0.9);
-        if (fb) reply = fb;
+        if (fb) { reply = fb; usedModelLabel = (TEXT_MODELS[fallbackModelId] || {}).label || fallbackModelId; }
+      }
+      // Last-resort safety net: grok directly, so chat never silently dies.
+      if (!reply && chatModelId !== 'grok' && fallbackModelId !== 'grok') {
+        const last = await callTextModel('grok', apiMessages, 2048, 0.9);
+        if (last) { reply = last; usedModelLabel = TEXT_MODELS['grok'].label; }
+      }
+      removeTyping(typingId);
+      if (!reply) {
+        throw new Error('No model returned a reply. ' + (lastTextModelError ? '(' + lastTextModelError + ') ' : '') + 'Check that the selected model and its fallback have a valid API key set.');
+      }
+      // If the primary model failed but something else rescued the turn, tell the user
+      // why — so a silent fall-through to grok is never mistaken for the chosen model working.
+      if (primaryFailReason) {
+        appendError(primaryFailReason + ' — used a fallback model for this reply.');
       }
     }
-    // Last-resort safety net: grok directly, so chat never silently dies.
-    if (!reply && effectiveChatModel !== 'grok' && fallbackModelId !== 'grok') {
-      const last = await callTextModel('grok', apiMessages, 2048, 0.9);
-      if (last) reply = last;
-    }
-    removeTyping(typingId);
-    if (!reply) {
-      throw new Error('No model returned a reply. ' + (lastTextModelError ? '(' + lastTextModelError + ') ' : '') + 'Check that the selected model and its fallback have a valid API key set.');
-    }
-    // If the primary model failed but something else rescued the turn, tell the user
-    // why — so a silent fall-through to grok is never mistaken for the chosen model working.
-    if (primaryFailReason) {
-      appendError(primaryFailReason + ' — used a fallback model for this reply.');
-    }
+    if (turnNeedsVision) removeTyping(typingId);
     addToHistory('assistant', reply);
-    addMessageToThread({ role: 'assistant', type: 'text', content: reply });
-    renderMessage('assistant', reply);
+    addMessageToThread({ role: 'assistant', type: 'text', content: reply, modelLabel: usedModelLabel });
+    renderMessage('assistant', reply, true, usedModelLabel);
     // Storyboard frames are now generated manually via the 🎬 Generate Frame button (no automatic spend).
   } catch(e) {
     removeTyping(typingId);
@@ -4529,13 +4546,13 @@ async function saveVideoToFiles(src, altText) {
 // ═══════════════════════════════════════════════════════
 // RENDER HELPERS
 // ═══════════════════════════════════════════════════════
-function renderMessage(role, text, animate = true) {
+function renderMessage(role, text, animate = true, modelLabel = '') {
   const div = document.createElement('div');
   div.className = `msg ${role}` + (animate ? '' : ' no-anim');
 
   const label = document.createElement('div');
   label.className = 'msg-label';
-  label.textContent = role === 'user' ? 'You' : 'Zaor';
+  label.textContent = role === 'user' ? 'You' : (modelLabel || 'Zaor');
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
