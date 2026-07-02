@@ -1367,15 +1367,12 @@
           </optgroup>
           <optgroup label="── Text-to-Video ──">
             <option value="seedance15t2v">Seedance 1.5 T2V</option>
-            <option value="wan26t2v">Wan 2.6 T2V</option>
-            <option value="hfwan22t2v">Wan 2.2 5B T2V (HF)</option>
             <option value="ltx23">LTX 2.3 (audio)</option>
           </optgroup>
           <optgroup label="── Animate (I2V) ──">
             <option value="aurora_i2v">Aurora I2V</option>
             <option value="seedance_i2v">Seedance 1.5 Spicy I2V</option>
             <option value="wan22spicy_i2v">Wan 2.2 Spicy I2V (incl. LoRA)</option>
-            <option value="hfwan22i2v">Wan 2.2 5B I2V (HF)</option>
             <option value="wan27spicy_i2v">Wan 2.7 Spicy I2V</option>
             <option value="ltx23spicy">LTX 2.3 Spicy I2V (audio)</option>
           </optgroup>
@@ -1564,9 +1561,6 @@
               <option value="wan22spicy">Wan 2.2 Spicy I2V · WaveSpeed — from $0.15</option>
               <option value="wan26spicy">Wan 2.7 Spicy I2V · WaveSpeed — from $0.50</option>
               <option value="ltx23spicy">LTX 2.3 Spicy I2V (+audio) · WaveSpeed — from $0.10</option>
-              <option value="hfwan22t2v">Wan 2.2 5B T2V · HF (fal) — $0.15/5s</option>
-              <option value="hfwan22t2vfast">Wan 2.2 5B T2V Fast · HF (fal) — $0.025/5s</option>
-              <option value="hfwan22i2v">Wan 2.2 5B I2V · HF (fal) — ~$0.15/5s</option>
             </select>
           </div>
           <div class="img-control-group">
@@ -1920,7 +1914,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.45';
+const APP_VERSION = '1.53';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2025,12 +2019,7 @@ const TEXT_MODEL_SOURCE_LABELS = { grok: 'xAI (paid)', openrouter: 'OpenRouter (
 const VISION_MODELS = {
   'grok':        { source: 'grok', label: 'Zaor (grok-4.3) · paid' },
   // HF vision (verified servable image-text-to-text models via HF Inference Providers):
-  'hf-glm45v':   { source: 'hf', slug: 'zai-org/GLM-4.5V', label: 'GLM-4.5V · HF' },
-  // GLM-4.1V-9B-Thinking removed in v1.45 — thinking-model reasoning traces blew the token
-  // budget and it consistently failed style extraction. Stored selections migrate to grok below.
-  // No provider suffix — router auto-selects the fastest live provider for each model.
-  // Kimi K2.5 only (K2.6/K2.7 dropped exposed image input); strong at structured/technical output.
-  'hf-kimi25':   { source: 'hf', slug: 'moonshotai/Kimi-K2.5', label: 'Kimi K2.5 · HF' },
+  // v1.46: Removed hf-glm45v and hf-kimi25 — both failed style extraction with "not supported by provider" errors.
   // Top-tier open VLM, rivals Gemini 2.5 Pro on perception benchmarks.
   'hf-qwen3vl':  { source: 'hf', slug: 'Qwen/Qwen3-VL-235B-A22B-Instruct', label: 'Qwen3-VL 235B · HF' }
 };
@@ -3840,16 +3829,11 @@ async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUr
   // Atlas video was abandoned (referer-locked output, unembeddable on iOS). All video routes
   // through Aurora (xAI direct) or WaveSpeed below — no Atlas video path exists.
 
-  // Aurora always uses xAI directly; hfwan* engines route via HF Inference Providers (fal queue,
-  // billed to the HF token); all other Wan/Seedance/LTX models use WaveSpeed directly.
-  const useHF = engine.startsWith('hfwan');
-  const useWaveSpeed = !useHF && engine !== 'aurora' && engine !== 'aurora_extend';
+  // Aurora always uses xAI directly; all other Wan/Seedance/LTX models use WaveSpeed directly.
+  const useWaveSpeed = engine !== 'aurora' && engine !== 'aurora_extend';
 
   try {
-    if (useHF) {
-      if (!hfKey) throw new Error('Hugging Face token required for HF video models. Tap "Set API Key" to add it.');
-      await generateVideoHFFal(prompt, imageDataUrl, engine, progressId, () => cancelled, durationOverride, resOverride);
-    } else if (useWaveSpeed) {
+    if (useWaveSpeed) {
       if (!wavespeedKey) throw new Error('WaveSpeed API key required for Wan models. Tap "Set API Key" to add it.');
       await generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engine, progressId, () => cancelled, durationOverride, resOverride);
     } else {
@@ -4026,102 +4010,6 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
     addSpend(videoCostNum(engine, duration, res));
     const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan22spicylora: 'Wan 2.2 Spicy LoRA', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', seedance15spicy: 'Seedance 1.5 Spicy', seedance15t2v: 'Seedance 1.5 T2V', ltx23spicy: 'LTX 2.3 Spicy', aurora: 'Aurora', 'aurora_extend': 'Aurora Extend' };
     const vidLabel = engineLabels[engine] || engine;
-    addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: vidLabel, storedDuration: duration, storedRes: res });
-    renderVideo(videoUrl, prompt, true, vidLabel, duration, res);
-  }
-}
-
-// ═══════════════════════════════════════════════════════
-// HF INFERENCE PROVIDERS VIDEO (Wan 2.2 TI2V-5B via fal, HF-token billed)
-// Requests route through router.huggingface.co/fal-ai/... — the HF router proxies
-// fal's queue API and swaps auth, so everything bills the Hugging Face token
-// (free tier + HF credits), NOT a fal or wavespeed account. No provider key needed.
-// fal queue flow: submit → { request_id, status_url, response_url } → poll status
-// until COMPLETED → fetch response. Returned queue.fal.run URLs are rewritten onto
-// the router so auth keeps working (same rewrite huggingface.js performs).
-// Wan 2.2 5B: up to 5s, 24fps. t2v $0.15/video (fast-wan variant $0.025 @720p);
-// i2v ~$0.15/video. LoRA: active "Wan"-tagged LoRAs are passed through in a `loras`
-// array. Same endpoint + no documented LoRA surcharge ⇒ same route with or without
-// LoRAs (separate routing is only warranted when cost differs). fal's 5B endpoints
-// accepting `loras` is UNVERIFIED — if rejected, the surfaced error will say so.
-// ═══════════════════════════════════════════════════════
-const HF_FAL_ROUTER = 'https://router.huggingface.co/fal-ai';
-function falQueueUrl(path) { return `${HF_FAL_ROUTER}/${path}?_subdomain=queue`; }
-function rewriteFalUrl(u) {
-  // queue.fal.run/... → router.huggingface.co/fal-ai/...?_subdomain=queue (HF auth keeps working)
-  if (!u) return null;
-  const rewritten = u.replace('https://queue.fal.run/', HF_FAL_ROUTER + '/');
-  return rewritten + (rewritten.includes('?') ? '&' : '?') + '_subdomain=queue';
-}
-
-async function generateVideoHFFal(prompt, imageDataUrl, engine, progressId, isCancelled, durationOverride = null, resOverride = null) {
-  const res = resOverride || document.getElementById('vid-res-select')?.value || '720p';
-  const ratio = document.getElementById('vid-ratio-select')?.value || '16:9';
-  const isI2V = engine === 'hfwan22i2v';
-  const duration = 5; // Wan 2.2 5B is a fixed ~5s (121 frames @24fps) model
-
-  if (isI2V && !imageDataUrl) throw new Error('Wan 2.2 5B I2V (HF) requires an image. Use the ▶ Animate button on a generated image.');
-
-  let falPath, body;
-  if (isI2V) {
-    falPath = 'fal-ai/wan/v2.2-5b/image-to-video';
-    body = { prompt, image_url: imageDataUrl, resolution: res, enable_safety_checker: false, enable_prompt_expansion: false };
-  } else if (engine === 'hfwan22t2vfast') {
-    // fast-wan distilled variant — 6× cheaper ($0.025 @720p). Arbitrary-subpath proxying through
-    // the HF router is UNVERIFIED for this variant; errors will surface plainly if it 404s.
-    falPath = 'fal-ai/wan/v2.2-5b/text-to-video/fast-wan';
-    body = { prompt, resolution: res, aspect_ratio: ratio, enable_safety_checker: false, enable_prompt_expansion: false };
-  } else {
-    falPath = 'fal-ai/wan/v2.2-5b/text-to-video';
-    body = { prompt, resolution: res, aspect_ratio: ratio, enable_safety_checker: false, enable_prompt_expansion: false };
-  }
-
-  // Optional LoRA passthrough — active "Wan"-tagged LoRAs (up to 3), same shape fal uses elsewhere.
-  const wanLoras = activeLoras().filter(l => l.base === 'Wan').slice(0, 3).map(l => ({ path: l.url, scale: Number(l.scale) || 1 }));
-  if (wanLoras.length) body.loras = wanLoras;
-
-  const submit = await fetch(falQueueUrl(falPath), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${hfKey}` },
-    body: JSON.stringify(body)
-  });
-  if (!submit.ok) {
-    const t = await submit.text().catch(() => '');
-    throw new Error(`HF/fal video error ${submit.status} (${falPath}): ${t.slice(0, 300)}`);
-  }
-  const sub = await submit.json();
-  const requestId = sub.request_id;
-  if (!requestId) throw new Error('HF/fal: no request_id returned: ' + JSON.stringify(sub).slice(0, 200));
-  const statusUrl = rewriteFalUrl(sub.status_url) || falQueueUrl(`${falPath}/requests/${requestId}/status`);
-  const responseUrl = rewriteFalUrl(sub.response_url) || falQueueUrl(`${falPath}/requests/${requestId}`);
-
-  // Poll fal queue status until COMPLETED, then fetch the response payload for the video URL.
-  const videoUrl = await pollForVideo(
-    async () => {
-      const st = await fetch(statusUrl, { headers: { 'Authorization': `Bearer ${hfKey}` } });
-      if (!st.ok) return st; // pollForVideo's fetchFn contract: return the Response
-      const sd = await st.json().catch(() => ({}));
-      if (sd.status === 'COMPLETED') {
-        const rr = await fetch(responseUrl, { headers: { 'Authorization': `Bearer ${hfKey}` } });
-        return new Response(JSON.stringify({ __done: true, payload: rr.ok ? await rr.json().catch(() => ({})) : { __err: rr.status } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-      }
-      return new Response(JSON.stringify(sd), { status: 200, headers: { 'Content-Type': 'application/json' } });
-    },
-    data => {
-      if (data.__done) {
-        if (data.payload && data.payload.__err) return 'FAILED';
-        return data.payload?.video?.url || data.payload?.video_url || 'FAILED';
-      }
-      if (data.status === 'FAILED' || data.status === 'ERROR') return 'FAILED';
-      return null; // IN_QUEUE / IN_PROGRESS → keep polling
-    },
-    progressId, isCancelled
-  );
-
-  if (videoUrl) {
-    addSpend(videoCostNum(engine, duration, res));
-    const labels = { hfwan22t2v: 'Wan 2.2 5B T2V (HF)', hfwan22t2vfast: 'Wan 2.2 5B T2V Fast (HF)', hfwan22i2v: 'Wan 2.2 5B I2V (HF)' };
-    const vidLabel = (labels[engine] || engine) + (wanLoras.length ? ' LoRA' : '');
     addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: vidLabel, storedDuration: duration, storedRes: res });
     renderVideo(videoUrl, prompt, true, vidLabel, duration, res);
   }
@@ -4407,11 +4295,7 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
       'aurora t2v': 'aurora', 'aurora': 'aurora',
       'wan 2.2 spicy': 'wan22spicy', 'wan 2.7 spicy': 'wan26spicy',
       'wan 2.6': 'wan26t2v', 'seedance 1.5 spicy': 'seedance15spicy', 'seedance 1.5 t2v': 'seedance15t2v',
-      'ltx 2.3 spicy': 'ltx23spicy',
-      'wan 2.2 5b t2v (hf)': 'hfwan22t2v', 'wan 2.2 5b t2v fast (hf)': 'hfwan22t2vfast',
-      'wan 2.2 5b i2v (hf)': 'hfwan22i2v',
-      'wan 2.2 5b t2v (hf) lora': 'hfwan22t2v', 'wan 2.2 5b t2v fast (hf) lora': 'hfwan22t2vfast',
-      'wan 2.2 5b i2v (hf) lora': 'hfwan22i2v'
+      'ltx 2.3 spicy': 'ltx23spicy'
     };
     const labelKey = engineLabel.toLowerCase().replace(' video','').trim();
     const engineKey = engineKeyMap[labelKey] || 'aurora';
@@ -5437,7 +5321,7 @@ document.getElementById('library-save')?.addEventListener('click', () => {
 const PE_MODE_MAP = {
   aurora: 'image', zimage: 'image', wan26t2v: 'image',
   qwen2: 'edit', qwen: 'edit', wan27: 'edit', fluxkontext: 'edit',
-  seedance15t2v: 'video', hfwan22t2v: 'video'
+  seedance15t2v: 'video'
   // i2v / extend generate via the ▶ Animate/Extend panel — handled separately
 };
 
@@ -6960,10 +6844,6 @@ const MODEL_CONSTRAINTS = {
   wan26spicy:     { durations: [5,10,15],      resolutions: ['720p','1080p'], hasRatio: false, maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
   seedance15spicy: { durations: [4,5,6,8,10,12], resolutions: ['480p','720p','1080p'], hasRatio: true, maxDur: 12, defaultDur: 4,  defaultRes: '480p' },
   ltx23spicy: { durations: [3,5,8,10,15,20], resolutions: ['480p','720p','1080p'], hasRatio: false, maxDur: 20, defaultDur: 5, defaultRes: '480p' },
-  // HF Inference Providers (fal) — Wan 2.2 5B is a fixed ~5s model; fal accepts 480p/580p/720p (app exposes 480p/720p)
-  hfwan22t2v:     { durations: [5], resolutions: ['480p','720p'], hasRatio: true,  maxDur: 5, defaultDur: 5, defaultRes: '720p' },
-  hfwan22t2vfast: { durations: [5], resolutions: ['480p','720p'], hasRatio: true,  maxDur: 5, defaultDur: 5, defaultRes: '720p' },
-  hfwan22i2v:     { durations: [5], resolutions: ['480p','720p'], hasRatio: false, maxDur: 5, defaultDur: 5, defaultRes: '720p' },
   // extend variants
   aurora_extend:        { durations: [4,6,8,10],       resolutions: ['480p','720p'],        hasRatio: false, maxDur: 10, defaultDur: 4,  defaultRes: '480p' },
   wan22spicy_extend:    { durations: [5],               resolutions: ['480p','720p'],        hasRatio: false, maxDur: 5,  defaultDur: 5,  defaultRes: '480p' },
@@ -7049,12 +6929,6 @@ function estimateVideoCost(engine, duration, res) {
     }
     case 'wan27extend':                  // Wan 2.7 extend (approx base)
       return `~$${(0.10 * d).toFixed(2)}`;
-    case 'hfwan22t2v':                   // Wan 2.2 5B via HF/fal: $0.15 flat per video (HF-token billed)
-      return '$0.15';
-    case 'hfwan22t2vfast':               // fast-wan distilled: $0.025 @720p, $0.0125 @480p
-      return hi ? '~$0.025' : '~$0.013';
-    case 'hfwan22i2v':                   // Wan 2.2 5B I2V via HF/fal (approx — fal page omits i2v price)
-      return '~$0.15';
     default:
       return '~$?';
   }
@@ -7148,8 +7022,6 @@ const PE_SYSTEM_PROMPTS = {
   ltx23: peSys("MODEL: LTX 2.3 (Lightricks video — T2V/I2V/extend with NATIVE AUDIO). Write the prompt as a flowing cinematic NARRATIVE in prose — never labelled fields like 'Subject:/Camera:'. Structure first, style second: give a clear subject, ONE specific action with concrete motion verbs ('hands moving with practiced precision', not 'cooking'), and the setting; then layer lighting and style words last. Describe the camera move in plain language, usually near the end ('the camera slowly dollies from behind the subject to in front'). CRUCIAL: LTX generates sound natively — explicitly describe the audio: ambient room tone, specific sound effects, and any music or dialogue (e.g. 'the strong thud of the hammer, soft country blues from an old gramophone'). Add realism cues (natural directional light, authentic skin texture). If animating from an image (I2V), describe ONLY the motion, light changes and audio — do NOT redescribe what is already in the frame. Keep to one coherent beat."),
   seedance_i2v: peSys("MODEL: Seedance image-to-video. Describe the motion, camera behaviour, emotional tone and visual style. Seedance handles bold, expressive motion well. Describe motion not appearance. Under ~100 words."),
   wan22spicy_i2v: peSys("MODEL: Wan 2.2 image-to-video. Lead with subject + motion, then camera. Pick ONE clear motion — avoid complex multi-action. Use motion-intensity words (subtle/gentle, smooth/flowing, dynamic/sweeping). Under ~60 words."),
-  hfwan22i2v: peSys("MODEL: Wan 2.2 5B image-to-video (HF). Describe ONLY motion — the still defines appearance. Lead with subject + one clear motion, then a simple camera move. Use motion-intensity words (subtle/gentle, smooth/flowing, dynamic/sweeping). 5-second clip, so one beat only. Under ~60 words."),
-  hfwan22t2v: peSys("MODEL: Wan 2.2 5B text-to-video (HF). Structure: Subject (with description) → Scene → ONE clear Motion → aesthetic/lighting → style. Natural language, concrete and physical. It's a 5-second clip — one action, one camera move max. Under ~80 words."),
   ltx23spicy: peSys("MODEL: LTX 2.3 Spicy image-to-video with synchronized audio. Describe ONE clear action/motion plus the camera move, and explicitly describe any audio you want (e.g. 'soft ambient music', 'waves', 'breathing') since this model generates sound. Keep motion focused — one action per prompt. Under ~60 words."),
   wan27spicy_i2v: peSys("MODEL: Wan 2.7 image-to-video. Supports a short arc: opening motion → development → resolution. Order subject → motion → camera → scene. Include camera work and clear motion-intensity. Under ~100 words."),
 
