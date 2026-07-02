@@ -1555,12 +1555,24 @@
           <div class="img-control-group">
             <span class="mode-label">Engine</span>
             <select id="vid-engine-select" class="img-control-select">
-              <option value="aurora" selected>Aurora · xAI — $0.05/s</option>
-              <option value="seedance15t2v">Seedance 1.5 T2V · WaveSpeed — from $0.06</option>
-              <option value="wan26t2v">Wan 2.6 · WaveSpeed — ~$0.34/5s</option>
-              <option value="wan22spicy">Wan 2.2 Spicy I2V · WaveSpeed — from $0.15</option>
-              <option value="wan26spicy">Wan 2.7 Spicy I2V · WaveSpeed — from $0.50</option>
-              <option value="ltx23spicy">LTX 2.3 Spicy I2V (+audio) · WaveSpeed — from $0.10</option>
+              <optgroup label="── Text-to-Video ──">
+                <option value="aurora" selected>Aurora · xAI — $0.05/s</option>
+                <option value="seedance15t2v">Seedance 1.5 T2V · WaveSpeed — from $0.06</option>
+                <option value="wan26t2v">Wan 2.6 · WaveSpeed — ~$0.34/5s</option>
+              </optgroup>
+              <optgroup label="── Animate (needs image) ──">
+                <option value="aurora_i2v">Aurora Animate · xAI — $0.05/s</option>
+                <option value="seedance15spicy">Seedance 1.5 Spicy · WaveSpeed — from $0.06</option>
+                <option value="wan22spicy">Wan 2.2 Spicy · WaveSpeed — from $0.15</option>
+                <option value="wan22spicylora">Wan 2.2 Spicy LoRA · WaveSpeed — from $0.20</option>
+                <option value="wan26spicy">Wan 2.7 Spicy · WaveSpeed — from $0.50</option>
+                <option value="ltx23spicy">LTX 2.3 Spicy (+audio) · WaveSpeed — from $0.10</option>
+              </optgroup>
+              <optgroup label="── Extend (needs video) ──">
+                <option value="aurora_extend">Aurora Extend · xAI — $0.05/s</option>
+                <option value="wan27extend">Wan 2.7 Extend · WaveSpeed — from ~$0.30</option>
+                <option value="wan22spicy_extend">Wan 2.2 Spicy Extend · WaveSpeed — from $0.15</option>
+              </optgroup>
             </select>
           </div>
           <div class="img-control-group">
@@ -1590,6 +1602,14 @@
               <option value="720p">720p</option>
             </select>
           </div>
+        </div>
+        <div id="vid-pin-row" style="display:none;align-items:center;gap:8px;padding:6px 4px 0;font-size:12px;flex-wrap:wrap;">
+          <span id="vid-pin-empty" style="color:var(--text-dim);">📌 Tap an image in the thread to animate it here.</span>
+          <span id="vid-pin-chip" style="display:none;align-items:center;gap:6px;background:var(--surface);border:1px solid #64b4ff;border-radius:16px;padding:3px 6px 3px 3px;">
+            <img id="vid-pin-thumb" style="width:28px;height:28px;object-fit:cover;border-radius:12px;" alt="pinned source">
+            <span id="vid-pin-label" style="color:#64b4ff;">Pinned</span>
+            <button id="vid-pin-clear" title="Unpin" style="background:transparent;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;padding:0 2px;">✕</button>
+          </span>
         </div>
       </div>
       <div id="enhance-mode-row">
@@ -1860,11 +1880,16 @@
 <!-- Save / Load Game Modal -->
 <div class="modal-overlay" id="savegame-overlay">
   <div class="modal" style="max-width:520px;width:92%;max-height:85vh;overflow-y:auto;">
-    <h2 style="margin-bottom:4px;">💾 Save / Load Game</h2>
-    <p style="margin-bottom:12px;">Save the current game as a code — story, cast, Story Setup, and storyboard settings. Images/videos are <em>not</em> included (save those separately); frames regenerate as you continue. Paste a code to recreate a game in a new thread.</p>
-    <button class="btn-primary" id="savegame-make" style="width:100%;">💾 Save this game → copy code</button>
-    <textarea id="savegame-code" placeholder="Your game code appears here when you save — or paste a code here to load." style="width:100%;min-height:120px;margin:10px 0;font-family:monospace;font-size:11px;"></textarea>
-    <button class="btn-primary" id="savegame-load" style="width:100%;">📂 Load game from code</button>
+    <h2 style="margin-bottom:4px;">💾 Save / Load</h2>
+    <p style="margin-bottom:12px;">Save a snapshot file of <b>everything</b> — all threads, cast, setup, settings, LoRAs, and API keys. Generated images/videos are not included (their prompts are kept). Use the share sheet to choose where the file goes (e.g. Files).</p>
+    <button class="btn-primary" id="savegame-make" style="width:100%;">💾 Save snapshot to file</button>
+    <button class="btn-primary" id="savegame-load" style="width:100%;margin-top:10px;">📂 Load snapshot from file…</button>
+    <input type="file" id="savegame-file-input" accept=".json,application/json" style="display:none;">
+    <div id="savegame-confirm" style="display:none;margin-top:12px;padding:10px;border:1px solid #c0392b;border-radius:8px;">
+      <p style="margin-bottom:10px;"><b>⚠️ This will wipe your current threads and settings</b> and replace them with the snapshot. Are you sure?</p>
+      <button class="btn-primary" id="savegame-confirm-yes" style="width:100%;background:#c0392b;">Yes — wipe &amp; load</button>
+      <button class="btn-secondary" id="savegame-confirm-no" style="width:100%;margin-top:8px;">Cancel</button>
+    </div>
     <button class="btn-secondary" id="savegame-close" style="width:100%;margin-top:8px;">Close</button>
   </div>
 </div>
@@ -1914,7 +1939,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.53';
+const APP_VERSION = '1.59';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -3128,6 +3153,8 @@ function setMode(mode) {
   inputArea?.classList.toggle('video-mode', mode === 'video');
   inputArea?.classList.toggle('enhance-mode', mode === 'enhance');
 
+  if (mode === 'video' && typeof updateVideoPinRow === 'function') updateVideoPinRow();
+
   const placeholders = { image: 'Describe an image…', edit: 'Describe your edit…', video: 'Describe a video…', enhance: '', chat: 'Say something…' };
   promptEl.placeholder = placeholders[mode] || 'Say something…';
 
@@ -3264,13 +3291,76 @@ document.getElementById('upscale-btn')?.addEventListener('click', async () => {
   el?.addEventListener('change', () => { updateCostEstimate(); el.blur(); });
 });
 
-// When engine changes in main video mode, update duration/resolution/ratio options
+// ── Video engine classification (v1.56) ──
+// T2V engines take no source; Animate (I2V) needs a pinned image; Extend needs a pinned video.
+const VIDEO_T2V_ENGINES    = ['aurora', 'seedance15t2v', 'wan26t2v'];
+const VIDEO_EXTEND_ENGINES = ['aurora_extend', 'wan27extend', 'wan22spicy_extend'];
+function videoEngineKind(engine) {
+  if (VIDEO_EXTEND_ENGINES.includes(engine)) return 'extend';
+  if (VIDEO_T2V_ENGINES.includes(engine)) return 't2v';
+  return 'i2v'; // everything else is an Animate/I2V engine
+}
+
+// ── Pinned source for Animate/Extend (v1.56) ──
+// Holds the media the user tapped in the thread. imageUrl for I2V, videoUrl for Extend.
+let pinnedVideoSource = null; // { kind:'image'|'video', url, thumb }
+
+function updateVideoPinRow() {
+  const engine = document.getElementById('vid-engine-select')?.value || 'aurora';
+  const kind = videoEngineKind(engine);
+  const row = document.getElementById('vid-pin-row');
+  const empty = document.getElementById('vid-pin-empty');
+  const chip = document.getElementById('vid-pin-chip');
+  if (!row) return;
+  if (kind === 't2v') { row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+  const needVideo = (kind === 'extend');
+  // Drop an incompatible pin (e.g. an image pinned, then user switches to Extend).
+  if (pinnedVideoSource && ((needVideo && pinnedVideoSource.kind !== 'video') || (!needVideo && pinnedVideoSource.kind !== 'image'))) {
+    pinnedVideoSource = null;
+  }
+  if (pinnedVideoSource) {
+    empty.style.display = 'none';
+    chip.style.display = 'inline-flex';
+    document.getElementById('vid-pin-thumb').src = pinnedVideoSource.thumb || pinnedVideoSource.url;
+    document.getElementById('vid-pin-label').textContent = needVideo ? 'Video pinned' : 'Image pinned';
+  } else {
+    empty.style.display = 'inline';
+    empty.textContent = needVideo
+      ? '📌 Tap a video in the thread to extend it here.'
+      : '📌 Tap an image in the thread to animate it here.';
+    chip.style.display = 'none';
+  }
+}
+
+function pinVideoSource(kind, url, thumb) {
+  pinnedVideoSource = { kind, url, thumb: thumb || url };
+  // If the current engine can't use this kind, switch to a sensible default that can.
+  const engineSel = document.getElementById('vid-engine-select');
+  const curKind = videoEngineKind(engineSel.value);
+  if (kind === 'image' && curKind !== 'i2v') engineSel.value = 'aurora_i2v';
+  if (kind === 'video' && curKind !== 'extend') engineSel.value = 'aurora_extend';
+  engineSel.dispatchEvent(new Event('change'));
+  // Make sure we're in video mode and scroll the composer into view.
+  updateVideoPinRow();
+  const promptEl = document.getElementById('prompt');
+  if (promptEl) promptEl.focus();
+}
+
+document.getElementById('vid-pin-clear')?.addEventListener('click', () => {
+  pinnedVideoSource = null;
+  updateVideoPinRow();
+});
+
+// When engine changes in main video mode, update duration/resolution/ratio options + pin row
 document.getElementById('vid-engine-select')?.addEventListener('change', () => {
   const engine = document.getElementById('vid-engine-select').value;
   const durEl = document.getElementById('vid-duration-select');
   const resEl = document.getElementById('vid-res-select');
   const ratioEl = document.getElementById('vid-ratio-select');
-  applyModelConstraints(engine, durEl, resEl, ratioEl, false, true, engine !== 'aurora' && engine !== 'wan26t2v'); // isI2V for spicy models
+  const kind = videoEngineKind(engine);
+  applyModelConstraints(engine, durEl, resEl, ratioEl, kind === 'extend', true, kind === 'i2v');
+  updateVideoPinRow();
   updateCostEstimate();
 });
 
@@ -3318,7 +3408,25 @@ async function handleSend() {
   } else if (imageMode) {
     await generateImage(text);
   } else if (videoMode) {
-    await generateVideo(text, null);
+    const vEngine = document.getElementById('vid-engine-select')?.value || 'aurora';
+    const vKind = videoEngineKind(vEngine);
+    if (vKind === 'i2v') {
+      if (!pinnedVideoSource || pinnedVideoSource.kind !== 'image') {
+        setLoading(false);
+        appendError('This Animate engine needs a source image. Tap an image in the thread to pin it, then send.');
+        return;
+      }
+      await generateVideo(text, pinnedVideoSource.url, vEngine, null);
+    } else if (vKind === 'extend') {
+      if (!pinnedVideoSource || pinnedVideoSource.kind !== 'video') {
+        setLoading(false);
+        appendError('This Extend engine needs a source video. Tap a video in the thread to pin it, then send.');
+        return;
+      }
+      await generateVideo(text, null, vEngine, pinnedVideoSource.url);
+    } else {
+      await generateVideo(text, null);
+    }
   } else {
     addToHistory('user', text);
     await generateText(text);
@@ -3830,7 +3938,9 @@ async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUr
   // through Aurora (xAI direct) or WaveSpeed below — no Atlas video path exists.
 
   // Aurora always uses xAI directly; all other Wan/Seedance/LTX models use WaveSpeed directly.
-  const useWaveSpeed = engine !== 'aurora' && engine !== 'aurora_extend';
+  // Aurora (xAI direct) handles its T2V, Animate (I2V), and Extend variants; everything else → WaveSpeed.
+  const AURORA_ENGINES = ['aurora', 'aurora_i2v', 'aurora_extend'];
+  const useWaveSpeed = !AURORA_ENGINES.includes(engine);
 
   try {
     if (useWaveSpeed) {
@@ -3942,7 +4052,7 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
     } else {
       // Wan 2.2 Spicy — dedicated extend endpoint
       modelPath = 'wavespeed-ai/wan-2.2-spicy/video-extend';
-      body = { prompt, video: extendVideoUrl, resolution: res, duration: 5, seed: -1 }; // 5s fixed
+      body = { prompt, video: extendVideoUrl, resolution: res, duration: (duration === 8 ? 8 : 5), seed: -1 };
     }
   } else if (imageDataUrl) {
     // I2V
@@ -3962,10 +4072,10 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
       // LTX 2.3 Spicy I2V — generates synchronized audio; safety checker off for uncensored.
       // No aspect_ratio param: output follows the input image's aspect ratio.
       modelPath = 'wavespeed-ai/ltx-2.3-spicy/image-to-video';
-      body = { prompt, image: imageDataUrl, resolution: res, duration: Math.min(Math.max(duration, 3), 20), seed: -1, enable_safety_checker: false };
+      body = { prompt, image: imageDataUrl, resolution: res, duration: Math.min(Math.max(duration, 5), 20), seed: -1, enable_safety_checker: false };
     } else {
       modelPath = 'wavespeed-ai/wan-2.2-spicy/image-to-video';
-      body = { prompt, image: imageDataUrl, resolution: res, duration: Math.min(duration, 5), aspect_ratio: ratio, seed: -1 };
+      body = { prompt, image: imageDataUrl, resolution: res, duration: (duration === 8 ? 8 : 5), aspect_ratio: ratio, seed: -1 };
     }
   } else if (engine === 'seedance15t2v') {
     // Seedance 1.5 Pro T2V
@@ -4259,28 +4369,13 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
     syncPePinHighlights();
   });
 
-  // Extend button
+  // Extend button — one-tap: switch to video mode, pin this video, ready the composer. No popup.
   const extendBtn = document.createElement('button');
   extendBtn.className = 'animate-btn';
   extendBtn.innerHTML = '⟳ Extend';
-  const panelOuter2 = document.createElement('div');
-  panelOuter2.className = 'animate-panel-outer';
-  let extendOpen = false;
   extendBtn.addEventListener('click', () => {
-    extendOpen = !extendOpen;
-    if (extendOpen) {
-      const panel = buildAnimatePanel(async (prompt, engine, duration, resolution) => {
-        panelOuter2.innerHTML = '';
-        extendOpen = false;
-        extendBtn.disabled = true;
-        await generateVideo(prompt || 'continue the scene naturally', null, engine, src, duration, resolution);
-        extendBtn.disabled = false;
-      }, true);
-      panelOuter2.innerHTML = '';
-      panelOuter2.appendChild(panel);
-    } else {
-      panelOuter2.innerHTML = '';
-    }
+    if (!videoMode) setMode('video');
+    pinVideoSource('video', src, null);
   });
 
   const retryVidBtn = document.createElement('button');
@@ -4317,137 +4412,10 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
   wrapper.appendChild(retryVidBtn);
   div.appendChild(label);
   div.appendChild(wrapper);
-  div.appendChild(panelOuter2);
   messagesEl.appendChild(div);
   if (animate) scrollToBottom();
 }
 
-// Shared panel for Animate and Extend
-function buildAnimatePanel(onSubmit, isExtend = false, initialPrompt = '') {
-  const panel = document.createElement('div');
-  panel.className = 'animate-panel';
-  panel.style.cssText = `
-    background: var(--surface);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 10px 12px;
-    margin-top: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  `;
-
-  // Optional prompt
-  const promptInput = document.createElement('input');
-  promptInput.type = 'text';
-  promptInput.placeholder = isExtend ? 'Continue the scene… (optional)' : 'Describe the motion… (optional)';
-  if (initialPrompt) promptInput.value = initialPrompt;
-  promptInput.style.cssText = `
-    background: var(--bg);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 8px;
-    padding: 8px 10px;
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    font-size: 13px;
-    outline: none;
-    width: 100%;
-  `;
-
-  const controlRow = document.createElement('div');
-  controlRow.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
-
-  // Engine selector
-  const engineLabel = document.createElement('span');
-  engineLabel.className = 'mode-label';
-  engineLabel.textContent = 'Engine';
-
-  // Engine selector
-  const engineSel = document.createElement('select');
-  engineSel.className = 'img-control-select';
-  if (isExtend) {
-    engineSel.innerHTML = `
-      <option value="aurora" selected>Aurora · xAI — $0.05/s</option>
-      <option value="wan27extend">Wan 2.7 Extend · WaveSpeed — from ~$0.30</option>
-      <option value="wan22spicy">Wan 2.2 Spicy · WaveSpeed — from $0.15</option>
-    `;
-  } else {
-    engineSel.innerHTML = `
-      <option value="aurora" selected>Aurora · xAI — $0.05/s</option>
-      <option value="seedance15spicy">Seedance 1.5 Spicy · WaveSpeed — from $0.06</option>
-      <option value="wan22spicy">Wan 2.2 Spicy · WaveSpeed — from $0.15</option>
-      <option value="wan22spicylora">Wan 2.2 Spicy · LoRA · WaveSpeed — from $0.20</option>
-      <option value="wan26spicy">Wan 2.7 Spicy · WaveSpeed — from $0.50</option>
-      <option value="ltx23spicy">LTX 2.3 Spicy (+audio) · WaveSpeed — from $0.10</option>
-    `;
-  }
-
-  // Duration selector
-  const durLabel = document.createElement('span');
-  durLabel.className = 'mode-label';
-  durLabel.textContent = 'Dur';
-
-  const durSel = document.createElement('select');
-  durSel.className = 'img-control-select';
-
-  // Resolution selector
-  const resLabel = document.createElement('span');
-  resLabel.className = 'mode-label';
-  resLabel.textContent = 'Res';
-
-  const resSel = document.createElement('select');
-  resSel.className = 'img-control-select';
-
-  // Apply initial constraints with cheapest defaults
-  applyModelConstraints('aurora', durSel, resSel, null, isExtend, true, !isExtend);
-  // Explicitly set values after populating options (select.value is empty until attached to DOM)
-  if (durSel.options.length) durSel.value = durSel.options[0].value;
-  if (resSel.options.length) resSel.value = resSel.options[0].value;
-
-  // Update when engine changes — apply cheapest defaults
-  engineSel.addEventListener('change', () => {
-    applyModelConstraints(engineSel.value, durSel, resSel, null, isExtend, true, !isExtend);
-    if (durSel.options.length) durSel.value = durSel.options[0].value;
-    if (resSel.options.length) resSel.value = resSel.options[0].value;
-  });
-
-  const generateBtn = document.createElement('button');
-  generateBtn.textContent = isExtend ? '⟳ Extend' : '▶ Go';
-  generateBtn.style.cssText = `
-    background: #64b4ff;
-    color: #1a1a2e;
-    border: none;
-    border-radius: 20px;
-    padding: 6px 14px;
-    font-family: 'Inter', sans-serif;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    margin-left: auto;
-    flex-shrink: 0;
-  `;
-
-  generateBtn.addEventListener('click', () => {
-    const dur = parseInt(durSel.value);
-    const res = resSel.value || '480p';
-    onSubmit(promptInput.value.trim(), engineSel.value, isNaN(dur) ? 4 : dur, res);
-  });
-
-  promptInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') generateBtn.click();
-  });
-
-  controlRow.appendChild(engineLabel);
-  controlRow.appendChild(engineSel);
-  controlRow.appendChild(durLabel);
-  controlRow.appendChild(durSel);
-  controlRow.appendChild(resLabel);
-  controlRow.appendChild(resSel);
-  controlRow.appendChild(generateBtn);
-  panel.appendChild(promptInput);
-  panel.appendChild(controlRow);
-  return panel;
-}
 
 // Capture the final frame of a video to a JPEG data URL (in-browser via canvas).
 function captureLastFrame(videoSrc) {
@@ -4738,27 +4706,11 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   animBtn.className = 'animate-btn';
   animBtn.innerHTML = '▶ Animate';
 
-  // Animate panel — lives outside wrapper, below btn bar
-  const panelOuter = document.createElement('div');
-  panelOuter.className = 'animate-panel-outer';
-  let panelOpen = false;
-
   if (hostedUrl) {
     animBtn.addEventListener('click', () => {
-      panelOpen = !panelOpen;
-      if (panelOpen) {
-        const panel = buildAnimatePanel(async (prompt, engine, duration, resolution) => {
-          panelOuter.innerHTML = '';
-          panelOpen = false;
-          animBtn.disabled = true;
-          await generateVideo(prompt || 'cinematic motion, smooth camera movement', hostedUrl, engine, null, duration, resolution);
-          animBtn.disabled = false;
-        }, false, videoPromptPrefill || '');
-        panelOuter.innerHTML = '';
-        panelOuter.appendChild(panel);
-      } else {
-        panelOuter.innerHTML = '';
-      }
+      // One-tap: switch to video mode, pin this image, ready the composer. No popup.
+      if (!videoMode) setMode('video');
+      pinVideoSource('image', hostedUrl, src);
     });
   } else {
     animBtn.addEventListener('click', () => {
@@ -4958,7 +4910,6 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   div.appendChild(wrapper);
   div.appendChild(btnBar);
   div.appendChild(stylePanelOuter);
-  div.appendChild(panelOuter);
   messagesEl.appendChild(div);
   if (animate) scrollToBottom();
 }
@@ -6099,35 +6050,21 @@ function fillStoryboardCard(card, src, videoPrompt, reason, frameId, modelLabel)
   editBtn.textContent = '✎ Edit';
   bar.appendChild(editBtn);
   card.appendChild(bar);
-  // Animate panel (image-to-video from this frame), pre-filled with the drafted video prompt
-  const vidPanelOuter = document.createElement('div');
-  vidPanelOuter.className = 'animate-panel-outer';
-  card.appendChild(vidPanelOuter);
-  let vidPanelOpen = false;
-  animBtn.addEventListener('click', () => {
-    vidPanelOpen = !vidPanelOpen;
-    if (vidPanelOpen) {
-      const panel = buildAnimatePanel(async (p, engine, duration, resolution) => {
-        vidPanelOuter.innerHTML = '';
-        vidPanelOpen = false;
-        animBtn.disabled = true;
-        const origTxt = animBtn.textContent;
-        try {
-          animBtn.textContent = '▶ Preparing…';
-          const hosted = await ensureHostedUrl(src);
-          animBtn.textContent = origTxt;
-          await generateVideo(p || videoPrompt || 'cinematic motion, smooth camera movement', hosted, engine, null, duration, resolution);
-        } catch (e) {
-          animBtn.textContent = origTxt;
-          appendError(e.message);
-        }
-        animBtn.disabled = false;
-      }, false, videoPrompt || '');
-      vidPanelOuter.innerHTML = '';
-      vidPanelOuter.appendChild(panel);
-    } else {
-      vidPanelOuter.innerHTML = '';
+  // Animate this frame — one-tap: host the image, switch to video mode, pin it, ready the composer.
+  animBtn.addEventListener('click', async () => {
+    animBtn.disabled = true;
+    const origTxt = animBtn.textContent;
+    try {
+      animBtn.textContent = '▶ Preparing…';
+      const hosted = await ensureHostedUrl(src);
+      animBtn.textContent = origTxt;
+      if (!videoMode) setMode('video');
+      pinVideoSource('image', hosted, src);
+    } catch (e) {
+      animBtn.textContent = origTxt;
+      appendError(e.message);
     }
+    animBtn.disabled = false;
   });
   // Inline editor (its own edit-model dropdown so the model in use is always clear)
   const editor = document.createElement('div');
@@ -6584,32 +6521,110 @@ function loadGame(payload) {
 
 const savegameOverlay = document.getElementById('savegame-overlay');
 document.getElementById('savegame-btn')?.addEventListener('click', () => {
-  document.getElementById('savegame-code').value = '';
+  document.getElementById('savegame-confirm').style.display = 'none';
+  pendingSnapshot = null;
   savegameOverlay.classList.add('open');
 });
 document.getElementById('savegame-close')?.addEventListener('click', () => savegameOverlay.classList.remove('open'));
 savegameOverlay?.addEventListener('click', e => { if (e.target === savegameOverlay) savegameOverlay.classList.remove('open'); });
+
+// ── Full-app snapshot (v1.54): everything except generated media ──
+function buildFullSnapshot() {
+  // All localStorage (settings, model selections, keys — user-approved, private device).
+  const ls = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    ls[k] = localStorage.getItem(k);
+  }
+  // All threads with media stripped: image/video messages become text placeholders keeping their prompts.
+  const threads = getThreads().map(t => ({
+    ...t,
+    cast: (t.cast || []).map(c => { const { imageUrl, ...rest } = c; return rest; }),
+    messages: (t.messages || []).map(m => {
+      if (m.type === 'image' || m.type === 'video') {
+        return { role: m.role, type: 'text', content: `🖼 [media not saved] ${m.type} · ${m.engineLabel || ''} · prompt: ${m.alt || m.prompt || '(none)'}` };
+      }
+      return m;
+    })
+  }));
+  return { zaorSnapshot: 2, savedAt: new Date().toISOString(), appVersion: APP_VERSION, localStorage: ls, threads };
+}
+
+async function saveSnapshotToFile() {
+  const snap = buildFullSnapshot();
+  const json = JSON.stringify(snap);
+  const stamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+  const fname = `zaor-save_${stamp}.json`;
+  const file = new File([json], fname, { type: 'application/json' });
+  // Prefer the iOS share sheet (lets you pick a folder in Files); fall back to a download link.
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: fname }); return; }
+    catch (e) { if (e.name === 'AbortError') return; /* user cancelled — done */ }
+  }
+  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = fname;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+let pendingSnapshot = null;
+
+function applySnapshot(snap) {
+  // Restore localStorage wholesale.
+  localStorage.clear();
+  for (const [k, v] of Object.entries(snap.localStorage || {})) {
+    try { localStorage.setItem(k, v); } catch (e) { console.error('[Zaor load] localStorage restore failed for', k, e); }
+  }
+  // Restore threads, then reload so every subsystem re-initialises from the restored state.
+  saveThreads(Array.isArray(snap.threads) ? snap.threads : []);
+  setTimeout(() => location.reload(), 300);
+}
+
 document.getElementById('savegame-make')?.addEventListener('click', async () => {
-  const code = serializeGame();
-  if (!code) { appendError('No game to save yet — start a story first.'); return; }
-  const ta = document.getElementById('savegame-code');
-  ta.value = code;
-  try { await navigator.clipboard.writeText(code); } catch (e) {}
   const b = document.getElementById('savegame-make');
   const o = b.textContent;
-  b.textContent = '✓ Saved · code copied';
+  try {
+    await saveSnapshotToFile();
+    b.textContent = '✓ Snapshot ready';
+  } catch (e) {
+    appendError('Save failed: ' + e.message);
+  }
   setTimeout(() => { b.textContent = o; }, 2000);
 });
+
 document.getElementById('savegame-load')?.addEventListener('click', () => {
-  const code = document.getElementById('savegame-code').value.trim();
-  if (!code) { appendError('Paste a game code first.'); return; }
-  try {
-    const payload = deserializeGame(code);
-    loadGame(payload);
-    savegameOverlay.classList.remove('open');
-  } catch (e) {
-    appendError('Couldn\'t load that code: ' + e.message);
-  }
+  document.getElementById('savegame-file-input').click();
+});
+
+document.getElementById('savegame-file-input')?.addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = ''; // allow re-picking the same file later
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onerror = () => appendError('Could not read that file.');
+  reader.onload = () => {
+    try {
+      const snap = JSON.parse(reader.result);
+      if (!snap || snap.zaorSnapshot !== 2 || typeof snap.localStorage !== 'object' || !Array.isArray(snap.threads)) {
+        throw new Error('not a Zaor snapshot file');
+      }
+      pendingSnapshot = snap;
+      document.getElementById('savegame-confirm').style.display = 'block';
+    } catch (err) {
+      appendError('Couldn\'t load that file: ' + err.message);
+    }
+  };
+  reader.readAsText(f);
+});
+
+document.getElementById('savegame-confirm-yes')?.addEventListener('click', () => {
+  if (!pendingSnapshot) { appendError('No snapshot pending.'); return; }
+  applySnapshot(pendingSnapshot);
+});
+document.getElementById('savegame-confirm-no')?.addEventListener('click', () => {
+  pendingSnapshot = null;
+  document.getElementById('savegame-confirm').style.display = 'none';
 });
 
 
@@ -6835,18 +6850,23 @@ document.getElementById('style-lock-input')?.addEventListener('input', function(
 // Per-model constraints
 const MODEL_CONSTRAINTS = {
   // defaultDur and defaultRes = cheapest option
+  // Verified against WaveSpeedAI docs (v1.55 audit) — values here are enforced in the UI so an
+  // invalid combo can't be submitted and fail server-side.
   aurora:     { durations: [4,6,8,10,15], resolutions: ['480p','720p'], hasRatio: true,  maxDur: 15, defaultDur: 4,  defaultRes: '480p' },
   aurora_i2v: { durations: [4,6,8,10,15], resolutions: ['480p','720p'], hasRatio: false, maxDur: 15, defaultDur: 4,  defaultRes: '480p' },
-  seedance15t2v: { durations: [4,5,6,8,10,12], resolutions: ['720p','1080p'], hasRatio: true, maxDur: 12, defaultDur: 4, defaultRes: '720p' },
+  seedance15t2v: { durations: [4,5,6,7,8,9,10,11,12], resolutions: ['720p','1080p'], hasRatio: true, maxDur: 12, defaultDur: 4, defaultRes: '720p' },
   wan26t2v:   { durations: [5,8,10,15],   resolutions: ['720p','1080p'], hasRatio: true,  maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
-  wan22spicy: { durations: [5],            resolutions: ['480p','720p'], hasRatio: false, maxDur: 5,  defaultDur: 5,  defaultRes: '480p' },
+  // Wan 2.2 Spicy I2V: API only accepts 5 or 8 seconds — anything else 400s server-side.
+  wan22spicy: { durations: [5,8],          resolutions: ['480p','720p'], hasRatio: false, maxDur: 8,  defaultDur: 5,  defaultRes: '480p' },
   wan22spicylora: { durations: [5,8],      resolutions: ['480p','720p'], hasRatio: false, maxDur: 8,  defaultDur: 5,  defaultRes: '480p' },
   wan26spicy:     { durations: [5,10,15],      resolutions: ['720p','1080p'], hasRatio: false, maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
-  seedance15spicy: { durations: [4,5,6,8,10,12], resolutions: ['480p','720p','1080p'], hasRatio: true, maxDur: 12, defaultDur: 4,  defaultRes: '480p' },
-  ltx23spicy: { durations: [3,5,8,10,15,20], resolutions: ['480p','720p','1080p'], hasRatio: false, maxDur: 20, defaultDur: 5, defaultRes: '480p' },
+  seedance15spicy: { durations: [4,5,6,7,8,9,10,11,12], resolutions: ['480p','720p','1080p'], hasRatio: true, maxDur: 12, defaultDur: 4,  defaultRes: '480p' },
+  // LTX 2.3 Spicy: API minimum is 5s, not 3s.
+  ltx23spicy: { durations: [5,8,10,15,20], resolutions: ['480p','720p','1080p'], hasRatio: false, maxDur: 20, defaultDur: 5, defaultRes: '480p' },
   // extend variants
   aurora_extend:        { durations: [4,6,8,10],       resolutions: ['480p','720p'],        hasRatio: false, maxDur: 10, defaultDur: 4,  defaultRes: '480p' },
-  wan22spicy_extend:    { durations: [5],               resolutions: ['480p','720p'],        hasRatio: false, maxDur: 5,  defaultDur: 5,  defaultRes: '480p' },
+  // Wan 2.2 Spicy Extend: same 5/8s constraint as its I2V sibling — not fixed to 5.
+  wan22spicy_extend:    { durations: [5,8],             resolutions: ['480p','720p'],        hasRatio: false, maxDur: 8,  defaultDur: 5,  defaultRes: '480p' },
   wan27extend:          { durations: [2,3,4,5,8,10,15],  resolutions: ['720p','1080p'],       hasRatio: false, maxDur: 15, defaultDur: 5,  defaultRes: '720p' },
 };
 
@@ -6909,6 +6929,8 @@ function estimateVideoCost(engine, duration, res) {
   const d = (!isNaN(duration) && duration > 0) ? duration : 5;
   switch (engine) {
     case 'aurora':                       // xAI grok-imagine-video: $0.05/s
+    case 'aurora_i2v':
+    case 'aurora_extend':
       return `~$${(0.05 * d).toFixed(2)}`;
     case 'wan26t2v':                     // Wan 2.6 T2V (approx, unverified base)
       return `~$${(0.068 * d).toFixed(2)}`;
@@ -6918,6 +6940,7 @@ function estimateVideoCost(engine, duration, res) {
       return `~$${Math.max(0.06, rate * d).toFixed(2)}`;
     }
     case 'wan22spicy':                   // Wan 2.2 Spicy: base $0.15 (5s, 480p)
+    case 'wan22spicy_extend':            // Wan 2.2 Spicy Extend: same base pricing
       return hi ? '~$0.20+' : '~$0.15';
     case 'wan22spicylora':               // Wan 2.2 Spicy LoRA: base ~$0.20 (5s), more at 8s/720p
       return (d >= 8 || hi) ? '~$0.30+' : '~$0.20';
