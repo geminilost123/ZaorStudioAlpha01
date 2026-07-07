@@ -1939,7 +1939,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.60';
+const APP_VERSION = '1.61';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2293,6 +2293,53 @@ const CHROMA_BOX_WORKFLOW = {
   "749": { "inputs": { "text": "This low quality greyscale unfinished sketch is inaccurate and flawed. The image is very blurred and lacks detail with excessive chromatic aberrations and artifacts. The image is overly saturated with excessive bloom. It has a toony aesthetic with bold outlines and flat colors. ", "clip": ["741", 0] }, "class_type": "CLIPTextEncode" }
 };
 
+// ═══════════════════════════════════════════════════════
+// ZAOR BOX VIDEO (v1.61) — LTX-2.3 / 10Eros v1.2 Q6_K GGUF, fully local encoding.
+// Proven graphs from Jul 7 live test (t2v ~40s warm, i2v via first-frame conditioning).
+// Injection points (see 'comfy' provider branch):
+//   3 = positive prompt · 4 = negative prompt · 9 = seed
+//   11 = width/height/num_frames (+ i2v: strength) · 16 (i2v only) = LoadImage filename
+// Frozen for v1.61: cfg 4.0 (node 6) · 20 steps (node 8) · euler · 24fps · video-only (no audio path)
+// ═══════════════════════════════════════════════════════
+const LTX_BOX_NEGATIVE = "blurry, distorted, static image, frozen, watermark, text, subtitles, low quality";
+
+const LTX_BOX_T2V_WORKFLOW = {
+  "1": { "class_type": "UnetLoaderGGUF", "inputs": { "unet_name": "10Eros_v1.2-Q6_K.gguf" } },
+  "2": { "class_type": "DualCLIPLoaderGGUF", "inputs": { "clip_name1": "gemma-3-12b-it-qat-Q4_K_XL.gguf", "clip_name2": "ltx-2.3_embeddings_connectors.safetensors", "type": "ltxv" } },
+  "3": { "class_type": "CLIPTextEncode", "inputs": { "clip": ["2", 0], "text": "" } },
+  "4": { "class_type": "CLIPTextEncode", "inputs": { "clip": ["2", 0], "text": LTX_BOX_NEGATIVE } },
+  "5": { "class_type": "LTXVConditioning", "inputs": { "positive": ["3", 0], "negative": ["4", 0], "frame_rate": 24 } },
+  "6": { "class_type": "CFGGuider", "inputs": { "model": ["1", 0], "positive": ["5", 0], "negative": ["5", 1], "cfg": 4.0 } },
+  "7": { "class_type": "KSamplerSelect", "inputs": { "sampler_name": "euler" } },
+  "8": { "class_type": "LTXVScheduler", "inputs": { "steps": 20, "max_shift": 2.05, "base_shift": 0.95, "stretch": true, "terminal": 0.1 } },
+  "9": { "class_type": "RandomNoise", "inputs": { "noise_seed": 0 } },
+  "10": { "class_type": "VAELoader", "inputs": { "vae_name": "ltx-2.3_video_vae.safetensors" } },
+  "11": { "class_type": "LTXVBaseSampler", "inputs": { "model": ["1", 0], "vae": ["10", 0], "width": 1280, "height": 736, "num_frames": 121, "guider": ["6", 0], "sampler": ["7", 0], "sigmas": ["8", 0], "noise": ["9", 0] } },
+  "13": { "class_type": "VAEDecode", "inputs": { "samples": ["11", 0], "vae": ["10", 0] } },
+  "14": { "class_type": "CreateVideo", "inputs": { "images": ["13", 0], "fps": 24 } },
+  "15": { "class_type": "SaveVideo", "inputs": { "video": ["14", 0], "filename_prefix": "ZaorLTX", "format": "mp4", "codec": "h264" } }
+};
+
+// i2v = t2v graph + LoadImage conditioning the first frame (index "0") at strength 0.9.
+const LTX_BOX_I2V_WORKFLOW = Object.assign(JSON.parse(JSON.stringify(LTX_BOX_T2V_WORKFLOW)), {
+  "16": { "class_type": "LoadImage", "inputs": { "image": "" } }
+});
+LTX_BOX_I2V_WORKFLOW["11"].inputs.optional_cond_images = ["16", 0];
+LTX_BOX_I2V_WORKFLOW["11"].inputs.optional_cond_indices = "0";
+LTX_BOX_I2V_WORKFLOW["11"].inputs.strength = 0.9;
+LTX_BOX_I2V_WORKFLOW["11"].inputs.crop = "center";
+
+// LTX hard rules: width/height divisible by 32, frames = 8n+1.
+function ltxDims(aspectRatio){
+  if (aspectRatio === '9:16') return { width: 736,  height: 1280 };
+  if (aspectRatio === '1:1')  return { width: 1024, height: 1024 };
+  return { width: 1280, height: 736 };   // default 16:9
+}
+function ltxFrames(durationSec){
+  const s = Math.min(Math.max(Number(durationSec) || 5, 2), 10);   // clamp 2–10s
+  return Math.round((s * 24) / 8) * 8 + 1;                          // 8n+1 @ 24fps (5s → 121)
+}
+
 const MODEL_REGISTRY = {
   // ─────────── TEXT-TO-IMAGE ───────────
   'aurora-simple':  { cat:'t2img', label:'Aurora Simple · xAI',  provider:'xai-image', path:'grok-imagine-image',          price:0.02, verified:true,
@@ -2382,6 +2429,14 @@ const MODEL_REGISTRY = {
   'atlas-wan27-t2v': { cat:'t2v', label:'Wan 2.7 T2V (Atlas)', provider:'atlas', path:'wan-2.7/text-to-video', pricePerS:0.02, verified:false,
     durations:[5,8,10], resolutions:['720p','1080p'],
     buildBody:p=>({ prompt:p.prompt, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,10) }) },
+  // Zaor Box: LTX-2.3 / 10Eros v1.2 (Q6_K) on the RunPod pod. price:0 — pod billed per-minute.
+  // 720p-class only (dims from aspect ratio); duration snaps to 8n+1 frames @ 24fps.
+  'box-ltx-t2v':     { cat:'t2v', label:'LTX 10Eros T2V · Zaor Box', provider:'comfy', box:'ltx-t2v', price:0, verified:true,
+    durations:[3,5,8,10], resolutions:['720p'],
+    buildBody:p=>{
+      const d = ltxDims(p.aspectRatio);
+      return { prompt:p.prompt, negative:null, seed:randomSeed(), width:d.width, height:d.height, frames:ltxFrames(p.duration) };
+    } },
 
   // ─────────── IMAGE EDIT (instruction-based) ───────────
   'qwen2-edit':    { cat:'edit', label:'Qwen 2.0 Edit · WaveSpeed',    provider:'wavespeed', path:'wavespeed-ai/qwen-image-2.0/edit', price:0.03, verified:true,
@@ -2418,6 +2473,13 @@ const MODEL_REGISTRY = {
   'wan27-spicy':       { cat:'i2v', label:'Wan 2.7 Spicy · WaveSpeed',     provider:'wavespeed', path:'alibaba/wan-2.7/image-to-video-spicy', price:0.50, verified:true,
     durations:[5,10,15], resolutions:['720p','1080p'],
     buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,15), aspect_ratio:p.aspectRatio||'16:9', seed:-1 }) },
+  // Zaor Box: LTX-2.3 / 10Eros v1.2 i2v — source image becomes frame 0 (strength 0.9, crop center).
+  'box-ltx-i2v':       { cat:'i2v', label:'LTX 10Eros I2V · Zaor Box', provider:'comfy', box:'ltx-i2v', price:0, verified:true,
+    durations:[3,5,8,10], resolutions:['720p'],
+    buildBody:p=>{
+      const d = ltxDims(p.aspectRatio);
+      return { prompt:p.prompt, negative:null, seed:randomSeed(), image:p.image, width:d.width, height:d.height, frames:ltxFrames(p.duration) };
+    } },
 
   // ─────────── VIDEO EXTEND ───────────
   'aurora-extend':      { cat:'extend', label:'Aurora Extend · WaveSpeed',       provider:'wavespeed', path:'x-ai/grok-imagine-video/video-extend', price:0.35, verified:false,
@@ -2520,6 +2582,87 @@ async function callModel(modelId, params){
 
   // ── Zaor Box (self-hosted ComfyUI on RunPod) ──
   // body = { prompt, negative, width, height, seed } from buildBody (+ seed-lock applied above).
+  if(m.provider==='comfy' && (m.box==='ltx-t2v' || m.box==='ltx-i2v')){
+    // ── Zaor Box LTX video ──
+    // body = { prompt, negative, seed, width, height, frames, image? } from buildBody.
+    const wf = JSON.parse(JSON.stringify(m.box==='ltx-i2v' ? LTX_BOX_I2V_WORKFLOW : LTX_BOX_T2V_WORKFLOW));
+    wf['3'].inputs.text = body.prompt || '';
+    if (body.negative) wf['4'].inputs.text = body.negative;   // null → keep quality-negative default
+    wf['9'].inputs.noise_seed = (body.seed != null && body.seed >= 0) ? body.seed : randomSeed();
+    wf['11'].inputs.width      = body.width  || 1280;
+    wf['11'].inputs.height     = body.height || 736;
+    wf['11'].inputs.num_frames = body.frames || 121;
+
+    if (m.box==='ltx-i2v'){
+      if (!body.image) throw new Error('LTX I2V needs a source image — attach one first.');
+      // Fetch the source (data-URL or https URL) as a blob, then upload to the pod so
+      // the LoadImage node can reference it by filename.
+      let blob;
+      try {
+        blob = await (await fetch(body.image)).blob();
+      } catch(e){
+        throw new Error('LTX I2V: could not read the source image (' + e.message + ')');
+      }
+      const fd = new FormData();
+      fd.append('image', blob, 'zaor_i2v_src_' + Date.now() + '.png');
+      fd.append('overwrite', 'true');
+      let up;
+      try {
+        up = await fetch(`${BOX_URL}/upload/image`, { method:'POST', body: fd });
+      } catch(e){
+        throw new Error('Zaor Box unreachable during image upload — is the pod running? (' + e.message + ')');
+      }
+      if(!up.ok){ const t = await up.text().catch(()=> ''); throw new Error(`Zaor Box image upload failed ${up.status}: ${t.slice(0,200)}`); }
+      const ud = await up.json();
+      wf['16'].inputs.image = (ud.subfolder ? ud.subfolder + '/' : '') + (ud.name || ud.filename);
+    }
+
+    let sub;
+    try {
+      sub = await fetch(`${BOX_URL}/prompt`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ prompt: wf })
+      });
+    } catch(e){
+      throw new Error('Zaor Box unreachable — is the pod running? (' + e.message + ')');
+    }
+    if(!sub.ok){ const t = await sub.text().catch(()=> ''); throw new Error(`Zaor Box error ${sub.status}: ${t.slice(0,300)}`); }
+    const sd = await sub.json();
+    if (sd.node_errors && Object.keys(sd.node_errors).length){
+      throw new Error('Zaor Box rejected the workflow: ' + JSON.stringify(sd.node_errors).slice(0,300));
+    }
+    const pid = sd.prompt_id;
+    if(!pid) throw new Error('Zaor Box: no prompt_id returned: ' + JSON.stringify(sd).slice(0,200));
+
+    let elapsed = 0;
+    while(elapsed < 480000){ // 8 min — warm run is ~1–2 min; a true cold start (~12 min model load) WILL exceed this
+      await new Promise(r=>setTimeout(r,3000)); elapsed += 3000;
+      if(params.isCancelled && params.isCancelled()) throw new Error('Cancelled');
+      let hr;
+      try { hr = await fetch(`${BOX_URL}/history/${pid}`); }
+      catch(e){ continue; }
+      if(!hr.ok) continue;
+      const hd = await hr.json();
+      const entry = hd[pid];
+      if(!entry) continue;
+      const st = entry.status || {};
+      if(st.status_str === 'error'){
+        throw new Error('Zaor Box video failed: ' + JSON.stringify(st.messages || st).slice(0,400));
+      }
+      const o15 = entry.outputs && entry.outputs['15'];
+      const vids = o15 && (o15.videos || o15.images || o15.gifs);   // SaveVideo key varies by build
+      if(vids && vids.length){
+        const v = vids[0];
+        const out = `${BOX_URL}/view?filename=${encodeURIComponent(v.filename)}&subfolder=${encodeURIComponent(v.subfolder || '')}&type=${encodeURIComponent(v.type || 'output')}`;
+        addSpend(modelCost(m, params));
+        return out;
+      }
+      if(st.completed) throw new Error('Zaor Box completed but returned no video: ' + JSON.stringify(entry.outputs || {}).slice(0,300));
+    }
+    throw new Error('Zaor Box video timed out (8 min). First generation after pod start loads ~24GB into VRAM (~12 min) — the pod is likely still finishing; retry in a few minutes and it will run warm (~1 min).');
+  }
+
   if(m.provider==='comfy'){
     const wf = JSON.parse(JSON.stringify(CHROMA_BOX_WORKFLOW));
     wf['748'].inputs.text = body.prompt || '';
