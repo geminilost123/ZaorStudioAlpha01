@@ -1559,6 +1559,7 @@
                 <option value="aurora" selected>Aurora · xAI — $0.05/s</option>
                 <option value="seedance15t2v">Seedance 1.5 T2V · WaveSpeed — from $0.06</option>
                 <option value="wan26t2v">Wan 2.6 · WaveSpeed — ~$0.34/5s</option>
+                <option value="box-ltx-t2v">LTX 10Eros T2V · Zaor Box — Free</option>
               </optgroup>
               <optgroup label="── Animate (needs image) ──">
                 <option value="aurora_i2v">Aurora Animate · xAI — $0.05/s</option>
@@ -1567,6 +1568,7 @@
                 <option value="wan22spicylora">Wan 2.2 Spicy LoRA · WaveSpeed — from $0.20</option>
                 <option value="wan26spicy">Wan 2.7 Spicy · WaveSpeed — from $0.50</option>
                 <option value="ltx23spicy">LTX 2.3 Spicy (+audio) · WaveSpeed — from $0.10</option>
+                <option value="box-ltx-i2v">LTX 10Eros I2V · Zaor Box — Free</option>
               </optgroup>
               <optgroup label="── Extend (needs video) ──">
                 <option value="aurora_extend">Aurora Extend · xAI — $0.05/s</option>
@@ -1939,7 +1941,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.61';
+const APP_VERSION = '1.62';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2432,7 +2434,7 @@ const MODEL_REGISTRY = {
   // Zaor Box: LTX-2.3 / 10Eros v1.2 (Q6_K) on the RunPod pod. price:0 — pod billed per-minute.
   // 720p-class only (dims from aspect ratio); duration snaps to 8n+1 frames @ 24fps.
   'box-ltx-t2v':     { cat:'t2v', label:'LTX 10Eros T2V · Zaor Box', provider:'comfy', box:'ltx-t2v', price:0, verified:true,
-    durations:[3,5,8,10], resolutions:['720p'],
+    durations:[3,5,8,10], resolutions:['720p'], hasRatio:true,
     buildBody:p=>{
       const d = ltxDims(p.aspectRatio);
       return { prompt:p.prompt, negative:null, seed:randomSeed(), width:d.width, height:d.height, frames:ltxFrames(p.duration) };
@@ -2475,7 +2477,7 @@ const MODEL_REGISTRY = {
     buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,15), aspect_ratio:p.aspectRatio||'16:9', seed:-1 }) },
   // Zaor Box: LTX-2.3 / 10Eros v1.2 i2v — source image becomes frame 0 (strength 0.9, crop center).
   'box-ltx-i2v':       { cat:'i2v', label:'LTX 10Eros I2V · Zaor Box', provider:'comfy', box:'ltx-i2v', price:0, verified:true,
-    durations:[3,5,8,10], resolutions:['720p'],
+    durations:[3,5,8,10], resolutions:['720p'], hasRatio:true,
     buildBody:p=>{
       const d = ltxDims(p.aspectRatio);
       return { prompt:p.prompt, negative:null, seed:randomSeed(), image:p.image, width:d.width, height:d.height, frames:ltxFrames(p.duration) };
@@ -3529,7 +3531,7 @@ document.getElementById('upscale-btn')?.addEventListener('click', async () => {
 
 // ── Video engine classification (v1.56) ──
 // T2V engines take no source; Animate (I2V) needs a pinned image; Extend needs a pinned video.
-const VIDEO_T2V_ENGINES    = ['aurora', 'seedance15t2v', 'wan26t2v'];
+const VIDEO_T2V_ENGINES    = ['aurora', 'seedance15t2v', 'wan26t2v', 'box-ltx-t2v'];
 const VIDEO_EXTEND_ENGINES = ['aurora_extend', 'wan27extend', 'wan22spicy_extend'];
 function videoEngineKind(engine) {
   if (VIDEO_EXTEND_ENGINES.includes(engine)) return 'extend';
@@ -4175,11 +4177,17 @@ async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUr
 
   // Aurora always uses xAI directly; all other Wan/Seedance/LTX models use WaveSpeed directly.
   // Aurora (xAI direct) handles its T2V, Animate (I2V), and Extend variants; everything else → WaveSpeed.
+  // Zaor Box (self-hosted ComfyUI/LTX) is a third path — routes through the MODEL_REGISTRY/callModel
+  // dispatcher, not WaveSpeed or xAI, and needs no API key at all.
   const AURORA_ENGINES = ['aurora', 'aurora_i2v', 'aurora_extend'];
-  const useWaveSpeed = !AURORA_ENGINES.includes(engine);
+  const registryEngine = MODEL_REGISTRY[engine];
+  const useZaorBox = !!(registryEngine && registryEngine.provider === 'comfy');
+  const useWaveSpeed = !AURORA_ENGINES.includes(engine) && !useZaorBox;
 
   try {
-    if (useWaveSpeed) {
+    if (useZaorBox) {
+      await generateVideoZaorBox(prompt, imageDataUrl, engine, progressId, () => cancelled, durationOverride, resOverride);
+    } else if (useWaveSpeed) {
       if (!wavespeedKey) throw new Error('WaveSpeed API key required for Wan models. Tap "Set API Key" to add it.');
       await generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engine, progressId, () => cancelled, durationOverride, resOverride);
     } else {
@@ -4358,6 +4366,39 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
     const vidLabel = engineLabels[engine] || engine;
     addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: vidLabel, storedDuration: duration, storedRes: res });
     renderVideo(videoUrl, prompt, true, vidLabel, duration, res);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// ZAOR BOX VIDEO (self-hosted ComfyUI / LTX-2.3 10Eros) — video-mode GUI entry point.
+// Unlike Aurora/WaveSpeed above, this doesn't build its own request: it hands off to the
+// shared MODEL_REGISTRY entry (box-ltx-t2v / box-ltx-i2v) via callModel(), which already
+// contains the full submit/upload/poll logic for the pod. No API key needed — BOX_URL only.
+// ═══════════════════════════════════════════════════════
+async function generateVideoZaorBox(prompt, imageDataUrl, engine, progressId, isCancelled, durationOverride = null, resOverride = null) {
+  const m = MODEL_REGISTRY[engine];
+  if (!m) throw new Error('Unknown Zaor Box engine: ' + engine);
+  if (m.box === 'ltx-i2v' && !imageDataUrl) {
+    throw new Error('This Zaor Box engine needs a source image. Tap an image in the thread to pin it, then send.');
+  }
+
+  const _dur = durationOverride != null ? parseInt(durationOverride) : parseInt(document.getElementById('vid-duration-select')?.value);
+  const duration = (!isNaN(_dur) && _dur > 0) ? _dur : (m.durations ? m.durations[0] : 5);
+  const ratio = document.getElementById('vid-ratio-select')?.value || '16:9';
+  const res = resOverride || document.getElementById('vid-res-select')?.value || '720p';
+
+  const videoUrl = await callModel(engine, {
+    prompt,
+    image: imageDataUrl || undefined,
+    duration,
+    aspectRatio: ratio,
+    isCancelled
+  });
+
+  removeVideoProgress(progressId);
+  if (videoUrl) {
+    addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: m.label, storedDuration: duration, storedRes: res });
+    renderVideo(videoUrl, prompt, true, m.label, duration, res);
   }
 }
 
@@ -7123,7 +7164,7 @@ function applyModelConstraints(engine, durEl, resEl, ratioEl, isExtend, useDefau
   if (!c && MODEL_REGISTRY[engine] && MODEL_REGISTRY[engine].durations) {
     const rm = MODEL_REGISTRY[engine];
     const rs = rm.resolutions || ['720p'];
-    c = { durations: rm.durations, resolutions: rs, hasRatio: false, maxDur: Math.max.apply(null, rm.durations), defaultDur: rm.durations[0], defaultRes: rs[0] };
+    c = { durations: rm.durations, resolutions: rs, hasRatio: !!rm.hasRatio, maxDur: Math.max.apply(null, rm.durations), defaultDur: rm.durations[0], defaultRes: rs[0] };
   }
   c = c || MODEL_CONSTRAINTS['aurora'];
 
@@ -7188,6 +7229,9 @@ function estimateVideoCost(engine, duration, res) {
     }
     case 'wan27extend':                  // Wan 2.7 extend (approx base)
       return `~$${(0.10 * d).toFixed(2)}`;
+    case 'box-ltx-t2v':                  // Zaor Box: self-hosted pod, billed per-minute not per-clip
+    case 'box-ltx-i2v':
+      return 'Free';
     default:
       return '~$?';
   }
