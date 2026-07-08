@@ -1941,7 +1941,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.67';
+const APP_VERSION = '1.68';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -5436,6 +5436,12 @@ const PROMPT_LIBRARY = [
   { type:'video', cat:'LTX 2.3', title:'LTX animate (I2V)', text:'[One specific motion of the subject], [secondary motion — hair, fabric, light shifting]. The camera [plain-language move]. Sound: [ambient tone], [specific effects], [any music]. Describe only the motion, light changes and sound — not the static scene that is already in the frame.' },
   { type:'modifier', cat:'LTX 2.3', title:'LTX sound design', text:'Sound: [room tone / outdoor ambience], [specific effects — e.g. footsteps on gravel, a door creak], [music: genre + how it plays softly/loudly], [dialogue if any]. Keep audio cues concrete — LTX generates them natively.' },
   { type:'modifier', cat:'LTX 2.3', title:'LTX rules (read me)', text:'LTX 2.3 tips: write flowing prose, never "Subject:/Camera:" fields · structure first (clear subject + one specific action + setting), style words last · use concrete motion verbs ("hands moving with practiced precision") · ALWAYS describe the audio (LTX makes sound) · for image-to-video describe only motion/light/sound, not the static frame.' },
+  // ── Seedance 1.5 Pro (one action per shot, explicit camera verbs, "Cut to" multi-shot, state what stays consistent) ──
+  { type:'video', cat:'Seedance 1.5', title:'Seedance cinematic shot (T2V)', text:'[Subject] [one clear action] in [setting], [time of day]. Camera: [dolly in / tracking shot / crane up / handheld follow]. [Lighting and mood], cinematic color grade, smooth realistic motion.' },
+  { type:'video', cat:'Seedance 1.5', title:'Seedance multi-shot sequence (T2V)', text:'Shot 1: [subject + action + framing]. Cut to Shot 2: [new angle or moment, same subject]. Cut to Shot 3: [closing beat]. Keep the same character, wardrobe, and lighting across all shots. [Overall mood / color grade].' },
+  { type:'video', cat:'Seedance 1.5', title:'Seedance animate (I2V)', text:'[Subject in frame] [one clear motion], [secondary motion — hair, fabric, ambient detail]. Camera [move in plain language]. Preserve the appearance and lighting of the input image. [Pacing: calm and steady / dynamic].' },
+  { type:'video', cat:'Seedance 1.5', title:'Seedance wardrobe change (I2V)', text:'The subject\'s [current outfit] transforms into [new outfit] in one smooth transition, [transition style: seamless morph / camera whips past and back / subject walks behind an object and emerges changed]. Keep the same face, hair, body, pose, and background throughout. Lighting stays unchanged.' },
+  { type:'modifier', cat:'Seedance 1.5', title:'Seedance rules (read me)', text:'Seedance 1.5 tips: ONE clear action per shot · use explicit camera verbs (dolly, crane, orbit, whip pan, handheld) — it follows camera language closely · chain shots with "Cut to" for multi-shot sequences · always state what stays consistent across cuts (character, wardrobe, lighting) · up to 12s fits 2-3 shots · phrase positively, no "don\'t/avoid".' },
   // ── Video (Wan/Seedance/Aurora: subject → motion → camera → scene, lead with subject+motion) ──
   { type:'video', cat:'Motion (I2V)', title:'Subtle natural motion', text:'[subject] [one small natural motion], camera slowly pushes in, [ambient detail] drifts gently, soft natural lighting, calm and steady pacing' },
   { type:'video', cat:'Motion (T2V)', title:'Single clear action', text:'[subject] [one clear action in present tense], camera [tracks alongside / orbits slowly], [environment], [lighting], smooth cinematic motion' },
