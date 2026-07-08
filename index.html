@@ -1941,7 +1941,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.66';
+const APP_VERSION = '1.67';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -5693,11 +5693,21 @@ const DEFAULT_LORAS = [
   { id:90012, name:'DR34ML4Y AIO NSFW (HIGH)', url:'https://huggingface.co/yeqiu168182/DR34ML4Y_I2V_14B_HIGH/resolve/main/DR34ML4Y_I2V_14B_HIGH.safetensors', trigger:'', base:'Wan', noise:'high', category:'realism', scale:1.0, notes:'Wan 2.2 all-in-one NSFW · high-noise half. Activate together with the LOW half.', active:false },
   { id:90013, name:'DR34ML4Y AIO NSFW (LOW)',  url:'https://huggingface.co/yeqiu168182/DR34ML4Y_I2V_14B_LOW/resolve/main/DR34ML4Y_I2V_14B_LOW.safetensors',  trigger:'', base:'Wan', noise:'low',  category:'realism', scale:1.0, notes:'Wan 2.2 all-in-one NSFW · low-noise half. Activate together with the HIGH half.', active:false }
 ];
+// Versioned seeding: bump LORA_SEED_VER whenever DEFAULT_LORAS changes so new
+// defaults merge into existing libraries (merge is by URL; user entries untouched).
+const LORA_SEED_VER = '2';
 try {
-  if (localStorage.getItem('zaor_loras_seeded') !== '1') {
+  // Migrate old SNOFS entry (glitchy civitai.red link) to the HF v1.4 mirror in place.
+  zaorLoras.forEach(l => {
+    if ((l.url || '').includes('civitai.red/api/download/models/2960556')) {
+      l.url = 'https://huggingface.co/MarriedGeekGuy/flux-klein-lora-sex-nudes-other-fun-stuff-snofs-klein-9b-v1-4/resolve/main/klein_snofs_v1_4.safetensors';
+      l.notes = 'NSFW training · high flexibility · v1.4 via HF mirror';
+    }
+  });
+  if (localStorage.getItem('zaor_loras_seed_ver') !== LORA_SEED_VER) {
     const haveUrls = new Set(zaorLoras.map(l => l.url));
     DEFAULT_LORAS.forEach(d => { if (!haveUrls.has(d.url)) zaorLoras.push({ ...d }); });
-    localStorage.setItem('zaor_loras_seeded', '1');
+    localStorage.setItem('zaor_loras_seed_ver', LORA_SEED_VER);
     try { localStorage.setItem('zaor_loras', JSON.stringify(zaorLoras)); } catch(e) {}
   }
 } catch(e) {}
