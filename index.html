@@ -1941,7 +1941,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.63';
+const APP_VERSION = '1.66';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -4310,10 +4310,15 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
     // I2V
     if (engine === 'wan22spicylora') {
       // Wan 2.2 Spicy Image-to-Video LoRA — applies your active "Wan"-tagged LoRAs (up to 3).
+      // Entries with noise:'high'/'low' route to the matching expert; others go in the global slot.
       modelPath = 'wavespeed-ai/wan-2.2-spicy/image-to-video-lora';
-      const wanLoras = activeLoras().filter(l => l.base === 'Wan').slice(0,3).map(l => ({ path: l.url, scale: Number(l.scale) || 1 }));
-      body = { prompt, image: imageDataUrl, resolution: res, duration: (duration === 8 ? 8 : 5), seed: -1, enable_safety_checker: false, loras: wanLoras };
-      if (!wanLoras.length) appendError('Tip: no Wan LoRAs are active — tap 🧬, add/tick a LoRA tagged "Wan", or this animates as plain Wan 2.2 Spicy.');
+      const _wanAll = activeLoras().filter(l => l.base === 'Wan').slice(0,3);
+      const _mapL = a => a.map(l => ({ path: l.url, scale: Number(l.scale) || 1 }));
+      const wanLoras     = _mapL(_wanAll.filter(l => !l.noise));
+      const wanLorasHigh = _mapL(_wanAll.filter(l => l.noise === 'high'));
+      const wanLorasLow  = _mapL(_wanAll.filter(l => l.noise === 'low'));
+      body = { prompt, image: imageDataUrl, resolution: res, duration: (duration === 8 ? 8 : 5), seed: -1, enable_safety_checker: false, loras: wanLoras, high_noise_loras: wanLorasHigh, low_noise_loras: wanLorasLow };
+      if (!_wanAll.length) appendError('Tip: no Wan LoRAs are active — tap 🧬, add/tick a LoRA tagged "Wan", or this animates as plain Wan 2.2 Spicy.');
     } else if (engine === 'seedance15spicy') {
       modelPath = 'bytedance/seedance-v1.5-pro/image-to-video-spicy';
       body = { prompt, image: imageDataUrl, resolution: res, duration: Math.min(duration, 12), aspect_ratio: ratio, generate_audio: false, seed: -1 };
@@ -5680,9 +5685,13 @@ const DEFAULT_LORAS = [
   { id:90002, name:'Z-Image-Turbo-Anime', url:'https://civitai.com/api/download/models/2543657', trigger:'', base:'Z-Image',     category:'style',   scale:0.85, notes:'Foundational anime style for turbo', active:false },
   { id:90003, name:'Z-IMAGE ANIME - ILL', url:'https://civitai.com/api/download/models/2463859', trigger:'', base:'Z-Image',     category:'style',   scale:0.85, notes:'High-contrast digital illustration', active:false },
   { id:90005, name:'samdoearts',          url:'https://civitai.com/api/download/models/2541753', trigger:'', base:'Z-Image',     category:'style',   scale:0.85, notes:'Semi-realistic 3D-cartoon digital painting', active:false },
-  { id:90006, name:'SNOFS (Klein 9B)',    url:'https://civitai.red/api/download/models/2960556?fileId=2839878', trigger:'', base:'Flux2-Klein', category:'realism', scale:0.90, notes:'NSFW training · high flexibility', active:false },
+  { id:90006, name:'SNOFS (Klein 9B)',    url:'https://huggingface.co/MarriedGeekGuy/flux-klein-lora-sex-nudes-other-fun-stuff-snofs-klein-9b-v1-4/resolve/main/klein_snofs_v1_4.safetensors', trigger:'', base:'Flux2-Klein', category:'realism', scale:0.90, notes:'NSFW training · high flexibility · v1.4 via HF mirror', active:false },
   { id:90007, name:'Lenovo styles real',  url:'https://civitai.com/api/download/models/2545735', trigger:'', base:'Flux2-Klein', category:'realism', scale:0.85, notes:'Highly realistic details for Klein', active:false },
-  { id:90009, name:'Anatomy fixer (slider)', url:'https://civitai.com/api/download/models/2615554?fileId=2502989', trigger:'', base:'Flux2-Klein', category:'realism', scale:2.0, notes:'Klein anatomy/quality slider. No trigger — works by WEIGHT only. Use ~2.0 for minor fixes, up to 3.0 for bigger artifacts. Negative weights make anatomy WORSE. Far stronger than normal LoRAs.', active:false }
+  { id:90009, name:'Anatomy fixer (slider)', url:'https://civitai.com/api/download/models/2615554?fileId=2502989', trigger:'', base:'Flux2-Klein', category:'realism', scale:2.0, notes:'Klein anatomy/quality slider. No trigger — works by WEIGHT only. Use ~2.0 for minor fixes, up to 3.0 for bigger artifacts. Negative weights make anatomy WORSE. Far stronger than normal LoRAs.', active:false },
+  { id:90010, name:'Ultra Real Klein 9B V4', url:'https://civitai.com/api/download/models/2846977?fileId=2733052', trigger:'This is a high-quality photograph of a', base:'Flux2-Klein', category:'realism', scale:0.75, notes:'Anti-plastic skin + NSFW detailing (V4). Gen weight 0.7–0.8; for edits use 0.55.', active:false },
+  { id:90011, name:'InstaPic Ultrareal (Klein)', url:'https://civitai.com/api/download/models/2912461', trigger:'instapic, detailed skin, capture from phone', base:'Flux2-Klein', category:'style', scale:1.0, notes:'Raw smartphone/social-media style layer. Strength 0.8–1.2, start 1.0. Stacks well with realism LoRAs.', active:false },
+  { id:90012, name:'DR34ML4Y AIO NSFW (HIGH)', url:'https://huggingface.co/yeqiu168182/DR34ML4Y_I2V_14B_HIGH/resolve/main/DR34ML4Y_I2V_14B_HIGH.safetensors', trigger:'', base:'Wan', noise:'high', category:'realism', scale:1.0, notes:'Wan 2.2 all-in-one NSFW · high-noise half. Activate together with the LOW half.', active:false },
+  { id:90013, name:'DR34ML4Y AIO NSFW (LOW)',  url:'https://huggingface.co/yeqiu168182/DR34ML4Y_I2V_14B_LOW/resolve/main/DR34ML4Y_I2V_14B_LOW.safetensors',  trigger:'', base:'Wan', noise:'low',  category:'realism', scale:1.0, notes:'Wan 2.2 all-in-one NSFW · low-noise half. Activate together with the HIGH half.', active:false }
 ];
 try {
   if (localStorage.getItem('zaor_loras_seeded') !== '1') {
@@ -5951,7 +5960,7 @@ document.getElementById('lora-import')?.addEventListener('click', () => {
   let added = 0;
   arr.forEach(l => {
     if (l && l.url && !have.has(l.url)) {
-      zaorLoras.push({ id: l.id || (Date.now() + Math.random()), name: l.name || 'Untitled', url: l.url, trigger: l.trigger || '', scale: l.scale || 1, base: l.base || 'Other', category: l.category || (l.base === 'Z-Image' ? 'style' : 'realism'), notes: l.notes || '', active: false });
+      zaorLoras.push({ id: l.id || (Date.now() + Math.random()), name: l.name || 'Untitled', url: l.url, trigger: l.trigger || '', scale: l.scale || 1, base: l.base || 'Other', noise: l.noise || undefined, category: l.category || (l.base === 'Z-Image' ? 'style' : 'realism'), notes: l.notes || '', active: false });
       have.add(l.url); added++;
     }
   });
