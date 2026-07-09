@@ -1943,7 +1943,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.72';
+const APP_VERSION = '1.74';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2408,10 +2408,18 @@ const MODEL_REGISTRY = {
     } },
   // Zaor Box: Flux.2 Klein 9B True-V3, self-hosted t2i on the pod. price:0 — pod billed
   // per-minute, not per-image. Uses KLEIN_BOX_WORKFLOW + kleinDims() defined above.
-  'box-klein':      { cat:'t2img', label:'Flux.2 Klein 9B · Zaor Box', provider:'comfy', box:'klein', price:0, verified:true,
+  // lora:true (v1.74) — reuses the same LoRA picker as klein9b-lora (WaveSpeed), but only
+  // entries with a boxFile (actually downloaded to the pod's loras/ folder) can be applied
+  // locally; others are silently dropped here (see generateImage's box-klein warning).
+  'box-klein':      { cat:'t2img', label:'Flux.2 Klein 9B · Zaor Box', provider:'comfy', box:'klein', price:0, verified:true, lora:true, loraBase:'Flux2-Klein',
     buildBody:p=>{
       const d = kleinDims(p.aspectRatio);
-      return { prompt:p.prompt, negative:null, seed:randomSeed(), width:d.width, height:d.height };
+      const body = { prompt:p.prompt, negative:null, seed:randomSeed(), width:d.width, height:d.height };
+      if (p.loras && p.loras.length){
+        const onBox = p.loras.filter(l => l.boxFile).slice(0,3);
+        if (onBox.length) body.loras = onBox.map(l => ({ file:l.boxFile, scale:Number(l.scale)||1 }));
+      }
+      return body;
     } },
   'klein9b-lora':   { cat:'t2img', label:'Flux.2 Klein 9B · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/flux-2-klein-9b/text-to-image-lora', price:0.015, verified:true, lora:true, loraBase:'Flux2-Klein',
     buildBody:p=>{
@@ -2716,6 +2724,21 @@ async function callModel(modelId, params){
     wf['7'].inputs.height = body.height || 1024;
     wf['8'].inputs.width  = body.width  || 1024;
     wf['8'].inputs.height = body.height || 1024;
+
+    // LoRA chain (v1.74): each active LoRA becomes a LoraLoaderModelOnly node,
+    // chained model→model, starting from the UNETLoader (node 1). Node ids
+    // 100+ to stay clear of the fixed template's 1–13. CFGGuider (node 10)
+    // gets repointed to the tail of the chain — or stays on node 1 untouched
+    // if no LoRAs are active.
+    if (body.loras && body.loras.length){
+      let modelSrc = ["1", 0];
+      body.loras.forEach((l, i) => {
+        const nid = String(100 + i);
+        wf[nid] = { class_type: "LoraLoaderModelOnly", inputs: { model: modelSrc, lora_name: l.file, strength_model: Number(l.scale) || 1 } };
+        modelSrc = [nid, 0];
+      });
+      wf['10'].inputs.model = modelSrc;
+    }
 
     let sub;
     try {
@@ -4136,7 +4159,7 @@ async function generateImage(prompt) {
       // Wrong-base LoRAs are NOT applied — only matching-base (or untagged/"Other") ones.
       const matching = act.filter(l => !l.base || l.base === 'Other' || l.base === m.loraBase);
       const skipped = act.filter(l => matching.indexOf(l) === -1);
-      callParams.loras = matching.map(l => ({ path: l.url, scale: Number(l.scale) || 1 }));
+      callParams.loras = matching.map(l => ({ path: l.url, scale: Number(l.scale) || 1, boxFile: l.boxFile || null }));
       // NOTE: trigger words are no longer injected here — they already live in the visible
       // prompt box (added when the LoRA is toggled on, and removable by the user). What you
       // see in the prompt is exactly what's sent.
@@ -4147,6 +4170,8 @@ async function generateImage(prompt) {
       }
       if (!matching.length) {
         appendError('Tip: no ' + (m.loraBase || 'matching') + ' LoRAs are active — tap 🧬 and tick one, or this generates as plain ' + (m.loraBase || 'base') + '.');
+      } else if (m.provider === 'comfy' && m.box === 'klein' && !callParams.loras.some(l => l.boxFile)) {
+        appendError('None of the active LoRAs are downloaded to the Zaor Box yet (only WaveSpeed-hosted) — generating plain Klein 9B without LoRAs.');
       }
     }
 
@@ -5727,17 +5752,16 @@ const DEFAULT_LORAS = [
   { id:90002, name:'Z-Image-Turbo-Anime', url:'https://civitai.com/api/download/models/2543657', trigger:'', base:'Z-Image',     category:'style',   scale:0.85, notes:'Foundational anime style for turbo', active:false },
   { id:90003, name:'Z-IMAGE ANIME - ILL', url:'https://civitai.com/api/download/models/2463859', trigger:'', base:'Z-Image',     category:'style',   scale:0.85, notes:'High-contrast digital illustration', active:false },
   { id:90005, name:'samdoearts',          url:'https://civitai.com/api/download/models/2541753', trigger:'', base:'Z-Image',     category:'style',   scale:0.85, notes:'Semi-realistic 3D-cartoon digital painting', active:false },
-  { id:90006, name:'SNOFS (Klein 9B)',    url:'https://huggingface.co/MarriedGeekGuy/flux-klein-lora-sex-nudes-other-fun-stuff-snofs-klein-9b-v1-4/resolve/main/klein_snofs_v1_4.safetensors', trigger:'', base:'Flux2-Klein', category:'realism', scale:0.90, notes:'NSFW training · high flexibility · v1.4 via HF mirror', active:false },
-  { id:90007, name:'Lenovo styles real',  url:'https://civitai.com/api/download/models/2545735', trigger:'', base:'Flux2-Klein', category:'realism', scale:0.85, notes:'Highly realistic details for Klein', active:false },
-  { id:90009, name:'Anatomy fixer (slider)', url:'https://civitai.com/api/download/models/2615554?fileId=2502989', trigger:'', base:'Flux2-Klein', category:'realism', scale:2.0, notes:'Klein anatomy/quality slider. No trigger — works by WEIGHT only. Use ~2.0 for minor fixes, up to 3.0 for bigger artifacts. Negative weights make anatomy WORSE. Far stronger than normal LoRAs.', active:false },
-  { id:90010, name:'Ultra Real Klein 9B V4', url:'https://civitai.com/api/download/models/2846977?fileId=2733052', trigger:'This is a high-quality photograph of a', base:'Flux2-Klein', category:'realism', scale:0.75, notes:'Anti-plastic skin + NSFW detailing (V4). Gen weight 0.7–0.8; for edits use 0.55.', active:false },
-  { id:90011, name:'InstaPic Ultrareal (Klein)', url:'https://civitai.com/api/download/models/2912461', trigger:'instapic, detailed skin, capture from phone', base:'Flux2-Klein', category:'style', scale:1.0, notes:'Raw smartphone/social-media style layer. Strength 0.8–1.2, start 1.0. Stacks well with realism LoRAs.', active:false },
+  { id:90006, name:'SNOFS (Klein 9B)',    url:'https://huggingface.co/MarriedGeekGuy/flux-klein-lora-sex-nudes-other-fun-stuff-snofs-klein-9b-v1-4/resolve/main/klein_snofs_v1_4.safetensors', trigger:'', base:'Flux2-Klein', category:'realism', scale:0.90, notes:'NSFW training · high flexibility · v1.4 via HF mirror', active:false, boxFile:'klein_snofs_v1_4.safetensors' },
+  { id:90009, name:'Anatomy fixer (slider)', url:'https://civitai.com/api/download/models/2615554?fileId=2502989', trigger:'', base:'Flux2-Klein', category:'realism', scale:2.0, notes:'Klein anatomy/quality slider. No trigger — works by WEIGHT only. Use ~2.0 for minor fixes, up to 3.0 for bigger artifacts. Negative weights make anatomy WORSE. Far stronger than normal LoRAs.', active:false, boxFile:'klein_anatomy_fixer.safetensors' },
+  { id:90010, name:'Ultra Real Klein 9B V4', url:'https://civitai.com/api/download/models/2846977?fileId=2733052', trigger:'This is a high-quality photograph of a', base:'Flux2-Klein', category:'realism', scale:0.75, notes:'Anti-plastic skin + NSFW detailing (V4). Gen weight 0.7–0.8; for edits use 0.55.', active:false, boxFile:'klein_ultra_real_v4.safetensors' },
+  { id:90011, name:'InstaPic Ultrareal (Klein)', url:'https://civitai.com/api/download/models/2912461', trigger:'instapic, detailed skin, capture from phone', base:'Flux2-Klein', category:'style', scale:1.0, notes:'Raw smartphone/social-media style layer. Strength 0.8–1.2, start 1.0. Stacks well with realism LoRAs.', active:false, boxFile:'klein_instapic_ultrareal.safetensors' },
   { id:90012, name:'DR34ML4Y AIO NSFW (HIGH)', url:'https://huggingface.co/yeqiu168182/DR34ML4Y_I2V_14B_HIGH/resolve/main/DR34ML4Y_I2V_14B_HIGH.safetensors', trigger:'', base:'Wan', noise:'high', category:'realism', scale:1.0, notes:'Wan 2.2 all-in-one NSFW · high-noise half. Activate together with the LOW half.', active:false },
   { id:90013, name:'DR34ML4Y AIO NSFW (LOW)',  url:'https://huggingface.co/yeqiu168182/DR34ML4Y_I2V_14B_LOW/resolve/main/DR34ML4Y_I2V_14B_LOW.safetensors',  trigger:'', base:'Wan', noise:'low',  category:'realism', scale:1.0, notes:'Wan 2.2 all-in-one NSFW · low-noise half. Activate together with the HIGH half.', active:false }
 ];
 // Versioned seeding: bump LORA_SEED_VER whenever DEFAULT_LORAS changes so new
 // defaults merge into existing libraries (merge is by URL; user entries untouched).
-const LORA_SEED_VER = '2';
+const LORA_SEED_VER = '3';
 try {
   // Migrate old SNOFS entry (glitchy civitai.red link) to the HF v1.4 mirror in place.
   zaorLoras.forEach(l => {
@@ -5746,12 +5770,24 @@ try {
       l.notes = 'NSFW training · high flexibility · v1.4 via HF mirror';
     }
   });
+  // Purge the mismatched "Lenovo styles real" entry (id 90007) — its Civitai
+  // versionId actually resolves to an unrelated ZImageTurbo LoRA, not a Klein
+  // resource at all. Removed from DEFAULT_LORAS in v1.72; this line clears it
+  // from any device that already seeded the old (wrong) entry.
+  zaorLoras = zaorLoras.filter(l => l.url !== 'https://civitai.com/api/download/models/2545735');
+  // Backfill boxFile onto already-seeded entries (v1.74) — DEFAULT_LORAS objects
+  // added below only apply to *new* seeds; existing devices carry copies made
+  // before boxFile existed, so patch them in place by matching URL.
+  const boxFileByUrl = new Map(DEFAULT_LORAS.filter(d => d.boxFile).map(d => [d.url, d.boxFile]));
+  zaorLoras.forEach(l => {
+    if (!l.boxFile && boxFileByUrl.has(l.url)) l.boxFile = boxFileByUrl.get(l.url);
+  });
   if (localStorage.getItem('zaor_loras_seed_ver') !== LORA_SEED_VER) {
     const haveUrls = new Set(zaorLoras.map(l => l.url));
     DEFAULT_LORAS.forEach(d => { if (!haveUrls.has(d.url)) zaorLoras.push({ ...d }); });
     localStorage.setItem('zaor_loras_seed_ver', LORA_SEED_VER);
-    try { localStorage.setItem('zaor_loras', JSON.stringify(zaorLoras)); } catch(e) {}
   }
+  try { localStorage.setItem('zaor_loras', JSON.stringify(zaorLoras)); } catch(e) {}
 } catch(e) {}
 // Backfill a category on any older entries that lack one.
 zaorLoras.forEach(l => { if (!l.category) l.category = (l.base === 'Z-Image' ? 'style' : 'realism'); });
