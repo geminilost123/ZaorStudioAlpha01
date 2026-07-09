@@ -1680,6 +1680,8 @@
     <input type="text" id="cloudinary-cloud-input" placeholder="your-cloud-name" autocomplete="off" spellcheck="false" />
     <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Cloudinary — unsigned upload preset</label>
     <input type="text" id="cloudinary-preset-input" placeholder="unsigned preset name" autocomplete="off" spellcheck="false" />
+    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Zaor Box URL (RunPod pod — changes on redeploy)</label>
+    <input type="text" id="box-url-input" placeholder="https://<pod-id>-8188.proxy.runpod.net" autocomplete="off" spellcheck="false" autocapitalize="off" />
     <div style="border-top:1px solid rgba(255,255,255,0.1);margin-top:8px;padding-top:12px;">
       <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Storage</label>
       <div id="storage-usage-modal" style="font-size:12px;color:var(--text-dim);margin-bottom:8px;"></div>
@@ -1941,7 +1943,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.68';
+const APP_VERSION = '1.70';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2267,33 +2269,16 @@ let lastAtlasRaw = ''; // captured raw Atlas response for on-screen debugging
 // ═══════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════
 // ZAOR BOX (v1.60) — self-hosted ComfyUI on RunPod
-// BOX_URL is derived from the pod ID, so it survives stop/start cycles.
+// BOX_URL is editable in Settings (v1.70) — pod IDs change on every redeploy, so it's
+// stored in localStorage ('zaor_box_url') with the latest pod as the shipped default.
+// Empty/unset → falls back to DEFAULT_BOX_URL below.
 // The pod must be RUNNING, and ComfyUI must be launched with
 // --enable-cors-header, or browser fetches from GitHub Pages will be blocked.
-// CHROMA_BOX_WORKFLOW is the API-format export of the ComfyUI Chroma template.
-// Injection points (see the 'comfy' provider branch in callModel):
-//   748 = positive prompt · 749 = negative prompt · 718 = seed · 737 = width/height
-// Frozen for v1.60: cfg 3.5 (node 694) · steps 26 (node 734) · euler/beta sampler
+// Used by the LTX video engines (box-ltx-t2v / box-ltx-i2v). The Chroma HD
+// image path was removed in v1.69 — Klein 9B will replace it as the box t2i engine.
 // ═══════════════════════════════════════════════════════
-const BOX_URL = 'https://k2ncdj8aru10h4-8188.proxy.runpod.net';
-
-const CHROMA_BOX_WORKFLOW = {
-  "298": { "inputs": { "samples": ["747", 0], "vae": ["710", 0] }, "class_type": "VAEDecode" },
-  "694": { "inputs": { "cfg": 3.5, "model": ["701", 0], "positive": ["748", 0], "negative": ["749", 0] }, "class_type": "CFGGuider" },
-  "700": { "inputs": { "sampler_name": "euler" }, "class_type": "KSamplerSelect" },
-  "701": { "inputs": { "shift": 1, "model": ["731", 0] }, "class_type": "ModelSamplingAuraFlow" },
-  "710": { "inputs": { "vae_name": "ae.safetensors" }, "class_type": "VAELoader" },
-  "718": { "inputs": { "noise_seed": 0 }, "class_type": "RandomNoise" },
-  "731": { "inputs": { "unet_name": "Chroma1-HD.safetensors", "weight_dtype": "default" }, "class_type": "UNETLoader" },
-  "733": { "inputs": { "clip_name": "t5xxl_fp8_e4m3fn.safetensors", "type": "chroma", "device": "default" }, "class_type": "CLIPLoader" },
-  "734": { "inputs": { "scheduler": "beta", "steps": 26, "denoise": 1, "model": ["701", 0] }, "class_type": "BasicScheduler" },
-  "737": { "inputs": { "width": 1024, "height": 1024, "batch_size": 1 }, "class_type": "EmptySD3LatentImage" },
-  "740": { "inputs": { "filename_prefix": "ZaorBox", "images": ["298", 0] }, "class_type": "SaveImage" },
-  "741": { "inputs": { "min_padding": 0, "min_length": 0, "clip": ["733", 0] }, "class_type": "T5TokenizerOptions" },
-  "747": { "inputs": { "noise": ["718", 0], "guider": ["694", 0], "sampler": ["700", 0], "sigmas": ["734", 0], "latent_image": ["737", 0] }, "class_type": "SamplerCustomAdvanced" },
-  "748": { "inputs": { "text": "", "clip": ["741", 0] }, "class_type": "CLIPTextEncode" },
-  "749": { "inputs": { "text": "This low quality greyscale unfinished sketch is inaccurate and flawed. The image is very blurred and lacks detail with excessive chromatic aberrations and artifacts. The image is overly saturated with excessive bloom. It has a toony aesthetic with bold outlines and flat colors. ", "clip": ["741", 0] }, "class_type": "CLIPTextEncode" }
-};
+const DEFAULT_BOX_URL = 'https://63998xwntutlxy-8188.proxy.runpod.net';
+let BOX_URL = (localStorage.getItem('zaor_box_url') || DEFAULT_BOX_URL).replace(/\/+$/, '');
 
 // ═══════════════════════════════════════════════════════
 // ZAOR BOX VIDEO (v1.61, refine pass added v1.63) — LTX-2.3 / 10Eros v1.2 Q6_K GGUF, fully local encoding.
@@ -2377,13 +2362,8 @@ const MODEL_REGISTRY = {
     buildBody:p=>{
       return { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, output_format:'png', enable_base64_output:false, enable_sync_mode:false };
     } },
-  // Zaor Box: self-hosted Chroma1-HD on the RunPod pod. price:0 — pod time is billed
-  // by RunPod per-minute, not per-image. Seed field present → seed-lock works here.
-  'box-chroma':     { cat:'t2img', label:'Chroma HD · Zaor Box', provider:'comfy', price:0, verified:true,
-    buildBody:p=>{
-      const parts = wsSize(p.aspectRatio, p.resolution).split('*');
-      return { prompt:p.prompt, negative:null, width:parseInt(parts[0],10)||1024, height:parseInt(parts[1],10)||1024, seed:randomSeed() };
-    } },
+  // Zaor Box t2i slot is vacant — Chroma HD removed in v1.69. Klein 9B (self-hosted)
+  // will be wired here in a later pass. LTX video engines still use the box via BOX_URL.
   'klein9b-lora':   { cat:'t2img', label:'Flux.2 Klein 9B · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/flux-2-klein-9b/text-to-image-lora', price:0.015, verified:true, lora:true, loraBase:'Flux2-Klein',
     buildBody:p=>{
       const b = { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, enable_safety_checker:false, enable_base64_output:false };
@@ -2673,59 +2653,9 @@ async function callModel(modelId, params){
     throw new Error('Zaor Box video timed out (8 min). First generation after pod start loads ~24GB into VRAM (~12 min) — the pod is likely still finishing; retry in a few minutes and it will run warm (~1 min).');
   }
 
-  if(m.provider==='comfy'){
-    const wf = JSON.parse(JSON.stringify(CHROMA_BOX_WORKFLOW));
-    wf['748'].inputs.text = body.prompt || '';
-    if (body.negative) wf['749'].inputs.text = body.negative;   // null → keep template's quality-negative default
-    wf['718'].inputs.noise_seed = (body.seed != null && body.seed >= 0) ? body.seed : randomSeed();
-    wf['737'].inputs.width  = body.width  || 1024;
-    wf['737'].inputs.height = body.height || 1024;
-
-    let sub;
-    try {
-      sub = await fetch(`${BOX_URL}/prompt`, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify({ prompt: wf })
-      });
-    } catch(e){
-      // fetch() only rejects on network-level failure → pod stopped, URL wrong, or CORS blocked
-      throw new Error('Zaor Box unreachable — is the pod running? (' + e.message + ')');
-    }
-    if(!sub.ok){ const t = await sub.text().catch(()=> ''); throw new Error(`Zaor Box error ${sub.status}: ${t.slice(0,300)}`); }
-    const sd = await sub.json();
-    if (sd.node_errors && Object.keys(sd.node_errors).length){
-      throw new Error('Zaor Box rejected the workflow: ' + JSON.stringify(sd.node_errors).slice(0,300));
-    }
-    const pid = sd.prompt_id;
-    if(!pid) throw new Error('Zaor Box: no prompt_id returned: ' + JSON.stringify(sd).slice(0,200));
-
-    let elapsed = 0;
-    while(elapsed < 300000){ // 5 min — covers cold 17GB model load (~1–2 min) + sampling
-      await new Promise(r=>setTimeout(r,3000)); elapsed += 3000;
-      if(params.isCancelled && params.isCancelled()) throw new Error('Cancelled');
-      let hr;
-      try { hr = await fetch(`${BOX_URL}/history/${pid}`); }
-      catch(e){ continue; }   // transient poll blip — keep waiting, submit already succeeded
-      if(!hr.ok) continue;
-      const hd = await hr.json();
-      const entry = hd[pid];
-      if(!entry) continue;    // still queued / executing
-      const st = entry.status || {};
-      if(st.status_str === 'error'){
-        throw new Error('Zaor Box generation failed: ' + JSON.stringify(st.messages || st).slice(0,400));
-      }
-      const imgs = entry.outputs && entry.outputs['740'] && entry.outputs['740'].images;
-      if(imgs && imgs.length){
-        const im = imgs[0];
-        const out = `${BOX_URL}/view?filename=${encodeURIComponent(im.filename)}&subfolder=${encodeURIComponent(im.subfolder || '')}&type=${encodeURIComponent(im.type || 'output')}`;
-        addSpend(modelCost(m, params));
-        return out;
-      }
-      if(st.completed) throw new Error('Zaor Box completed but returned no image: ' + JSON.stringify(entry.outputs || {}).slice(0,300));
-    }
-    throw new Error('Zaor Box timed out (5 min). First run after pod start loads 17GB into VRAM — if this was a cold start, try again.');
-  }
+  // Zaor Box t2i image dispatch (Chroma HD) removed in v1.69.
+  // Klein 9B self-hosted t2i will land here in a later pass, reusing the
+  // submit/poll pattern from the LTX branch above.
 
   if(m.provider==='atlas'){
     if(!atlasKey) throw new Error('Atlas Cloud API key required. Add it in settings.');
@@ -6968,6 +6898,7 @@ function openModal(type) {
     document.getElementById('hf-key-input').value = hfKey;
     document.getElementById('cloudinary-cloud-input').value = cloudinaryCloud;
     document.getElementById('cloudinary-preset-input').value = cloudinaryPreset;
+    document.getElementById('box-url-input').value = BOX_URL;
     modalOverlay.classList.add('open');
     updateStorageInfo();
     setTimeout(() => keyInput.focus(), 100);
@@ -7003,6 +6934,15 @@ document.getElementById('modal-save').addEventListener('click', () => {
   localStorage.setItem('cloudinary_cloud', cloudinaryCloud);
   cloudinaryPreset = document.getElementById('cloudinary-preset-input').value.trim();
   localStorage.setItem('cloudinary_preset', cloudinaryPreset);
+  // Zaor Box URL — trims trailing slashes; clearing the field resets to the shipped default.
+  const boxVal = document.getElementById('box-url-input').value.trim().replace(/\/+$/, '');
+  if (boxVal) {
+    BOX_URL = boxVal;
+    localStorage.setItem('zaor_box_url', boxVal);
+  } else {
+    BOX_URL = DEFAULT_BOX_URL;
+    localStorage.removeItem('zaor_box_url');
+  }
   // Clear clipboard so keys don't linger
   try { navigator.clipboard.writeText(' ').catch(()=>{}); } catch(e) {}
   modalOverlay.classList.remove('open');
