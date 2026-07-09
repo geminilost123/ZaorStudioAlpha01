@@ -1943,7 +1943,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.70';
+const APP_VERSION = '1.72';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2275,7 +2275,7 @@ let lastAtlasRaw = ''; // captured raw Atlas response for on-screen debugging
 // The pod must be RUNNING, and ComfyUI must be launched with
 // --enable-cors-header, or browser fetches from GitHub Pages will be blocked.
 // Used by the LTX video engines (box-ltx-t2v / box-ltx-i2v). The Chroma HD
-// image path was removed in v1.69 — Klein 9B will replace it as the box t2i engine.
+// image path was removed in v1.69 — Klein 9B now wired as the box t2i engine (v1.71).
 // ═══════════════════════════════════════════════════════
 const DEFAULT_BOX_URL = 'https://63998xwntutlxy-8188.proxy.runpod.net';
 let BOX_URL = (localStorage.getItem('zaor_box_url') || DEFAULT_BOX_URL).replace(/\/+$/, '');
@@ -2334,6 +2334,50 @@ function ltxFrames(durationSec){
   return Math.round((s * 24) / 8) * 8 + 1;                          // 8n+1 @ 24fps (5s → 121)
 }
 
+// ═══════════════════════════════════════════════════════
+// ZAOR BOX KLEIN 9B (v1.71, pass 1) — Flux.2 Klein 9B True-V3, self-hosted t2i.
+// Node structure adapted from wikeeyang's official ComfyUI blueprint
+// ("Image Edit (Flux.2 Klein 4B)") — same loader/sampler chain, stripped of the
+// image-edit/reference-conditioning subgraph since this is pure text-to-image.
+// Diffusion model is fp8 .safetensors (plain UNETLoader). Text encoder is a
+// GGUF quant, so it needs CLIPLoaderGGUF (not the core CLIPLoader the
+// blueprint uses for its .safetensors encoder) — same GGUF pack already
+// providing UnetLoaderGGUF/DualCLIPLoaderGGUF for the LTX graph above.
+// Confirmed filenames on the pod (Jul 9):
+//   diffusion_models/Flux2-Klein-9B-True-V3-fp8mixed.safetensors
+//   text_encoders/flux2-klein-9b-uncensored-q6_k.gguf
+//   vae/flux2-vae.safetensors
+// Injection points (see 'comfy' provider branch):
+//   3 = positive prompt · 4 = negative prompt · 9 = seed · 7/8 = width/height
+// UNVERIFIED: CLIPLoaderGGUF accepting type:"flux2" — first live submit will
+// either work or surface a node_errors mismatch we fix in one line.
+// ═══════════════════════════════════════════════════════
+const KLEIN_BOX_WORKFLOW = {
+  "1": { "class_type": "UNETLoader", "inputs": { "unet_name": "Flux2-Klein-9B-True-V3-fp8mixed.safetensors", "weight_dtype": "default" } },
+  "2": { "class_type": "CLIPLoaderGGUF", "inputs": { "clip_name": "flux2-klein-9b-uncensored-q6_k.gguf", "type": "flux2" } },
+  "3": { "class_type": "CLIPTextEncode", "inputs": { "clip": ["2", 0], "text": "" } },
+  "4": { "class_type": "CLIPTextEncode", "inputs": { "clip": ["2", 0], "text": "" } },
+  "5": { "class_type": "VAELoader", "inputs": { "vae_name": "flux2-vae.safetensors" } },
+  "6": { "class_type": "KSamplerSelect", "inputs": { "sampler_name": "euler" } },
+  "7": { "class_type": "Flux2Scheduler", "inputs": { "steps": 20, "width": 1024, "height": 1024 } },
+  "8": { "class_type": "EmptyFlux2LatentImage", "inputs": { "width": 1024, "height": 1024, "batch_size": 1 } },
+  "9": { "class_type": "RandomNoise", "inputs": { "noise_seed": 0 } },
+  "10": { "class_type": "CFGGuider", "inputs": { "model": ["1", 0], "positive": ["3", 0], "negative": ["4", 0], "cfg": 5 } },
+  "11": { "class_type": "SamplerCustomAdvanced", "inputs": { "noise": ["9", 0], "guider": ["10", 0], "sampler": ["6", 0], "sigmas": ["7", 0], "latent_image": ["8", 0] } },
+  "12": { "class_type": "VAEDecode", "inputs": { "samples": ["11", 0], "vae": ["5", 0] } },
+  "13": { "class_type": "SaveImage", "inputs": { "images": ["12", 0], "filename_prefix": "ZaorKlein" } }
+};
+
+// Klein hard rule: dims should be multiples of 16 (Flux2 latent patch size).
+// ~1MP default resolutions, matching common aspect ratios.
+function kleinDims(aspectRatio){
+  if (aspectRatio === '9:16') return { width: 768,  height: 1344 };
+  if (aspectRatio === '1:1')  return { width: 1024, height: 1024 };
+  if (aspectRatio === '4:3')  return { width: 1152, height: 896  };
+  if (aspectRatio === '3:4')  return { width: 896,  height: 1152 };
+  return { width: 1344, height: 768 };   // default 16:9
+}
+
 const MODEL_REGISTRY = {
   // ─────────── TEXT-TO-IMAGE ───────────
   'aurora-simple':  { cat:'t2img', label:'Aurora Simple · xAI',  provider:'xai-image', path:'grok-imagine-image',          price:0.02, verified:true,
@@ -2362,8 +2406,13 @@ const MODEL_REGISTRY = {
     buildBody:p=>{
       return { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, output_format:'png', enable_base64_output:false, enable_sync_mode:false };
     } },
-  // Zaor Box t2i slot is vacant — Chroma HD removed in v1.69. Klein 9B (self-hosted)
-  // will be wired here in a later pass. LTX video engines still use the box via BOX_URL.
+  // Zaor Box: Flux.2 Klein 9B True-V3, self-hosted t2i on the pod. price:0 — pod billed
+  // per-minute, not per-image. Uses KLEIN_BOX_WORKFLOW + kleinDims() defined above.
+  'box-klein':      { cat:'t2img', label:'Flux.2 Klein 9B · Zaor Box', provider:'comfy', box:'klein', price:0, verified:true,
+    buildBody:p=>{
+      const d = kleinDims(p.aspectRatio);
+      return { prompt:p.prompt, negative:null, seed:randomSeed(), width:d.width, height:d.height };
+    } },
   'klein9b-lora':   { cat:'t2img', label:'Flux.2 Klein 9B · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/flux-2-klein-9b/text-to-image-lora', price:0.015, verified:true, lora:true, loraBase:'Flux2-Klein',
     buildBody:p=>{
       const b = { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, enable_safety_checker:false, enable_base64_output:false };
@@ -2654,8 +2703,65 @@ async function callModel(modelId, params){
   }
 
   // Zaor Box t2i image dispatch (Chroma HD) removed in v1.69.
-  // Klein 9B self-hosted t2i will land here in a later pass, reusing the
-  // submit/poll pattern from the LTX branch above.
+  // Klein 9B self-hosted t2i (v1.71) — same submit/poll pattern as the LTX
+  // branch above, but pulls a still image from the SaveImage node (13)
+  // instead of a video from SaveVideo.
+  if(m.provider==='comfy' && m.box==='klein'){
+    const wf = JSON.parse(JSON.stringify(KLEIN_BOX_WORKFLOW));
+    wf['3'].inputs.text = body.prompt || '';
+    if (body.negative) wf['4'].inputs.text = body.negative;
+    const seed = (body.seed != null && body.seed >= 0) ? body.seed : randomSeed();
+    wf['9'].inputs.noise_seed = seed;
+    wf['7'].inputs.width  = body.width  || 1024;
+    wf['7'].inputs.height = body.height || 1024;
+    wf['8'].inputs.width  = body.width  || 1024;
+    wf['8'].inputs.height = body.height || 1024;
+
+    let sub;
+    try {
+      sub = await fetch(`${BOX_URL}/prompt`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ prompt: wf })
+      });
+    } catch(e){
+      throw new Error('Zaor Box unreachable — is the pod running? (' + e.message + ')');
+    }
+    if(!sub.ok){ const t = await sub.text().catch(()=> ''); throw new Error(`Zaor Box error ${sub.status}: ${t.slice(0,300)}`); }
+    const sd = await sub.json();
+    if (sd.node_errors && Object.keys(sd.node_errors).length){
+      throw new Error('Zaor Box rejected the workflow: ' + JSON.stringify(sd.node_errors).slice(0,300));
+    }
+    const pid = sd.prompt_id;
+    if(!pid) throw new Error('Zaor Box: no prompt_id returned: ' + JSON.stringify(sd).slice(0,200));
+
+    let elapsed = 0;
+    while(elapsed < 480000){ // 8 min — warm run is ~1–2 min; cold load (~12 min, new model into VRAM) may exceed this on first gen
+      await new Promise(r=>setTimeout(r,3000)); elapsed += 3000;
+      if(params.isCancelled && params.isCancelled()) throw new Error('Cancelled');
+      let hr;
+      try { hr = await fetch(`${BOX_URL}/history/${pid}`); }
+      catch(e){ continue; }
+      if(!hr.ok) continue;
+      const hd = await hr.json();
+      const entry = hd[pid];
+      if(!entry) continue;
+      const st = entry.status || {};
+      if(st.status_str === 'error'){
+        throw new Error('Zaor Box image failed: ' + JSON.stringify(st.messages || st).slice(0,400));
+      }
+      const o13 = entry.outputs && entry.outputs['13'];
+      const imgs = o13 && o13.images;
+      if(imgs && imgs.length){
+        const v = imgs[0];
+        const out = `${BOX_URL}/view?filename=${encodeURIComponent(v.filename)}&subfolder=${encodeURIComponent(v.subfolder || '')}&type=${encodeURIComponent(v.type || 'output')}`;
+        addSpend(modelCost(m, params));
+        return out;
+      }
+      if(st.completed) throw new Error('Zaor Box completed but returned no image: ' + JSON.stringify(entry.outputs || {}).slice(0,300));
+    }
+    throw new Error('Zaor Box image timed out (8 min). First generation after pod start loads the Klein model into VRAM (~12 min) — the pod is likely still finishing; retry in a few minutes and it will run warm (~1–2 min).');
+  }
 
   if(m.provider==='atlas'){
     if(!atlasKey) throw new Error('Atlas Cloud API key required. Add it in settings.');
