@@ -925,21 +925,6 @@
     .enhance-action-btn:disabled { opacity: 0.4; cursor: default; }
 
     /* PE pin button — distinct from edit target */
-    .pe-pin-btn {
-      background: transparent;
-      border: 1px solid rgba(201,184,232,0.4);
-      color: var(--lavender);
-      font-family: 'Inter', sans-serif;
-      font-size: 11px;
-      padding: 3px 8px;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: all 0.2s;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .pe-pin-btn:hover { background: rgba(201,184,232,0.12); }
-    .pe-pin-btn.active { background: rgba(201,184,232,0.2); border-color: var(--lavender); font-weight: 600; }
 
     /* Set as edit target button */
     .set-target-btn {
@@ -1110,25 +1095,6 @@
     #refresh-btn:hover { border-color: var(--lavender); color: var(--lavender); }
     #refresh-btn.spinning { animation: spin 0.8s linear infinite; }
 
-    #pe-btn {
-      background: transparent;
-      border: 1px solid rgba(255,255,255,0.1);
-      color: var(--text-dim);
-      font-family: 'Inter', sans-serif;
-      font-size: 11px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      cursor: pointer;
-      transition: all 0.2s;
-      white-space: nowrap;
-      letter-spacing: 0.03em;
-    }
-    #pe-btn:hover { border-color: var(--lavender); color: var(--lavender); }
-    #pe-btn.active {
-      background: rgba(201,184,232,0.15);
-      border-color: var(--lavender);
-      color: var(--lavender);
-    }
     /* Visible header icon buttons + overflow ("More") menu */
     #menu-btn, #style-lock-btn {
       background: transparent;
@@ -1232,16 +1198,6 @@
     .sb-edit-input { width: 100%; background: var(--surface); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: var(--text); padding: 8px; font-family: inherit; }
     .sb-editor-btns { display: flex; gap: 8px; }
 
-    #pe-model-row {
-      display: none;
-      flex-direction: column;
-      gap: 0;
-      margin-top: 0;
-      background: var(--surface);
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-      padding: 8px 0 0;
-    }
-    #pe-model-row.visible { display: flex; }
 
     /* ── Edit target highlight ── */
     .img-wrapper.edit-target {
@@ -1320,7 +1276,6 @@
           <option value="grok-4.3" selected>Zaor</option>
         </select>
         <button id="style-lock-btn" title="Style Lock">🔒</button>
-        <button id="pe-btn" title="Prompt Engineer mode">✦ PE</button>
         <div class="menu-wrap">
           <button id="menu-btn" title="More" aria-haspopup="true" aria-expanded="false">⋯</button>
           <div id="overflow-menu" class="overflow-menu">
@@ -1348,56 +1303,6 @@
       </div>
     </div>
 
-    <div id="pe-model-row">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:0 14px 6px;">
-        <span class="mode-label">Tool</span>
-        <select id="pe-model-select" class="img-control-select" style="flex:1;min-width:140px;">
-          <optgroup label="── Image ──">
-            <option value="aurora">Aurora / Flux / Chroma / Klein</option>
-            <option value="zimage">Z-Image (text &amp; i2i)</option>
-            <option value="wan26t2v">Wan 2.6 / 2.7 Image</option>
-            <option value="qwen2">Qwen 2.0 Edit</option>
-            <option value="qwen">Qwen Edit</option>
-            <option value="wan27">Wan 2.7 Edit</option>
-            <option value="fluxkontext">Flux Kontext Edit</option>
-          </optgroup>
-          <optgroup label="── Text-to-Video ──">
-            <option value="seedance15t2v">Seedance 1.5 T2V</option>
-            <option value="ltx23">LTX 2.3 (audio)</option>
-          </optgroup>
-          <optgroup label="── Animate (I2V) ──">
-            <option value="aurora_i2v">Aurora I2V</option>
-            <option value="seedance_i2v">Seedance 1.5 Spicy I2V</option>
-            <option value="wan22spicy_i2v">Wan 2.2 Spicy I2V (incl. LoRA)</option>
-            <option value="wan27spicy_i2v">Wan 2.7 Spicy I2V</option>
-            <option value="ltx23spicy">LTX 2.3 Spicy I2V (audio)</option>
-          </optgroup>
-          <optgroup label="── Video Extend ──">
-            <option value="aurora_extend">Aurora Extend</option>
-            <option value="wan27extend">Wan 2.7 Extend</option>
-            <option value="wan22spicy_extend">Wan 2.2 Spicy Extend</option>
-          </optgroup>
-        </select>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:0 14px 8px;border-top:1px solid rgba(255,255,255,0.05);padding-top:8px;">
-        <span class="mode-label">Visual context</span>
-        <button id="pe-img-toggle" style="
-          background:transparent;border:1px solid rgba(255,255,255,0.1);
-          color:var(--text-dim);font-family:'Inter',sans-serif;font-size:11px;
-          padding:3px 9px;border-radius:10px;cursor:pointer;transition:all 0.2s;white-space:nowrap;
-        ">🖼 Pin Image/Video</button>
-        <span id="pe-pin-status" style="font-size:11px;color:var(--text-dim);font-style:italic;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">None pinned — works without image context too</span>
-        <button id="pe-pin-clear" style="
-          display:none;background:transparent;border:none;
-          color:var(--text-dim);font-size:11px;cursor:pointer;padding:2px 6px;
-          font-family:'Inter',sans-serif;
-        ">✕</button>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;padding:8px 14px;border-top:1px solid rgba(255,255,255,0.05);">
-        <button id="pe-finalize-btn" style="background:var(--lavender);border:none;color:#1a1a2e;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;padding:6px 14px;border-radius:12px;cursor:pointer;white-space:nowrap;">✅ Get final prompts</button>
-        <span style="font-size:11px;color:var(--text-dim);flex:1;min-width:0;">Best + runner-up, ready to use or save</span>
-      </div>
-    </div>
   <div id="messages">
       <div id="empty-state">
         <div class="star">✦</div>
@@ -1502,8 +1407,6 @@
               <option value="klein9b-edit-lora">Flux.2 Klein 9B Edit · WaveSpeed · LoRA — $0.021</option>
               <option value="z-image-i2i-lora">Z-Image i2i · WaveSpeed · LoRA — $0.01</option>
               <option value="z-image-i2i">Z-Image i2i · WaveSpeed — $0.005</option>
-              <option value="atlas-flux-kontext">Flux Kontext · Atlas · uncensored — $0.025</option>
-              <option value="atlas-qwen-edit">Qwen Edit · Atlas — $0.02</option>
               <option value="atlas-nano-banana-2-edit">Nano Banana 2 Edit · Atlas · Standard — $0.08</option>
               <option value="atlas-nano-banana-2-edit-dev">Nano Banana 2 Edit · Atlas · Developer (½-price) — $0.04</option>
               <option value="aurora-simple">Aurora Simple Edit · xAI — ~$0.02</option>
@@ -1550,7 +1453,6 @@
                 <option value="aurora" selected>Aurora · xAI — $0.05/s</option>
                 <option value="seedance15t2v">Seedance 1.5 T2V · WaveSpeed — from $0.06</option>
                 <option value="wan26t2v">Wan 2.6 · WaveSpeed — ~$0.34/5s</option>
-                <option value="box-ltx-t2v">LTX 10Eros T2V · Zaor Box — Free</option>
               </optgroup>
               <optgroup label="── Animate (needs image) ──">
                 <option value="aurora_i2v">Aurora Animate · xAI — $0.05/s</option>
@@ -1559,7 +1461,6 @@
                 <option value="wan22spicylora">Wan 2.2 Spicy LoRA · WaveSpeed — from $0.20</option>
                 <option value="wan26spicy">Wan 2.7 Spicy · WaveSpeed — from $0.50</option>
                 <option value="ltx23spicy">LTX 2.3 Spicy (+audio) · WaveSpeed — from $0.10</option>
-                <option value="box-ltx-i2v">LTX 10Eros I2V · Zaor Box — Free</option>
               </optgroup>
               <optgroup label="── Extend (needs video) ──">
                 <option value="aurora_extend">Aurora Extend · xAI — $0.05/s</option>
@@ -1671,8 +1572,6 @@
     <input type="text" id="cloudinary-cloud-input" placeholder="your-cloud-name" autocomplete="off" spellcheck="false" />
     <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Cloudinary — unsigned upload preset</label>
     <input type="text" id="cloudinary-preset-input" placeholder="unsigned preset name" autocomplete="off" spellcheck="false" />
-    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Zaor Box URL (RunPod pod — changes on redeploy)</label>
-    <input type="text" id="box-url-input" placeholder="https://<pod-id>-8188.proxy.runpod.net" autocomplete="off" spellcheck="false" autocapitalize="off" />
     <div style="border-top:1px solid rgba(255,255,255,0.1);margin-top:8px;padding-top:12px;">
       <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Storage</label>
       <div id="storage-usage-modal" style="font-size:12px;color:var(--text-dim);margin-bottom:8px;"></div>
@@ -1857,7 +1756,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.75';
+const APP_VERSION = '1.77';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -1970,10 +1869,8 @@ const VISION_MODEL_SOURCE_LABELS = { grok: 'xAI (paid)', hf: 'Hugging Face' };
 
 // Independent per-role vision selections (each persists separately).
 let styleExtractorModelId = localStorage.getItem('zaor_style_extractor_model') || 'grok';
-let peImageModelId = localStorage.getItem('zaor_pe_image_model') || 'grok';
 // Migration guard: if a stored selection points at a removed model (e.g. hf-glm41v9b), fall back to grok.
 if (!VISION_MODELS[styleExtractorModelId]) { styleExtractorModelId = 'grok'; localStorage.setItem('zaor_style_extractor_model', 'grok'); }
-if (!VISION_MODELS[peImageModelId]) { peImageModelId = 'grok'; localStorage.setItem('zaor_pe_image_model', 'grok'); }
 
 // Populate vision model dropdowns, grouped by source.
 function populateVisionModelSelect(sel, selectedId) {
@@ -2158,11 +2055,6 @@ let activeEditTarget = null;
 let enhanceMode = false; // manually selected edit target (null = use lastImageUrl)
 let lockedStyle = localStorage.getItem('zaor_style_lock') || ''; // persisted style text
 let styleLockActive = localStorage.getItem('zaor_style_active') === '1'; // whether lock is engaged
-let promptEngineerMode = false; // PE mode for chat
-let peUseImage = false; // whether to feed current image to Zaor in PE mode
-let pePinnedUrl = null;   // independently pinned image or video URL for PE
-let pePinnedType = null;  // 'image' or 'video'
-let pePinnedLabel = '';   // display label for pinned item
 let isLoading = false;
 let currentThreadId = null;
 let pendingDeleteId = null;
@@ -2180,117 +2072,6 @@ let lastAtlasRaw = ''; // captured raw Atlas response for on-screen debugging
 //   verified: only verified:true models appear in dropdowns
 //   buildBody(params) → provider-specific request body
 // ═══════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════
-// ZAOR BOX (v1.60) — self-hosted ComfyUI on RunPod
-// BOX_URL is editable in Settings (v1.70) — pod IDs change on every redeploy, so it's
-// stored in localStorage ('zaor_box_url') with the latest pod as the shipped default.
-// Empty/unset → falls back to DEFAULT_BOX_URL below.
-// The pod must be RUNNING, and ComfyUI must be launched with
-// --enable-cors-header, or browser fetches from GitHub Pages will be blocked.
-// Used by the LTX video engines (box-ltx-t2v / box-ltx-i2v). The Chroma HD
-// image path was removed in v1.69 — Klein 9B now wired as the box t2i engine (v1.71).
-// ═══════════════════════════════════════════════════════
-const DEFAULT_BOX_URL = 'https://63998xwntutlxy-8188.proxy.runpod.net';
-let BOX_URL = (localStorage.getItem('zaor_box_url') || DEFAULT_BOX_URL).replace(/\/+$/, '');
-
-// ═══════════════════════════════════════════════════════
-// ZAOR BOX VIDEO (v1.61, refine pass added v1.63) — LTX-2.3 / 10Eros v1.2 Q6_K GGUF, fully local encoding.
-// Proven graphs from Jul 7 live test (t2v ~40s warm, i2v via first-frame conditioning).
-// Injection points (see 'comfy' provider branch):
-//   3 = positive prompt · 4 = negative prompt · 9 = base seed · 21 = refine seed
-//   11 = width/height/num_frames (+ i2v: strength) · 16 (i2v only) = LoadImage filename
-// Frozen for v1.61: cfg 4.0 (node 6) · 20 steps (node 8) · euler · 24fps · video-only (no audio path)
-// v1.63 de-fog: nodes 20–22 same-res refine tail (SplitSigmas@14 → SamplerCustomAdvanced), decode moved 11→22
-// ═══════════════════════════════════════════════════════
-const LTX_BOX_NEGATIVE = "blurry, distorted, static image, frozen, watermark, text, subtitles, low quality";
-
-const LTX_BOX_T2V_WORKFLOW = {
-  "1": { "class_type": "UnetLoaderGGUF", "inputs": { "unet_name": "10Eros_v1.2-Q6_K.gguf" } },
-  "2": { "class_type": "DualCLIPLoaderGGUF", "inputs": { "clip_name1": "gemma-3-12b-it-qat-Q4_K_XL.gguf", "clip_name2": "ltx-2.3_embeddings_connectors.safetensors", "type": "ltxv" } },
-  "3": { "class_type": "CLIPTextEncode", "inputs": { "clip": ["2", 0], "text": "" } },
-  "4": { "class_type": "CLIPTextEncode", "inputs": { "clip": ["2", 0], "text": LTX_BOX_NEGATIVE } },
-  "5": { "class_type": "LTXVConditioning", "inputs": { "positive": ["3", 0], "negative": ["4", 0], "frame_rate": 24 } },
-  "6": { "class_type": "CFGGuider", "inputs": { "model": ["1", 0], "positive": ["5", 0], "negative": ["5", 1], "cfg": 4.0 } },
-  "7": { "class_type": "KSamplerSelect", "inputs": { "sampler_name": "euler" } },
-  "8": { "class_type": "LTXVScheduler", "inputs": { "steps": 20, "max_shift": 2.05, "base_shift": 0.95, "stretch": true, "terminal": 0.1 } },
-  "9": { "class_type": "RandomNoise", "inputs": { "noise_seed": 0 } },
-  "10": { "class_type": "VAELoader", "inputs": { "vae_name": "ltx-2.3_video_vae.safetensors" } },
-  "11": { "class_type": "LTXVBaseSampler", "inputs": { "model": ["1", 0], "vae": ["10", 0], "width": 1280, "height": 736, "num_frames": 121, "guider": ["6", 0], "sampler": ["7", 0], "sigmas": ["8", 0], "noise": ["9", 0] } },
-  "13": { "class_type": "VAEDecode", "inputs": { "samples": ["22", 0], "vae": ["10", 0] } },
-  "14": { "class_type": "CreateVideo", "inputs": { "images": ["13", 0], "fps": 24 } },
-  "15": { "class_type": "SaveVideo", "inputs": { "video": ["14", 0], "filename_prefix": "ZaorLTX", "format": "mp4", "codec": "h264" } },
-  // v1.63 de-fog refine pass: re-run the low-noise tail (steps 14→20) of the same
-  // schedule over the finished latent — img2img-style polish, same resolution.
-  // Tuning knob: node 20 "step" (higher = gentler/faster, lower = stronger de-fog).
-  "20": { "class_type": "SplitSigmas", "inputs": { "sigmas": ["8", 0], "step": 14 } },
-  "21": { "class_type": "RandomNoise", "inputs": { "noise_seed": 0 } },
-  "22": { "class_type": "SamplerCustomAdvanced", "inputs": { "noise": ["21", 0], "guider": ["6", 0], "sampler": ["7", 0], "sigmas": ["20", 1], "latent_image": ["11", 0] } }
-};
-
-// i2v = t2v graph + LoadImage conditioning the first frame (index "0") at strength 0.9.
-const LTX_BOX_I2V_WORKFLOW = Object.assign(JSON.parse(JSON.stringify(LTX_BOX_T2V_WORKFLOW)), {
-  "16": { "class_type": "LoadImage", "inputs": { "image": "" } }
-});
-LTX_BOX_I2V_WORKFLOW["11"].inputs.optional_cond_images = ["16", 0];
-LTX_BOX_I2V_WORKFLOW["11"].inputs.optional_cond_indices = "0";
-LTX_BOX_I2V_WORKFLOW["11"].inputs.strength = 0.9;
-LTX_BOX_I2V_WORKFLOW["11"].inputs.crop = "center";
-
-// LTX hard rules: width/height divisible by 32, frames = 8n+1.
-function ltxDims(aspectRatio){
-  if (aspectRatio === '9:16') return { width: 736,  height: 1280 };
-  if (aspectRatio === '1:1')  return { width: 1024, height: 1024 };
-  return { width: 1280, height: 736 };   // default 16:9
-}
-function ltxFrames(durationSec){
-  const s = Math.min(Math.max(Number(durationSec) || 5, 2), 10);   // clamp 2–10s
-  return Math.round((s * 24) / 8) * 8 + 1;                          // 8n+1 @ 24fps (5s → 121)
-}
-
-// ═══════════════════════════════════════════════════════
-// ZAOR BOX KLEIN 9B (v1.71, pass 1) — Flux.2 Klein 9B True-V3, self-hosted t2i.
-// Node structure adapted from wikeeyang's official ComfyUI blueprint
-// ("Image Edit (Flux.2 Klein 4B)") — same loader/sampler chain, stripped of the
-// image-edit/reference-conditioning subgraph since this is pure text-to-image.
-// Diffusion model is fp8 .safetensors (plain UNETLoader). Text encoder is a
-// GGUF quant, so it needs CLIPLoaderGGUF (not the core CLIPLoader the
-// blueprint uses for its .safetensors encoder) — same GGUF pack already
-// providing UnetLoaderGGUF/DualCLIPLoaderGGUF for the LTX graph above.
-// Confirmed filenames on the pod (Jul 9):
-//   diffusion_models/Flux2-Klein-9B-True-V3-fp8mixed.safetensors
-//   text_encoders/flux2-klein-9b-uncensored-q6_k.gguf
-//   vae/flux2-vae.safetensors
-// Injection points (see 'comfy' provider branch):
-//   3 = positive prompt · 4 = negative prompt · 9 = seed · 7/8 = width/height
-// UNVERIFIED: CLIPLoaderGGUF accepting type:"flux2" — first live submit will
-// either work or surface a node_errors mismatch we fix in one line.
-// ═══════════════════════════════════════════════════════
-const KLEIN_BOX_WORKFLOW = {
-  "1": { "class_type": "UNETLoader", "inputs": { "unet_name": "Flux2-Klein-9B-True-V3-fp8mixed.safetensors", "weight_dtype": "default" } },
-  "2": { "class_type": "CLIPLoaderGGUF", "inputs": { "clip_name": "flux2-klein-9b-uncensored-q6_k.gguf", "type": "flux2" } },
-  "3": { "class_type": "CLIPTextEncode", "inputs": { "clip": ["2", 0], "text": "" } },
-  "4": { "class_type": "CLIPTextEncode", "inputs": { "clip": ["2", 0], "text": "" } },
-  "5": { "class_type": "VAELoader", "inputs": { "vae_name": "flux2-vae.safetensors" } },
-  "6": { "class_type": "KSamplerSelect", "inputs": { "sampler_name": "euler" } },
-  "7": { "class_type": "Flux2Scheduler", "inputs": { "steps": 20, "width": 1024, "height": 1024 } },
-  "8": { "class_type": "EmptyFlux2LatentImage", "inputs": { "width": 1024, "height": 1024, "batch_size": 1 } },
-  "9": { "class_type": "RandomNoise", "inputs": { "noise_seed": 0 } },
-  "10": { "class_type": "CFGGuider", "inputs": { "model": ["1", 0], "positive": ["3", 0], "negative": ["4", 0], "cfg": 5 } },
-  "11": { "class_type": "SamplerCustomAdvanced", "inputs": { "noise": ["9", 0], "guider": ["10", 0], "sampler": ["6", 0], "sigmas": ["7", 0], "latent_image": ["8", 0] } },
-  "12": { "class_type": "VAEDecode", "inputs": { "samples": ["11", 0], "vae": ["5", 0] } },
-  "13": { "class_type": "SaveImage", "inputs": { "images": ["12", 0], "filename_prefix": "ZaorKlein" } }
-};
-
-// Klein hard rule: dims should be multiples of 16 (Flux2 latent patch size).
-// ~1MP default resolutions, matching common aspect ratios.
-function kleinDims(aspectRatio){
-  if (aspectRatio === '9:16') return { width: 768,  height: 1344 };
-  if (aspectRatio === '1:1')  return { width: 1024, height: 1024 };
-  if (aspectRatio === '4:3')  return { width: 1152, height: 896  };
-  if (aspectRatio === '3:4')  return { width: 896,  height: 1152 };
-  return { width: 1344, height: 768 };   // default 16:9
-}
-
 const MODEL_REGISTRY = {
   // ─────────── TEXT-TO-IMAGE ───────────
   'aurora-simple':  { cat:'t2img', label:'Aurora Simple · xAI',  provider:'xai-image', path:'grok-imagine-image',          price:0.02, verified:true,
@@ -2319,21 +2100,6 @@ const MODEL_REGISTRY = {
     buildBody:p=>{
       return { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, output_format:'png', enable_base64_output:false, enable_sync_mode:false };
     } },
-  // Zaor Box: Flux.2 Klein 9B True-V3, self-hosted t2i on the pod. price:0 — pod billed
-  // per-minute, not per-image. Uses KLEIN_BOX_WORKFLOW + kleinDims() defined above.
-  // lora:true (v1.74) — reuses the same LoRA picker as klein9b-lora (WaveSpeed), but only
-  // entries with a boxFile (actually downloaded to the pod's loras/ folder) can be applied
-  // locally; others are silently dropped here (see generateImage's box-klein warning).
-  'box-klein':      { cat:'t2img', label:'Flux.2 Klein 9B · Zaor Box', provider:'comfy', box:'klein', price:0, verified:true, lora:true, loraBase:'Flux2-Klein',
-    buildBody:p=>{
-      const d = kleinDims(p.aspectRatio);
-      const body = { prompt:p.prompt, negative:null, seed:randomSeed(), width:d.width, height:d.height };
-      if (p.loras && p.loras.length){
-        const onBox = p.loras.filter(l => l.boxFile).slice(0,3);
-        if (onBox.length) body.loras = onBox.map(l => ({ file:l.boxFile, scale:Number(l.scale)||1 }));
-      }
-      return body;
-    } },
   'klein9b-lora':   { cat:'t2img', label:'Flux.2 Klein 9B · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/flux-2-klein-9b/text-to-image-lora', price:0.015, verified:true, lora:true, loraBase:'Flux2-Klein',
     buildBody:p=>{
       const b = { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, enable_safety_checker:false, enable_base64_output:false };
@@ -2343,11 +2109,6 @@ const MODEL_REGISTRY = {
     } },
   'atlas-flux-dev': { cat:'t2img', label:'Flux Dev · Atlas', provider:'atlas', path:'black-forest-labs/flux-dev', price:0.01, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
-  // NOTE: No Atlas-hosted Z-Image LoRA model exists — Atlas offers z-image/turbo (non-LoRA) only,
-  // and reserves server-side LoRA for the Flux Dev base. The old 'atlas-z-image-lora' entry pointed
-  // at a non-existent model and always 400'd. Z-Image LoRA runs through WaveSpeed ('z-image-lora').
-  'atlas-flux-dev-lora': { cat:'t2img', label:'Flux Dev · Atlas · LoRA (fallback)', provider:'atlas', path:'black-forest-labs/flux-dev-lora', price:0.015, verified:true, lora:true, loraBase:'Flux',
-    buildBody:p=>{ const b={ prompt:p.prompt, num_images:1, enable_safety_checker:false }; if(p.loras&&p.loras.length) b.loras=p.loras.slice(0,3).map(l=>({path:l.path,scale:Number(l.scale)||1})); return b; } },
   'atlas-flux-schnell': { cat:'t2img', label:'Flux Schnell · Atlas', provider:'atlas', path:'black-forest-labs/flux-schnell', price:0.003, verified:true,
     buildBody:p=>({ prompt:p.prompt, num_images:1, enable_safety_checker:false }) },
   'atlas-flux-2-pro': { cat:'t2img', label:'Flux 2 Pro · Atlas', provider:'atlas', path:'black-forest-labs/flux-2-pro/text-to-image', price:0.04, verified:true,
@@ -2361,43 +2122,18 @@ const MODEL_REGISTRY = {
   // Developer tier: same model, ~half price, lower stability/priority (Atlas's "developer" variant). Identical call shape.
   'atlas-nano-banana-2-dev': { cat:'t2img', label:'Nano Banana 2 · Atlas · Developer (½-price)', provider:'atlas', path:'google/nano-banana-2/text-to-image-developer', price:0.04, verified:true,
     buildBody:p=>{ const ok=['1:1','3:2','2:3','3:4','4:3','4:5','5:4','9:16','16:9','21:9']; const b={ prompt:p.prompt, resolution:(p.resolution||'1k'), output_format:'png' }; if(ok.includes(p.aspectRatio)) b.aspect_ratio=p.aspectRatio; return b; } },
-  'atlas-flux-kontext': { cat:'edit', label:'Flux Kontext · Atlas', provider:'atlas', path:'black-forest-labs/flux-kontext-dev', price:0.025, verified:true,
-    buildBody:p=>({ prompt:p.prompt, image:p.image, guidance_scale:2.5, num_inference_steps:28, enable_base64_output:false, enable_safety_checker:false }) },
-  'atlas-qwen-edit':   { cat:'edit', label:'Qwen Edit · Atlas', provider:'atlas', path:'atlascloud/qwen-image/edit', price:0.02, verified:true,
-    buildBody:p=>({ prompt:p.prompt, image:p.image, enable_base64_output:false, enable_safety_checker:false }) },
-  // Nano Banana 2 Edit — identity/style-preserving i2i. Atlas edit endpoint takes an `images` array (up to 14 refs).
   'atlas-nano-banana-2-edit': { cat:'edit', label:'Nano Banana 2 Edit · Atlas · Standard', provider:'atlas', path:'google/nano-banana-2/edit', price:0.08, verified:true,
     buildBody:p=>({ prompt:p.prompt, images:[p.image], output_format:'png' }) },
   // Developer tier: same edit model, ~half price, lower stability/priority. Identical call shape (images array).
   'atlas-nano-banana-2-edit-dev': { cat:'edit', label:'Nano Banana 2 Edit · Atlas · Developer (½-price)', provider:'atlas', path:'google/nano-banana-2/edit-developer', price:0.04, verified:true,
     buildBody:p=>({ prompt:p.prompt, images:[p.image], output_format:'png' }) },
 
-  // ─────────── TEXT-TO-VIDEO ───────────
-  // NOTE: Aurora video (T2V/I2V/extend/edit) is handled by generateVideoAurora via xAI DIRECT,
-  // never through callModel/WaveSpeed. The four 'aurora-*'/'grok-vedit' entries below are legacy
-  // and kept inert (verified:false) for reference only — do not wire them into dropdowns.
-  'aurora-t2v':      { cat:'t2v', label:'Aurora T2V · xAI',         provider:'xai-video', path:'grok-imagine-video',                      pricePerS:0.05, verified:false,
-    durations:[4,6,8,10], resolutions:['480p','720p'],
-    buildBody:p=>({ prompt:p.prompt, duration:Math.min(p.duration||4,10), aspect_ratio:p.aspectRatio||'16:9', resolution:p.resolution||'480p' }) },
   'seedance15-t2v':  { cat:'t2v', label:'Seedance 1.5 T2V · WaveSpeed',   provider:'wavespeed', path:'bytedance/seedance-v1.5-pro/text-to-video', price:0.06, verified:true,
     durations:[4,5,6,8,10,12], resolutions:['720p','1080p'],
     buildBody:p=>({ prompt:p.prompt, resolution:p.resolution||'720p', aspect_ratio:p.aspectRatio||'16:9', duration:Math.min(p.duration||4,12), generate_audio:false, seed:-1 }) },
   'wan26-t2v':       { cat:'t2v', label:'Wan 2.6 T2V · WaveSpeed',        provider:'wavespeed', path:'alibaba/wan-2.6/text-to-video', pricePerS:0.068, verified:true,
     durations:[5,8,10,15], resolutions:['720p','1080p'],
     buildBody:p=>({ prompt:p.prompt, resolution:p.resolution||'720p', aspect_ratio:p.aspectRatio||'16:9', duration:Math.min(p.duration||5,15), seed:-1 }) },
-  'atlas-wan27-t2v': { cat:'t2v', label:'Wan 2.7 T2V (Atlas)', provider:'atlas', path:'wan-2.7/text-to-video', pricePerS:0.02, verified:false,
-    durations:[5,8,10], resolutions:['720p','1080p'],
-    buildBody:p=>({ prompt:p.prompt, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,10) }) },
-  // Zaor Box: LTX-2.3 / 10Eros v1.2 (Q6_K) on the RunPod pod. price:0 — pod billed per-minute.
-  // 720p-class only (dims from aspect ratio); duration snaps to 8n+1 frames @ 24fps.
-  'box-ltx-t2v':     { cat:'t2v', label:'LTX 10Eros T2V · Zaor Box', provider:'comfy', box:'ltx-t2v', price:0, verified:true,
-    durations:[3,5,8,10], resolutions:['720p'], hasRatio:true,
-    buildBody:p=>{
-      const d = ltxDims(p.aspectRatio);
-      return { prompt:p.prompt, negative:null, seed:randomSeed(), width:d.width, height:d.height, frames:ltxFrames(p.duration) };
-    } },
-
-  // ─────────── IMAGE EDIT (instruction-based) ───────────
   'qwen2-edit':    { cat:'edit', label:'Qwen 2.0 Edit · WaveSpeed',    provider:'wavespeed', path:'wavespeed-ai/qwen-image-2.0/edit', price:0.03, verified:true,
     buildBody:p=>({ prompt:p.prompt, images:[p.image], seed:-1, enable_safety_checker:false }) },
   'qwen-edit':     { cat:'edit', label:'Qwen Edit · WaveSpeed',        provider:'wavespeed', path:'wavespeed-ai/qwen-image/edit', price:0.02, verified:true, timeout:180000,
@@ -2415,14 +2151,6 @@ const MODEL_REGISTRY = {
   'z-image-i2i-lora': { cat:'edit', label:'Z-Image i2i · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/z-image-turbo/image-to-image-lora', price:0.01, verified:true, lora:true, loraBase:'Z-Image',
     buildBody:p=>{ const b={ prompt:p.prompt, image:p.image, strength:(p.strength!=null?p.strength:0.6), size:'1024*1024', seed:-1 }; if(p.loras&&p.loras.length) b.loras=p.loras.slice(0,3).map(l=>({path:l.path,scale:Number(l.scale)||1})); return b; } },
 
-  // ─────────── IMG2IMG (strength-based) ───  [path pending confirmation] ───
-  'flux-img2img':  { cat:'img2img', label:'Flux img2img · WaveSpeed',  provider:'wavespeed', path:'wavespeed-ai/flux-dev/image-to-image', price:0.02, verified:false,
-    buildBody:p=>({ prompt:p.prompt, image:p.image, strength:(p.strength!=null?p.strength:0.7), enable_safety_checker:false }) },
-
-  // ─────────── IMAGE-TO-VIDEO (animate) ───────────
-  'aurora-i2v':        { cat:'i2v', label:'Aurora I2V · WaveSpeed',         provider:'wavespeed', path:'x-ai/grok-imagine-video-v1.5/image-to-video', price:0.05, verified:false,
-    durations:[4,6,8,10], resolutions:['480p','720p'],
-    buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'480p', duration:Math.min(p.duration||4,10) }) },
   'seedance15-spicy':  { cat:'i2v', label:'Seedance 1.5 Spicy · WaveSpeed', provider:'wavespeed', path:'bytedance/seedance-v1.5-pro/image-to-video-spicy', price:0.06, verified:true,
     durations:[4,5,6,8,10,12], resolutions:['480p','720p','1080p'],
     buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'480p', duration:Math.min(p.duration||4,12), aspect_ratio:p.aspectRatio||'16:9', generate_audio:false, seed:-1 }) },
@@ -2432,18 +2160,6 @@ const MODEL_REGISTRY = {
   'wan27-spicy':       { cat:'i2v', label:'Wan 2.7 Spicy · WaveSpeed',     provider:'wavespeed', path:'alibaba/wan-2.7/image-to-video-spicy', price:0.50, verified:true,
     durations:[5,10,15], resolutions:['720p','1080p'],
     buildBody:p=>({ prompt:p.prompt, image:p.image, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,15), aspect_ratio:p.aspectRatio||'16:9', seed:-1 }) },
-  // Zaor Box: LTX-2.3 / 10Eros v1.2 i2v — source image becomes frame 0 (strength 0.9, crop center).
-  'box-ltx-i2v':       { cat:'i2v', label:'LTX 10Eros I2V · Zaor Box', provider:'comfy', box:'ltx-i2v', price:0, verified:true,
-    durations:[3,5,8,10], resolutions:['720p'], hasRatio:true,
-    buildBody:p=>{
-      const d = ltxDims(p.aspectRatio);
-      return { prompt:p.prompt, negative:null, seed:randomSeed(), image:p.image, width:d.width, height:d.height, frames:ltxFrames(p.duration) };
-    } },
-
-  // ─────────── VIDEO EXTEND ───────────
-  'aurora-extend':      { cat:'extend', label:'Aurora Extend · WaveSpeed',       provider:'wavespeed', path:'x-ai/grok-imagine-video/video-extend', price:0.35, verified:false,
-    durations:[4,6,8,10], resolutions:['480p','720p'],
-    buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'480p', duration:Math.min(p.duration||4,10) }) },
   'wan22spicy-extend':  { cat:'extend', label:'Wan 2.2 Spicy Extend · WaveSpeed', provider:'wavespeed', path:'wavespeed-ai/wan-2.2-spicy/video-extend', price:0.15, verified:true,
     durations:[5], resolutions:['480p','720p'],
     buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'480p', duration:5, seed:-1 }) },
@@ -2451,11 +2167,7 @@ const MODEL_REGISTRY = {
     durations:[2,3,4,5,8,10,15], resolutions:['720p','1080p'],
     buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'720p', duration:Math.min(p.duration||5,15), seed:-1 }) },
 
-  // ─────────── VIDEO-TO-VIDEO EDIT ───────────
-  'grok-vedit':        { cat:'v2v', label:'Aurora Video Edit · WaveSpeed',  provider:'wavespeed', path:'x-ai/grok-imagine-video/edit-video', price:0.10, verified:false,
-    buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'720p' }) },
-  'atlas-wan27-vedit': { cat:'v2v', label:'Wan 2.7 Video Edit (Atlas)', provider:'atlas', path:'wan-2.7/video-edit', pricePerS:0.05, verified:false,
-    buildBody:p=>({ prompt:p.prompt, video:p.video, resolution:p.resolution||'720p' }) },
+
 };
 
 // Format a price label for dropdowns
@@ -2537,166 +2249,6 @@ async function callModel(modelId, params){
     const _wsOut = await callWaveSpeed(m.path, body, m.timeout||120000);
     addSpend(modelCost(m, params));
     return _wsOut;
-  }
-
-  // ── Zaor Box (self-hosted ComfyUI on RunPod) ──
-  // body = { prompt, negative, width, height, seed } from buildBody (+ seed-lock applied above).
-  if(m.provider==='comfy' && (m.box==='ltx-t2v' || m.box==='ltx-i2v')){
-    // ── Zaor Box LTX video ──
-    // body = { prompt, negative, seed, width, height, frames, image? } from buildBody.
-    const wf = JSON.parse(JSON.stringify(m.box==='ltx-i2v' ? LTX_BOX_I2V_WORKFLOW : LTX_BOX_T2V_WORKFLOW));
-    wf['3'].inputs.text = body.prompt || '';
-    if (body.negative) wf['4'].inputs.text = body.negative;   // null → keep quality-negative default
-    wf['9'].inputs.noise_seed = (body.seed != null && body.seed >= 0) ? body.seed : randomSeed();
-    wf['21'].inputs.noise_seed = randomSeed();   // v1.63 refine-pass noise (independent of base seed)
-    wf['11'].inputs.width      = body.width  || 1280;
-    wf['11'].inputs.height     = body.height || 736;
-    wf['11'].inputs.num_frames = body.frames || 121;
-
-    if (m.box==='ltx-i2v'){
-      if (!body.image) throw new Error('LTX I2V needs a source image — attach one first.');
-      // Fetch the source (data-URL or https URL) as a blob, then upload to the pod so
-      // the LoadImage node can reference it by filename.
-      let blob;
-      try {
-        blob = await (await fetch(body.image)).blob();
-      } catch(e){
-        throw new Error('LTX I2V: could not read the source image (' + e.message + ')');
-      }
-      const fd = new FormData();
-      fd.append('image', blob, 'zaor_i2v_src_' + Date.now() + '.png');
-      fd.append('overwrite', 'true');
-      let up;
-      try {
-        up = await fetch(`${BOX_URL}/upload/image`, { method:'POST', body: fd });
-      } catch(e){
-        throw new Error('Zaor Box unreachable during image upload — is the pod running? (' + e.message + ')');
-      }
-      if(!up.ok){ const t = await up.text().catch(()=> ''); throw new Error(`Zaor Box image upload failed ${up.status}: ${t.slice(0,200)}`); }
-      const ud = await up.json();
-      wf['16'].inputs.image = (ud.subfolder ? ud.subfolder + '/' : '') + (ud.name || ud.filename);
-    }
-
-    let sub;
-    try {
-      sub = await fetch(`${BOX_URL}/prompt`, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify({ prompt: wf })
-      });
-    } catch(e){
-      throw new Error('Zaor Box unreachable — is the pod running? (' + e.message + ')');
-    }
-    if(!sub.ok){ const t = await sub.text().catch(()=> ''); throw new Error(`Zaor Box error ${sub.status}: ${t.slice(0,300)}`); }
-    const sd = await sub.json();
-    if (sd.node_errors && Object.keys(sd.node_errors).length){
-      throw new Error('Zaor Box rejected the workflow: ' + JSON.stringify(sd.node_errors).slice(0,300));
-    }
-    const pid = sd.prompt_id;
-    if(!pid) throw new Error('Zaor Box: no prompt_id returned: ' + JSON.stringify(sd).slice(0,200));
-
-    let elapsed = 0;
-    while(elapsed < 480000){ // 8 min — warm run is ~1–2 min; a true cold start (~12 min model load) WILL exceed this
-      await new Promise(r=>setTimeout(r,3000)); elapsed += 3000;
-      if(params.isCancelled && params.isCancelled()) throw new Error('Cancelled');
-      let hr;
-      try { hr = await fetch(`${BOX_URL}/history/${pid}`); }
-      catch(e){ continue; }
-      if(!hr.ok) continue;
-      const hd = await hr.json();
-      const entry = hd[pid];
-      if(!entry) continue;
-      const st = entry.status || {};
-      if(st.status_str === 'error'){
-        throw new Error('Zaor Box video failed: ' + JSON.stringify(st.messages || st).slice(0,400));
-      }
-      const o15 = entry.outputs && entry.outputs['15'];
-      const vids = o15 && (o15.videos || o15.images || o15.gifs);   // SaveVideo key varies by build
-      if(vids && vids.length){
-        const v = vids[0];
-        const out = `${BOX_URL}/view?filename=${encodeURIComponent(v.filename)}&subfolder=${encodeURIComponent(v.subfolder || '')}&type=${encodeURIComponent(v.type || 'output')}`;
-        addSpend(modelCost(m, params));
-        return out;
-      }
-      if(st.completed) throw new Error('Zaor Box completed but returned no video: ' + JSON.stringify(entry.outputs || {}).slice(0,300));
-    }
-    throw new Error('Zaor Box video timed out (8 min). First generation after pod start loads ~24GB into VRAM (~12 min) — the pod is likely still finishing; retry in a few minutes and it will run warm (~1 min).');
-  }
-
-  // Zaor Box t2i image dispatch (Chroma HD) removed in v1.69.
-  // Klein 9B self-hosted t2i (v1.71) — same submit/poll pattern as the LTX
-  // branch above, but pulls a still image from the SaveImage node (13)
-  // instead of a video from SaveVideo.
-  if(m.provider==='comfy' && m.box==='klein'){
-    const wf = JSON.parse(JSON.stringify(KLEIN_BOX_WORKFLOW));
-    wf['3'].inputs.text = body.prompt || '';
-    if (body.negative) wf['4'].inputs.text = body.negative;
-    const seed = (body.seed != null && body.seed >= 0) ? body.seed : randomSeed();
-    wf['9'].inputs.noise_seed = seed;
-    wf['7'].inputs.width  = body.width  || 1024;
-    wf['7'].inputs.height = body.height || 1024;
-    wf['8'].inputs.width  = body.width  || 1024;
-    wf['8'].inputs.height = body.height || 1024;
-
-    // LoRA chain (v1.74): each active LoRA becomes a LoraLoaderModelOnly node,
-    // chained model→model, starting from the UNETLoader (node 1). Node ids
-    // 100+ to stay clear of the fixed template's 1–13. CFGGuider (node 10)
-    // gets repointed to the tail of the chain — or stays on node 1 untouched
-    // if no LoRAs are active.
-    if (body.loras && body.loras.length){
-      let modelSrc = ["1", 0];
-      body.loras.forEach((l, i) => {
-        const nid = String(100 + i);
-        wf[nid] = { class_type: "LoraLoaderModelOnly", inputs: { model: modelSrc, lora_name: l.file, strength_model: Number(l.scale) || 1 } };
-        modelSrc = [nid, 0];
-      });
-      wf['10'].inputs.model = modelSrc;
-    }
-
-    let sub;
-    try {
-      sub = await fetch(`${BOX_URL}/prompt`, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify({ prompt: wf })
-      });
-    } catch(e){
-      throw new Error('Zaor Box unreachable — is the pod running? (' + e.message + ')');
-    }
-    if(!sub.ok){ const t = await sub.text().catch(()=> ''); throw new Error(`Zaor Box error ${sub.status}: ${t.slice(0,300)}`); }
-    const sd = await sub.json();
-    if (sd.node_errors && Object.keys(sd.node_errors).length){
-      throw new Error('Zaor Box rejected the workflow: ' + JSON.stringify(sd.node_errors).slice(0,300));
-    }
-    const pid = sd.prompt_id;
-    if(!pid) throw new Error('Zaor Box: no prompt_id returned: ' + JSON.stringify(sd).slice(0,200));
-
-    let elapsed = 0;
-    while(elapsed < 480000){ // 8 min — warm run is ~1–2 min; cold load (~12 min, new model into VRAM) may exceed this on first gen
-      await new Promise(r=>setTimeout(r,3000)); elapsed += 3000;
-      if(params.isCancelled && params.isCancelled()) throw new Error('Cancelled');
-      let hr;
-      try { hr = await fetch(`${BOX_URL}/history/${pid}`); }
-      catch(e){ continue; }
-      if(!hr.ok) continue;
-      const hd = await hr.json();
-      const entry = hd[pid];
-      if(!entry) continue;
-      const st = entry.status || {};
-      if(st.status_str === 'error'){
-        throw new Error('Zaor Box image failed: ' + JSON.stringify(st.messages || st).slice(0,400));
-      }
-      const o13 = entry.outputs && entry.outputs['13'];
-      const imgs = o13 && o13.images;
-      if(imgs && imgs.length){
-        const v = imgs[0];
-        const out = `${BOX_URL}/view?filename=${encodeURIComponent(v.filename)}&subfolder=${encodeURIComponent(v.subfolder || '')}&type=${encodeURIComponent(v.type || 'output')}`;
-        addSpend(modelCost(m, params));
-        return out;
-      }
-      if(st.completed) throw new Error('Zaor Box completed but returned no image: ' + JSON.stringify(entry.outputs || {}).slice(0,300));
-    }
-    throw new Error('Zaor Box image timed out (8 min). First generation after pod start loads the Klein model into VRAM (~12 min) — the pod is likely still finishing; retry in a few minutes and it will run warm (~1–2 min).');
   }
 
   if(m.provider==='atlas'){
@@ -3347,20 +2899,6 @@ function setMode(mode) {
   videoMode   = mode === 'video';
   enhanceMode = mode === 'enhance';
 
-  // PE mode only relevant in chat — deactivate when switching away
-  if (mode !== 'chat' && promptEngineerMode) {
-    promptEngineerMode = false;
-    peUseImage = pePinnedUrl != null; // keep if something is pinned
-    updatePeImgToggle();
-    syncPePinHighlights(); // clear the pin highlight while PE is off (pin URL is kept)
-  }
-  const peBtn = document.getElementById('pe-btn');
-  if (peBtn) {
-    peBtn.classList.toggle('active', promptEngineerMode);
-    peBtn.textContent = promptEngineerMode ? '✦ PE ON' : '✦ PE';
-  }
-  document.getElementById('pe-model-row')?.classList.toggle('visible', promptEngineerMode);
-
   imgToggle?.classList.toggle('active', mode === 'image');
   document.getElementById('vid-toggle')?.classList.toggle('active', mode === 'video');
   document.getElementById('enhance-toggle')?.classList.toggle('active', mode === 'enhance');
@@ -3511,7 +3049,7 @@ document.getElementById('upscale-btn')?.addEventListener('click', async () => {
 
 // ── Video engine classification (v1.56) ──
 // T2V engines take no source; Animate (I2V) needs a pinned image; Extend needs a pinned video.
-const VIDEO_T2V_ENGINES    = ['aurora', 'seedance15t2v', 'wan26t2v', 'box-ltx-t2v'];
+const VIDEO_T2V_ENGINES    = ['aurora', 'seedance15t2v', 'wan26t2v'];
 const VIDEO_EXTEND_ENGINES = ['aurora_extend', 'wan27extend', 'wan22spicy_extend'];
 function videoEngineKind(engine) {
   if (VIDEO_EXTEND_ENGINES.includes(engine)) return 'extend';
@@ -3774,13 +3312,13 @@ async function runEdit(fullPrompt, imageUrl, editModel) {
     addSpend(EDIT_PRICE[editModel] || 0.04);
     return { src: url, hostedUrl: url, modelLabel: editModel === 'aurora-simple' ? 'Aurora Simple Edit' : 'Aurora Quality Edit' };
 
-  } else if (editModel === 'atlas-flux-kontext' || editModel === 'atlas-qwen-edit' || editModel === 'atlas-nano-banana-2-edit' || editModel === 'atlas-nano-banana-2-edit-dev') {
+  } else if (editModel === 'atlas-nano-banana-2-edit' || editModel === 'atlas-nano-banana-2-edit-dev') {
     // ── Atlas edit (Flux Kontext / Qwen / Nano Banana 2 standard + developer) ──
     if (!atlasKey) throw new Error('Atlas Cloud API key required. Tap "Set API Key" to add it.');
     const atlasImg = await atlasPrepareImage(imageUrl);
     const resultUrl = await callModel(editModel, { prompt: fullPrompt, image: atlasImg, isCancelled: () => false });
     if (!resultUrl) throw new Error('Atlas edit timed out');
-    const atlasEditLabels = { 'atlas-flux-kontext': 'Flux Kontext Edit · Atlas', 'atlas-qwen-edit': 'Qwen Edit · Atlas', 'atlas-nano-banana-2-edit': 'Nano Banana 2 Edit · Atlas', 'atlas-nano-banana-2-edit-dev': 'Nano Banana 2 Edit · Atlas · DEV' };
+    const atlasEditLabels = { 'atlas-nano-banana-2-edit': 'Nano Banana 2 Edit · Atlas', 'atlas-nano-banana-2-edit-dev': 'Nano Banana 2 Edit · Atlas · DEV' };
     return { src: resultUrl, hostedUrl: resultUrl, modelLabel: atlasEditLabels[editModel] || 'Atlas Edit' };
 
   } else {
@@ -3871,117 +3409,28 @@ async function generateText(userText) {
     // Safety: if history was lost (e.g. storage eviction), still send the current turn so chat never 400s on empty messages
     if (messages.length === 0 && userText) messages = [{ role: 'user', content: userText }];
 
-    // Inject PE system prompt if active
+    // Build the outgoing message list from history.
     let apiMessages = [...messages];
-    if (promptEngineerMode) {
-      const peModel = document.getElementById('pe-model-select')?.value || 'aurora';
-      const sysPrompt = PE_SYSTEM_PROMPTS[peModel] || PE_SYSTEM_PROMPTS.aurora;
-      apiMessages = [{ role: 'system', content: sysPrompt }, ...messages];
-
-      // If a PE target is pinned, include it in the message
-      const peUrl = pePinnedUrl || (peUseImage ? lastImageUrl : null);
-      if (peUrl) {
-        // xAI vision only accepts JPG/PNG/WebP/ICO image URLs — not video, not base64, not expired CDN
-        const isVideo = pePinnedType === 'video' || /\.mp4|video/i.test(peUrl);
-        const isBase64 = peUrl.startsWith('data:');
-        const isLikelyImage = !isVideo && !isBase64;
-
-        if (isVideo) {
-          // Video pinned — extract last frame and send as image context
-          try {
-            const frameDataUrl = await extractLastFrame(peUrl);
-            const lastUserIdx = [...apiMessages].reverse().findIndex(m => m.role === 'user');
-            if (lastUserIdx !== -1) {
-              const realIdx = apiMessages.length - 1 - lastUserIdx;
-              const userText = typeof apiMessages[realIdx].content === 'string'
-                ? apiMessages[realIdx].content : '';
-              apiMessages[realIdx] = {
-                role: 'user',
-                content: [
-                  { type: 'image_url', image_url: { url: frameDataUrl, detail: 'auto' } },
-                  { type: 'text', text: userText }
-                ]
-              };
-            }
-          } catch(e) {
-            // Frame extraction failed (e.g. CORS) — fall back to text-only with note
-            const lastUserIdx = [...apiMessages].reverse().findIndex(m => m.role === 'user');
-            if (lastUserIdx !== -1) {
-              const realIdx = apiMessages.length - 1 - lastUserIdx;
-              const userText = typeof apiMessages[realIdx].content === 'string'
-                ? apiMessages[realIdx].content : '';
-              apiMessages[realIdx] = {
-                role: 'user',
-                content: userText + (userText ? '\n\n' : '') + '[Note: Could not extract a frame from the pinned video for visual context — ' + e.message + '. Write the extend prompt based on the text description alone.]'
-              };
-            }
-          }
-        } else if (isBase64) {
-          // Base64 — extract mime type and send as base64 image_url
-          const mimeMatch = peUrl.match(/^data:(image\/[^;]+);base64,/);
-          if (mimeMatch) {
-            const lastUserIdx = [...apiMessages].reverse().findIndex(m => m.role === 'user');
-            if (lastUserIdx !== -1) {
-              const realIdx = apiMessages.length - 1 - lastUserIdx;
-              const userText = typeof apiMessages[realIdx].content === 'string'
-                ? apiMessages[realIdx].content : '';
-              apiMessages[realIdx] = {
-                role: 'user',
-                content: [
-                  { type: 'image_url', image_url: { url: peUrl, detail: 'auto' } },
-                  { type: 'text', text: userText }
-                ]
-              };
-            }
-          }
-        } else if (isLikelyImage) {
-          // Hosted image URL — pass directly
-          const lastUserIdx = [...apiMessages].reverse().findIndex(m => m.role === 'user');
-          if (lastUserIdx !== -1) {
-            const realIdx = apiMessages.length - 1 - lastUserIdx;
-            const userText = typeof apiMessages[realIdx].content === 'string'
-              ? apiMessages[realIdx].content : '';
-            apiMessages[realIdx] = {
-              role: 'user',
-              content: [
-                { type: 'image_url', image_url: { url: peUrl, detail: 'auto' } },
-                { type: 'text', text: userText }
-              ]
-            };
-          }
-        }
-      }
-    }
 
     // ── Chat routing with independent model selection ──────────────────────────
-    // Determine whether this turn needs vision: PE mode with a pinned image, or any
-    // message carrying an image_url content block.
+    // Determine whether this turn needs vision: any message carrying an image_url block.
     const turnNeedsVision = apiMessages.some(msg =>
       Array.isArray(msg.content) && msg.content.some(part => part && part.type === 'image_url')
-    ) || promptEngineerMode;
+    );
 
     let reply = '';
     let usedModelLabel = ''; // whichever model actually produced the reply — shown in the UI instead of a hardcoded "Zaor"
 
     if (turnNeedsVision) {
-      // ── VISION PATH: route through the user's selected vision model (peImageModelId), not the text chat model. ──
-      const visionInfo = VISION_MODELS[peImageModelId] || VISION_MODELS['grok'];
+      // ── VISION PATH: route through grok vision (Pass 4 will add per-engine attach routing). ──
+      const _visionId = 'grok';
+      const visionInfo = VISION_MODELS[_visionId] || VISION_MODELS['grok'];
       try {
-        reply = await callVisionModel(peImageModelId, apiMessages, 2048, 0.9);
+        reply = await callVisionModel(_visionId, apiMessages, 2048, 0.9);
         usedModelLabel = visionInfo.label;
       } catch (e) {
-        // Selected vision model failed (no key, HTTP error, timeout, etc). Fall back to grok vision,
-        // and only bother the user if grok wasn't already the selection.
-        if (peImageModelId !== 'grok') {
-          appendError('Vision model "' + visionInfo.label + '" failed (' + e.message + ') — used Zaor (grok) for this turn instead.');
-        }
-        try {
-          reply = await callVisionModel('grok', apiMessages, 2048, 0.9);
-          usedModelLabel = VISION_MODELS['grok'].label;
-        } catch (e2) {
-          removeTyping(typingId);
-          throw new Error('Vision reply failed on both the selected model and the grok fallback: ' + e2.message);
-        }
+        removeTyping(typingId);
+        throw new Error('Vision reply failed: ' + e.message);
       }
     } else {
       // ── TEXT PATH: unchanged fallback ladder (chat model → fallback model → grok), now tracking which one replied. ──
@@ -4078,8 +3527,6 @@ async function generateImage(prompt) {
       }
       if (!matching.length) {
         appendError('Tip: no ' + (m.loraBase || 'matching') + ' LoRAs are active — tap 🧬 and tick one, or this generates as plain ' + (m.loraBase || 'base') + '.');
-      } else if (m.provider === 'comfy' && m.box === 'klein' && !callParams.loras.some(l => l.boxFile)) {
-        appendError('None of the active LoRAs are downloaded to the Zaor Box yet (only WaveSpeed-hosted) — generating plain Klein 9B without LoRAs.');
       }
     }
 
@@ -4154,17 +3601,11 @@ async function generateVideo(prompt, imageDataUrl, engineOverride, extendVideoUr
 
   // Aurora always uses xAI directly; all other Wan/Seedance/LTX models use WaveSpeed directly.
   // Aurora (xAI direct) handles its T2V, Animate (I2V), and Extend variants; everything else → WaveSpeed.
-  // Zaor Box (self-hosted ComfyUI/LTX) is a third path — routes through the MODEL_REGISTRY/callModel
-  // dispatcher, not WaveSpeed or xAI, and needs no API key at all.
   const AURORA_ENGINES = ['aurora', 'aurora_i2v', 'aurora_extend'];
-  const registryEngine = MODEL_REGISTRY[engine];
-  const useZaorBox = !!(registryEngine && registryEngine.provider === 'comfy');
-  const useWaveSpeed = !AURORA_ENGINES.includes(engine) && !useZaorBox;
+  const useWaveSpeed = !AURORA_ENGINES.includes(engine);
 
   try {
-    if (useZaorBox) {
-      await generateVideoZaorBox(prompt, imageDataUrl, engine, progressId, () => cancelled, durationOverride, resOverride);
-    } else if (useWaveSpeed) {
+    if (useWaveSpeed) {
       if (!wavespeedKey) throw new Error('WaveSpeed API key required for Wan models. Tap "Set API Key" to add it.');
       await generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engine, progressId, () => cancelled, durationOverride, resOverride);
     } else {
@@ -4351,42 +3792,6 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
   }
 }
 
-// ═══════════════════════════════════════════════════════
-// ZAOR BOX VIDEO (self-hosted ComfyUI / LTX-2.3 10Eros) — video-mode GUI entry point.
-// Unlike Aurora/WaveSpeed above, this doesn't build its own request: it hands off to the
-// shared MODEL_REGISTRY entry (box-ltx-t2v / box-ltx-i2v) via callModel(), which already
-// contains the full submit/upload/poll logic for the pod. No API key needed — BOX_URL only.
-// ═══════════════════════════════════════════════════════
-async function generateVideoZaorBox(prompt, imageDataUrl, engine, progressId, isCancelled, durationOverride = null, resOverride = null) {
-  const m = MODEL_REGISTRY[engine];
-  if (!m) throw new Error('Unknown Zaor Box engine: ' + engine);
-  if (m.box === 'ltx-i2v' && !imageDataUrl) {
-    throw new Error('This Zaor Box engine needs a source image. Tap an image in the thread to pin it, then send.');
-  }
-
-  const _dur = durationOverride != null ? parseInt(durationOverride) : parseInt(document.getElementById('vid-duration-select')?.value);
-  const duration = (!isNaN(_dur) && _dur > 0) ? _dur : (m.durations ? m.durations[0] : 5);
-  const ratio = document.getElementById('vid-ratio-select')?.value || '16:9';
-  const res = resOverride || document.getElementById('vid-res-select')?.value || '720p';
-
-  const videoUrl = await callModel(engine, {
-    prompt,
-    image: imageDataUrl || undefined,
-    duration,
-    aspectRatio: ratio,
-    isCancelled
-  });
-
-  removeVideoProgress(progressId);
-  if (videoUrl) {
-    addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: m.label, storedDuration: duration, storedRes: res });
-    renderVideo(videoUrl, prompt, true, m.label, duration, res);
-  }
-}
-
-// ═══════════════════════════════════════════════════════
-// SHARED POLLING HELPER
-// ═══════════════════════════════════════════════════════
 async function pollForVideo(fetchFn, extractFn, progressId, isCancelled) {
   let elapsed = 0;
   const pollInterval = 5000;
@@ -4617,17 +4022,6 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
   lastFrameBtn.addEventListener('click', () => grabLastFrame(src, lastFrameBtn));
 
   // Pin for PE button on videos
-  const pinVidPEBtn = document.createElement('button');
-  pinVidPEBtn.className = 'pe-pin-btn';
-  pinVidPEBtn.textContent = '✦ PE';
-  pinVidPEBtn.title = 'Pin this video as context for Prompt Engineer extend prompts';
-  pinVidPEBtn.dataset.peUrl = src;
-  if (promptEngineerMode && pePinnedUrl === src) { pinVidPEBtn.classList.add('active'); pinVidPEBtn.textContent = '✦ PE ✓'; }
-  pinVidPEBtn.addEventListener('click', () => {
-    pinForPE(src, 'video', engineLabel + ' Video');
-    syncPePinHighlights();
-  });
-
   // Extend button — one-tap: switch to video mode, pin this video, ready the composer. No popup.
   const extendBtn = document.createElement('button');
   extendBtn.className = 'animate-btn';
@@ -4666,7 +4060,6 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
   vidBtnBar.appendChild(lastFrameBtn);
   vidBtnBar.appendChild(makeDeleteBtn(() => div, src, null, 'vid-save-btn'));
   wrapper.appendChild(vidBtnBar);
-  wrapper.appendChild(pinVidPEBtn);
   wrapper.appendChild(extendBtn);
   wrapper.appendChild(retryVidBtn);
   div.appendChild(label);
@@ -4978,17 +4371,6 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   }
 
   // Pin for PE button
-  const pinPEBtn = document.createElement('button');
-  pinPEBtn.className = 'pe-pin-btn';
-  pinPEBtn.textContent = '✦ PE';
-  pinPEBtn.title = 'Pin this image as visual context for Prompt Engineer mode';
-  pinPEBtn.dataset.peUrl = hostedUrl || src;
-  if (promptEngineerMode && pePinnedUrl === (hostedUrl || src)) { pinPEBtn.classList.add('active'); pinPEBtn.textContent = '✦ PE ✓'; }
-  pinPEBtn.addEventListener('click', () => {
-    pinForPE(hostedUrl || src, 'image', modelLabel);
-    syncPePinHighlights();
-  });
-
   // Set as edit target button
   const setTargetBtn = document.createElement('button');
   setTargetBtn.className = 'set-target-btn';
@@ -5157,7 +4539,6 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   btnBar.appendChild(saveBtn);
   btnBar.appendChild(cloudBtn);
   btnBar.appendChild(copyPromptBtn);
-  btnBar.appendChild(pinPEBtn);
   btnBar.appendChild(setTargetBtn);
   btnBar.appendChild(getStyleBtn);
   btnBar.appendChild(applyStyleBtn);
@@ -5528,124 +4909,6 @@ document.getElementById('library-save')?.addEventListener('click', () => {
   document.querySelectorAll('.lib-filter').forEach(b => b.classList.toggle('active', b.dataset.filter === 'mine'));
   renderLibrary();
 });
-
-// ═══════════════════════════════════════════════════════
-// PE FINALIZE — a separate grok call returns BEST + RUNNER-UP
-// prompts. The conversation is never touched; this call's whole
-// job is to emit the two prompts, so parsing is reliable.
-// ═══════════════════════════════════════════════════════
-const PE_MODE_MAP = {
-  aurora: 'image', zimage: 'image', wan26t2v: 'image',
-  qwen2: 'edit', qwen: 'edit', wan27: 'edit', fluxkontext: 'edit',
-  seedance15t2v: 'video'
-  // i2v / extend generate via the ▶ Animate/Extend panel — handled separately
-};
-
-function parseFinalPrompts(text) {
-  const t = (text || '').trim();
-  let best = '', runner = '';
-  const b = t.match(/BEST\s*:\s*([\s\S]*?)(?=\n\s*RUNNER[\s-]?UP\s*:|$)/i);
-  const r = t.match(/RUNNER[\s-]?UP\s*:\s*([\s\S]*)$/i);
-  if (b) best = b[1].trim();
-  if (r) runner = r[1].trim();
-  if (!best && !runner) {
-    // Fallback: no markers — take the first substantial line as best, rest as runner
-    const lines = t.split('\n').map(l => l.trim()).filter(Boolean);
-    best = lines[0] || t;
-    runner = lines.slice(1).join(' ');
-  }
-  const clean = s => (s || '')
-    .replace(/^(BEST|RUNNER[\s-]?UP)\s*:\s*/i, '')
-    .replace(/^["'`\u201c\u201d]+|["'`\u201c\u201d]+$/g, '')
-    .trim();
-  return { best: clean(best), runner: clean(runner) };
-}
-
-function peUsePrompt(text) {
-  const peModel = document.getElementById('pe-model-select')?.value || 'aurora';
-  const input = document.getElementById('prompt');
-  if (input) {
-    input.value = text;
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-  }
-  try { if (navigator.clipboard) navigator.clipboard.writeText(text); } catch(e) {}
-  const targetMode = PE_MODE_MAP[peModel];
-  if (targetMode) {
-    setMode(targetMode); // switches mode + turns PE off (mode !== 'chat'); preserves the box
-  } else {
-    // i2v / extend: exit PE, keep the prompt in the box + clipboard for the Animate/Extend panel
-    promptEngineerMode = false;
-    const peBtn = document.getElementById('pe-btn');
-    if (peBtn) { peBtn.classList.remove('active'); peBtn.textContent = '✦ PE'; }
-    document.getElementById('pe-model-row')?.classList.remove('visible');
-  }
-  input?.focus();
-}
-
-function peSavePrompt(text) {
-  if (!text) return false;
-  const suggested = text.slice(0, 40) + (text.length > 40 ? '…' : '');
-  const title = (window.prompt('Name this template:', suggested) || '').trim();
-  if (!title) return false;
-  userPrompts.unshift({ id: Date.now(), title, text, cat: 'Mine' });
-  saveUserPrompts();
-  return true;
-}
-
-function renderFinalPromptCards(best, runner) {
-  const items = [{ label: 'BEST', txt: best }, { label: 'RUNNER-UP', txt: runner }].filter(x => x.txt);
-  if (!items.length) return;
-  const wrap = document.createElement('div');
-  wrap.className = 'pe-final-cards';
-  wrap.innerHTML = '<div class="pe-final-head">✅ Final prompts — tap ▶ Use to load one</div>' +
-    items.map(it => '<div class="pe-final-card"><div class="pe-final-label">' + it.label +
-      '</div><div class="pe-final-text"></div><div class="pe-final-actions"><button class="pe-final-use">▶ Use</button><button class="pe-final-save">★ Save</button></div></div>').join('');
-  wrap.querySelectorAll('.pe-final-card').forEach((c, i) => {
-    c.querySelector('.pe-final-text').textContent = items[i].txt;
-    c.querySelector('.pe-final-use').addEventListener('click', () => peUsePrompt(items[i].txt));
-    c.querySelector('.pe-final-save').addEventListener('click', (e) => {
-      if (peSavePrompt(items[i].txt)) { e.target.textContent = '✓ Saved'; e.target.disabled = true; }
-    });
-  });
-  messagesEl.appendChild(wrap);
-  wrap.scrollIntoView({ behavior: 'smooth', block: 'end' });
-}
-
-async function finalizePromptPE() {
-  if (!apiKey) { openModal('api'); return; }
-  const hist = getHistory();
-  if (!hist || hist.length === 0) { appendError('Chat with the prompt builder first, then finalize.'); return; }
-  const peModel = document.getElementById('pe-model-select')?.value || 'aurora';
-  const guide = (PE_SYSTEM_PROMPTS[peModel] || PE_SYSTEM_PROMPTS.aurora).replace(PE_CONVO, '');
-  const finalizeSys = guide + "\n\nYou are now FINALIZING. From the whole conversation, decide the single strongest prompt and one meaningfully different runner-up. Output ONLY the two prompts — no preamble, no commentary, no quotes, no markdown. Use EXACTLY this format and nothing else:\nBEST: <the prompt with the best chance to succeed>\nRUNNER-UP: <the runner-up most likely to succeed>";
-  const apiMessages = [{ role: 'system', content: finalizeSys }, ...hist, { role: 'user', content: 'Output the BEST and RUNNER-UP final prompts now, in the exact format.' }];
-  const btn = document.getElementById('pe-finalize-btn');
-  const orig = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = '… finalizing'; }
-  try {
-    const res = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: modelSelect.value, messages: apiMessages, max_tokens: 1024 })
-    });
-    if (!res.ok) {
-      const ed = await res.json().catch(() => ({}));
-      throw new Error(`Finalize error ${res.status}: ${ed.error?.message || ed.error || ed.message || ''}`);
-    }
-    const data = await res.json();
-    const text = data.choices?.[0]?.message?.content || '';
-    try { addTextSpend(data.usage); } catch(e) {}
-    const { best, runner } = parseFinalPrompts(text);
-    if (!best && !runner) { appendError('Could not read a final prompt from the reply. Keep refining or try again.'); return; }
-    renderFinalPromptCards(best, runner);
-  } catch(e) {
-    appendError(e.message);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = orig; }
-  }
-}
-
-document.getElementById('pe-finalize-btn')?.addEventListener('click', finalizePromptPE);
 
 // ═══════════════════════════════════════════════════════
 // LoRA MANAGER — save LoRAs (link + trigger word), apply up to 3
@@ -6117,7 +5380,6 @@ function openModal(type) {
     document.getElementById('hf-key-input').value = hfKey;
     document.getElementById('cloudinary-cloud-input').value = cloudinaryCloud;
     document.getElementById('cloudinary-preset-input').value = cloudinaryPreset;
-    document.getElementById('box-url-input').value = BOX_URL;
     modalOverlay.classList.add('open');
     updateStorageInfo();
     setTimeout(() => keyInput.focus(), 100);
@@ -6153,15 +5415,6 @@ document.getElementById('modal-save').addEventListener('click', () => {
   localStorage.setItem('cloudinary_cloud', cloudinaryCloud);
   cloudinaryPreset = document.getElementById('cloudinary-preset-input').value.trim();
   localStorage.setItem('cloudinary_preset', cloudinaryPreset);
-  // Zaor Box URL — trims trailing slashes; clearing the field resets to the shipped default.
-  const boxVal = document.getElementById('box-url-input').value.trim().replace(/\/+$/, '');
-  if (boxVal) {
-    BOX_URL = boxVal;
-    localStorage.setItem('zaor_box_url', boxVal);
-  } else {
-    BOX_URL = DEFAULT_BOX_URL;
-    localStorage.removeItem('zaor_box_url');
-  }
   // Clear clipboard so keys don't linger
   try { navigator.clipboard.writeText(' ').catch(()=>{}); } catch(e) {}
   modalOverlay.classList.remove('open');
@@ -6421,9 +5674,6 @@ function estimateVideoCost(engine, duration, res) {
     }
     case 'wan27extend':                  // Wan 2.7 extend (approx base)
       return `~$${(0.10 * d).toFixed(2)}`;
-    case 'box-ltx-t2v':                  // Zaor Box: self-hosted pod, billed per-minute not per-clip
-    case 'box-ltx-i2v':
-      return 'Free';
     default:
       return '~$?';
   }
@@ -6445,7 +5695,7 @@ function updateCostEstimate() {
   } else if (editMode) {
     // Edit = input image + output image
     const editMod = document.getElementById('edit-model-select')?.value || 'wan27';
-    const editCostMap = { aurora: '~$0.04', 'aurora-simple': '~$0.02', wan27pro: '$0.06', wan27: '$0.03', fluxkontext: '$0.02', qwen2: '$0.03', qwen: '$0.02', 'klein9b-edit-lora': '$0.021', 'z-image-i2i': '$0.005', 'z-image-i2i-lora': '$0.01', 'atlas-flux-kontext': '$0.025', 'atlas-qwen-edit': '$0.02' };
+    const editCostMap = { aurora: '~$0.04', 'aurora-simple': '~$0.02', wan27pro: '$0.06', wan27: '$0.03', fluxkontext: '$0.02', qwen2: '$0.03', qwen: '$0.02', 'klein9b-edit-lora': '$0.021', 'z-image-i2i': '$0.005', 'z-image-i2i-lora': '$0.01' };
     el.textContent = editCostMap[editMod] || '$0.02';
     modeText.textContent = 'Edit image mode';
 
@@ -6495,115 +5745,6 @@ document.getElementById('refresh-btn')?.addEventListener('click', async () => {
     location.replace(location.pathname + '?fresh=' + Date.now());
   }
 });
-
-// ── Prompt Engineer Mode ──
-// Shared conversational behaviour for the Prompt Engineer. Composed with per-model guidance below.
-const PE_CONVO = "You are an expert prompt engineer collaborating with the user to craft the best possible prompt for a specific generation model. How you work: 1) If the user's idea is vague or missing important details (subject specifics, setting, mood, or style), ask 1-2 SHORT clarifying questions first and stop — do not write a prompt yet. 2) Once you have enough, you may give one short sentence of guidance, then output the final prompts clearly labelled, each on its own line, in EXACTLY this format:\nPROMPT: <the optimized prompt>\nVARIATION A: <a meaningfully different take>\nVARIATION B: <another different take>\n3) If the user asks to adjust anything ('moodier', 'wider shot', 'add rain'), revise and re-output in the same labelled format. 4) Keep commentary minimal — the prompts are the product. Never wrap prompts in quotes or markdown. ";
-const peSys = g => PE_CONVO + g;
-
-const PE_SYSTEM_PROMPTS = {
-  // ── Image generation ──
-  aurora: peSys("MODEL: FLUX / Aurora (image). Write each prompt as a single flowing natural-language description, NOT a comma-separated tag list. Order it: subject → action/pose → setting → lighting → camera. For photorealism, name a lens and/or film stock (e.g. 'shot on 85mm f/1.4', 'Fujifilm X-T5') and add 'visible skin pores, vellus hair' to avoid waxy AI skin. Aim for 30-80 words. Avoid contradictory directions like 'wide-angle close-up'. If the user is generating on Flux (especially with a LoRA) and fine detail or anatomy matters, you may also suggest generation settings: raise inference steps to ~36-45 (slower but sharper) and keep guidance scale around 3-4. Note that Flux's base model is weak on explicit anatomy, so a single close subject works better than multiple interacting figures."),
-  zimage: peSys("MODEL: Z-Image Turbo (image, Tongyi). Write a detailed natural-language description and front-load the subject (and any on-image text) at the very start. CRITICAL: Z-Image ignores negative prompts — phrase EVERY constraint positively (write 'clean seamless backdrop, sharp focus' NOT 'no clutter, not blurry'). Name the medium explicitly (camera/lens or film stock, e.g. 'shot on Hasselblad X2D, 80mm' or 'Kodak Portra 400 film grain'). Always specify lighting — it's Z-Image's biggest strength (volumetric, rim light, golden hour, chiaroscuro). Add texture words ('skin pores, fabric detail, film grain') to avoid a plastic look. Keep to 3-5 strong visual concepts in one style family; never mix contradictory styles. Z-Image renders text accurately, so put any sign/poster text in quotes."),
-  wan26t2v: peSys("MODEL: Wan (image). Natural-language description, specific and concrete (avoid bare tag dumps). Cover: subject, scene/environment, style, lighting, and quality. Be vivid but coherent."),
-  qwen2: peSys("MODEL: Qwen Image 2.0 (EDIT). Write an instruction, not a description. State clearly: what to KEEP unchanged, what to CHANGE, and constraints (match lighting, preserve identity). Be surgical and specific."),
-  qwen: peSys("MODEL: Qwen (EDIT). Write an edit instruction: what to change, what to preserve, desired outcome. Specific and direct."),
-  wan27: peSys("MODEL: Wan 2.7 (EDIT). Instruction style: state the subject, the precise change, what to preserve, and the visual style. Be explicit."),
-  fluxkontext: peSys("MODEL: Flux Kontext (EDIT). Use the form 'Keep [what stays unchanged]. Change [what to edit]. Ensure [style/lighting constraints].' Flux Kontext excels at preserving identity while making targeted edits."),
-
-  // ── Animate / Image-to-Video ──
-  aurora_i2v: peSys("MODEL: Aurora image-to-video. Describe MOTION, not appearance (the still already defines looks). Order: subject motion → camera move → mood/pacing. Use cinematic camera verbs ('slow push in', 'gentle parallax', 'subject turns to camera'). Keep under ~80 words."),
-  seedance15t2v: peSys("MODEL: Seedance text-to-video. Order: subject → one clear action (present tense) → camera → style. One main movement per shot. Vivid, physical language. Under ~100 words."),
-  ltx23: peSys("MODEL: LTX 2.3 (Lightricks video — T2V/I2V/extend with NATIVE AUDIO). Write the prompt as a flowing cinematic NARRATIVE in prose — never labelled fields like 'Subject:/Camera:'. Structure first, style second: give a clear subject, ONE specific action with concrete motion verbs ('hands moving with practiced precision', not 'cooking'), and the setting; then layer lighting and style words last. Describe the camera move in plain language, usually near the end ('the camera slowly dollies from behind the subject to in front'). CRUCIAL: LTX generates sound natively — explicitly describe the audio: ambient room tone, specific sound effects, and any music or dialogue (e.g. 'the strong thud of the hammer, soft country blues from an old gramophone'). Add realism cues (natural directional light, authentic skin texture). If animating from an image (I2V), describe ONLY the motion, light changes and audio — do NOT redescribe what is already in the frame. Keep to one coherent beat."),
-  seedance_i2v: peSys("MODEL: Seedance image-to-video. Describe the motion, camera behaviour, emotional tone and visual style. Seedance handles bold, expressive motion well. Describe motion not appearance. Under ~100 words."),
-  wan22spicy_i2v: peSys("MODEL: Wan 2.2 image-to-video. Lead with subject + motion, then camera. Pick ONE clear motion — avoid complex multi-action. Use motion-intensity words (subtle/gentle, smooth/flowing, dynamic/sweeping). Under ~60 words."),
-  ltx23spicy: peSys("MODEL: LTX 2.3 Spicy image-to-video with synchronized audio. Describe ONE clear action/motion plus the camera move, and explicitly describe any audio you want (e.g. 'soft ambient music', 'waves', 'breathing') since this model generates sound. Keep motion focused — one action per prompt. Under ~60 words."),
-  wan27spicy_i2v: peSys("MODEL: Wan 2.7 image-to-video. Supports a short arc: opening motion → development → resolution. Order subject → motion → camera → scene. Include camera work and clear motion-intensity. Under ~100 words."),
-
-  // ── Video Extend ──
-  aurora_extend: peSys("MODEL: Aurora video EXTEND. Describe what happens NEXT as a natural continuation: follow-on action, camera movement, mood. Match the original's style. Phrases like 'continues into', 'camera pulls back to reveal'. Under ~80 words."),
-  wan27extend: peSys("MODEL: Wan 2.7 video EXTEND. Describe what happens next: motion, camera, atmosphere, scene development. Specific and directional, continuing the prior mood. Under ~80 words."),
-  wan22spicy_extend: peSys("MODEL: Wan 2.2 video EXTEND. Keep it simple — one or two clear continuation actions, matching the prior shot's mood. Direct, under ~50 words.")
-};
-
-document.getElementById('pe-btn')?.addEventListener('click', () => {
-  promptEngineerMode = !promptEngineerMode;
-  const btn = document.getElementById('pe-btn');
-  const modelRow = document.getElementById('pe-model-row');
-  btn?.classList.toggle('active', promptEngineerMode);
-  if (modelRow) modelRow.classList.toggle('visible', promptEngineerMode);
-  if (promptEngineerMode) {
-    btn.textContent = '✦ PE ON';
-    syncPePinHighlights(); // re-light the pinned card (pin was remembered)
-  } else {
-    btn.textContent = '✦ PE';
-    // Keep pin but deactivate use, and clear the pin highlight while PE is off
-    peUseImage = false;
-    updatePeImgToggle();
-    syncPePinHighlights();
-  }
-});
-
-// Pin highlight = PE is on AND this card is the pinned one. Matches by URL so it survives re-renders.
-function syncPePinHighlights() {
-  document.querySelectorAll('.pe-pin-btn').forEach(b => {
-    const isPinned = promptEngineerMode && !!pePinnedUrl && b.dataset.peUrl === pePinnedUrl;
-    b.classList.toggle('active', isPinned);
-    b.textContent = isPinned ? '✦ PE ✓' : '✦ PE';
-  });
-}
-
-function updatePeImgToggle() {
-  const btn = document.getElementById('pe-img-toggle');
-  const status = document.getElementById('pe-pin-status');
-  const clearBtn = document.getElementById('pe-pin-clear');
-  if (!btn) return;
-  if (pePinnedUrl) {
-    btn.style.borderColor = 'var(--lavender)';
-    btn.style.color = 'var(--lavender)';
-    btn.style.background = 'rgba(201,184,232,0.12)';
-    btn.textContent = pePinnedType === 'video' ? '🎬 Video Pinned' : '🖼 Image Pinned';
-    if (status) { status.textContent = pePinnedLabel || 'Pinned for context'; status.style.color = 'var(--lavender)'; }
-    if (clearBtn) clearBtn.style.display = 'inline';
-    peUseImage = true;
-  } else {
-    btn.style.borderColor = 'rgba(255,255,255,0.1)';
-    btn.style.color = 'var(--text-dim)';
-    btn.style.background = 'transparent';
-    btn.textContent = '🖼 Pin Image/Video';
-    if (status) { status.textContent = 'None pinned — works without image context too'; status.style.color = 'var(--text-dim)'; }
-    if (clearBtn) clearBtn.style.display = 'none';
-    peUseImage = false;
-  }
-}
-
-// Pin clear button
-document.getElementById('pe-pin-clear')?.addEventListener('click', () => {
-  pePinnedUrl = null; pePinnedType = null; pePinnedLabel = '';
-  updatePeImgToggle();
-  syncPePinHighlights();
-});
-
-// Pin button — cycles through showing instructions
-document.getElementById('pe-img-toggle')?.addEventListener('click', () => {
-  if (pePinnedUrl) {
-    // Already pinned — clear it
-    pePinnedUrl = null; pePinnedType = null; pePinnedLabel = '';
-    updatePeImgToggle();
-  } else {
-    // Show instruction
-    const status = document.getElementById('pe-pin-status');
-    if (status) { status.textContent = '👆 Tap 📌 Pin on any image or 📌 Pin on any video below'; status.style.color = '#f4d03f'; }
-  }
-});
-
-// Global function to pin an item for PE — called from image/video buttons
-function pinForPE(url, type, label) {
-  pePinnedUrl = url;
-  pePinnedType = type;
-  pePinnedLabel = label || (type === 'video' ? 'Video' : 'Image');
-  updatePeImgToggle();
-}
 
 function updateKeyBtn() {
   apiKeyBtn.textContent = apiKey ? '🔑 API Keys ✓' : '🔑 Set API Keys';
