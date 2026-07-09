@@ -252,6 +252,7 @@
       align-items: center;
       gap: 8px;
       flex-shrink: 0;
+      margin-left: auto;
     }
 
     #api-key-btn {
@@ -439,6 +440,8 @@
 
     #prompt {
       flex: 1;
+      min-width: 0;
+      overflow-wrap: break-word;
       background: transparent;
       border: none; outline: none;
       color: var(--text);
@@ -463,6 +466,12 @@
     #img-toggle:hover { color: var(--lavender); }
     #img-toggle.active { background: rgba(196,122,138,0.18); color: var(--rose); }
 
+    #chat-mode-row { display: flex; flex-direction: column; padding: 0 4px; }
+    #input-area.image-mode #chat-mode-row,
+    #input-area.edit-mode #chat-mode-row,
+    #input-area.video-mode #chat-mode-row,
+    #input-area.enhance-mode #chat-mode-row { display: none !important; }
+
     #img-mode-row {
       display: none;
       flex-direction: column;
@@ -471,6 +480,25 @@
       padding: 0 4px;
     }
     #input-area.image-mode #img-mode-row { display: flex; }
+
+    /* Shared reference-image attach/pin pattern — used by chat, edit, and video modes */
+    .ref-pin-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px 0; font-size: 12px; flex-wrap: wrap; }
+    .ref-pin-empty { color: var(--text-dim); }
+    .ref-attach-btn {
+      background: transparent; border: 1px solid rgba(255,255,255,0.15); color: var(--text-dim);
+      font-family: 'Inter', sans-serif; font-size: 11px; padding: 3px 10px; border-radius: 10px;
+      cursor: pointer; white-space: nowrap; margin-left: 4px;
+    }
+    .ref-attach-btn:hover { border-color: var(--lavender); color: var(--lavender); }
+    .ref-pin-chip {
+      display: none; align-items: center; gap: 6px; background: var(--surface);
+      border: 1px solid #64b4ff; border-radius: 16px; padding: 3px 6px 3px 3px;
+    }
+    .ref-pin-chip.visible { display: inline-flex; }
+    .ref-pin-thumb { width: 28px; height: 28px; object-fit: cover; border-radius: 12px; }
+    .ref-pin-label { color: #64b4ff; }
+    .ref-pin-clear { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 0 2px; }
+    .ref-pin-clear:hover { color: var(--lavender); }
 
     /* Edit mode — its own dedicated toolbar, separate from text-to-image */
     #edit-mode-row {
@@ -1327,6 +1355,17 @@
           </svg>
         </button>
       </div>
+      <div id="chat-mode-row">
+        <div class="ref-pin-row" id="chat-pin-row">
+          <span id="chat-pin-empty" class="ref-pin-empty">📌 Tap 📎 Attach, or an image in the thread, to give Zaor visual context.</span>
+          <button id="chat-attach-btn" class="ref-attach-btn" title="Attach an image for Zaor to look at">📎 Attach</button>
+          <span id="chat-pin-chip" class="ref-pin-chip">
+            <img id="chat-pin-thumb" class="ref-pin-thumb" alt="attached reference">
+            <span class="ref-pin-label">Attached</span>
+            <button id="chat-pin-clear" class="ref-pin-clear" title="Remove">✕</button>
+          </span>
+        </div>
+      </div>
       <div id="img-mode-row">
         <div class="img-controls-row">
           <div class="img-control-group">
@@ -1394,6 +1433,14 @@
       <div id="edit-mode-row">
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:0 0 2px;">
           <button id="upload-img-btn" class="edit-img-btn visible" title="Upload an image to edit">🖼 Upload Image</button>
+        </div>
+        <div class="ref-pin-row" id="edit-pin-row">
+          <span id="edit-pin-empty" class="ref-pin-empty">📌 Upload, or tap 🎯 Edit Target on an image in the thread.</span>
+          <span id="edit-pin-chip" class="ref-pin-chip">
+            <img id="edit-pin-thumb" class="ref-pin-thumb" alt="edit target">
+            <span class="ref-pin-label">Target set</span>
+            <button id="edit-pin-clear" class="ref-pin-clear" title="Clear target">✕</button>
+          </span>
         </div>
         <div class="img-controls-row">
           <div class="img-control-group" style="flex:1;min-width:180px;">
@@ -1497,12 +1544,12 @@
             </select>
           </div>
         </div>
-        <div id="vid-pin-row" style="display:none;align-items:center;gap:8px;padding:6px 4px 0;font-size:12px;flex-wrap:wrap;">
-          <span id="vid-pin-empty" style="color:var(--text-dim);">📌 Tap an image in the thread to animate it here.</span>
-          <span id="vid-pin-chip" style="display:none;align-items:center;gap:6px;background:var(--surface);border:1px solid #64b4ff;border-radius:16px;padding:3px 6px 3px 3px;">
-            <img id="vid-pin-thumb" style="width:28px;height:28px;object-fit:cover;border-radius:12px;" alt="pinned source">
-            <span id="vid-pin-label" style="color:#64b4ff;">Pinned</span>
-            <button id="vid-pin-clear" title="Unpin" style="background:transparent;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;padding:0 2px;">✕</button>
+        <div id="vid-pin-row" class="ref-pin-row" style="display:none;">
+          <span id="vid-pin-empty" class="ref-pin-empty">📌 Tap an image in the thread to animate it here.</span>
+          <span id="vid-pin-chip" class="ref-pin-chip" style="display:none;">
+            <img id="vid-pin-thumb" class="ref-pin-thumb" alt="pinned source">
+            <span id="vid-pin-label" class="ref-pin-label">Pinned</span>
+            <button id="vid-pin-clear" class="ref-pin-clear" title="Unpin">✕</button>
           </span>
         </div>
       </div>
@@ -1756,7 +1803,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.77';
+const APP_VERSION = '1.79';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2934,6 +2981,7 @@ document.getElementById('edit-toggle')?.addEventListener('click', () => {
 
 // ── Upload image for editing/animating ──
 document.getElementById('upload-img-btn').addEventListener('click', () => {
+  pendingUploadTarget = 'edit';
   document.getElementById('img-file-input').click();
 });
 
@@ -2952,6 +3000,11 @@ document.getElementById('img-file-input').addEventListener('change', async (e) =
   reader.onload = () => {
     const dataUrl = reader.result;
 
+    if (pendingUploadTarget === 'chat') {
+      attachChatImage(dataUrl, dataUrl);
+      return;
+    }
+
     // Ensure a game exists
     if (!currentThreadId) createThread('New Game');
     document.getElementById('empty-state')?.remove();
@@ -2962,6 +3015,7 @@ document.getElementById('img-file-input').addEventListener('change', async (e) =
     renderImage(dataUrl, 'Uploaded image', true, null, 'Uploaded');
     lastImageUrl = dataUrl;
     activeEditTarget = dataUrl;
+    updateEditPinRow();
     showEditButton();
     setEditMode(true);
   };
@@ -3060,6 +3114,54 @@ function videoEngineKind(engine) {
 // ── Pinned source for Animate/Extend (v1.56) ──
 // Holds the media the user tapped in the thread. imageUrl for I2V, videoUrl for Extend.
 let pinnedVideoSource = null; // { kind:'image'|'video', url, thumb }
+let chatAttachedImage = null; // { url, thumb } — reference image for vision-capable chat replies
+let pendingUploadTarget = 'edit'; // 'edit' | 'chat' — which flow the shared file picker is currently serving
+
+function updateChatPinRow() {
+  const empty = document.getElementById('chat-pin-empty');
+  const chip = document.getElementById('chat-pin-chip');
+  if (!empty || !chip) return;
+  if (chatAttachedImage) {
+    empty.style.display = 'none';
+    chip.classList.add('visible');
+    document.getElementById('chat-pin-thumb').src = chatAttachedImage.thumb || chatAttachedImage.url;
+  } else {
+    empty.style.display = 'inline';
+    chip.classList.remove('visible');
+  }
+}
+function attachChatImage(url, thumb) {
+  chatAttachedImage = { url, thumb: thumb || url };
+  updateChatPinRow();
+}
+document.getElementById('chat-pin-clear')?.addEventListener('click', () => {
+  chatAttachedImage = null;
+  updateChatPinRow();
+});
+document.getElementById('chat-attach-btn')?.addEventListener('click', () => {
+  pendingUploadTarget = 'chat';
+  document.getElementById('img-file-input').click();
+});
+
+function updateEditPinRow() {
+  const empty = document.getElementById('edit-pin-empty');
+  const chip = document.getElementById('edit-pin-chip');
+  if (!empty || !chip) return;
+  const target = activeEditTarget || lastImageUrl;
+  if (target) {
+    empty.style.display = 'none';
+    chip.classList.add('visible');
+    document.getElementById('edit-pin-thumb').src = target;
+  } else {
+    empty.style.display = 'inline';
+    chip.classList.remove('visible');
+  }
+}
+document.getElementById('edit-pin-clear')?.addEventListener('click', () => {
+  activeEditTarget = null;
+  lastImageUrl = null;
+  updateEditPinRow();
+});
 
 function updateVideoPinRow() {
   const engine = document.getElementById('vid-engine-select')?.value || 'aurora';
@@ -3184,7 +3286,14 @@ async function handleSend() {
       await generateVideo(text, null);
     }
   } else {
-    addToHistory('user', text);
+    if (chatAttachedImage) {
+      addToHistory('user', [
+        { type: 'image_url', image_url: { url: chatAttachedImage.url, detail: 'auto' } },
+        { type: 'text', text: text }
+      ]);
+    } else {
+      addToHistory('user', text);
+    }
     await generateText(text);
   }
 
@@ -4370,7 +4479,6 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
     });
   }
 
-  // Pin for PE button
   // Set as edit target button
   const setTargetBtn = document.createElement('button');
   setTargetBtn.className = 'set-target-btn';
@@ -4393,8 +4501,19 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
     activeEditTarget = hostedUrl || src;
     setTargetBtn.classList.add('is-target');
     setTargetBtn.textContent = '🎯 Target Set';
+    updateEditPinRow();
     showEditButton();
     if (!editMode && !enhanceMode) setEditMode(true);
+  });
+
+  // Attach this image as chat vision context
+  const chatAttachBtn = document.createElement('button');
+  chatAttachBtn.className = 'set-target-btn';
+  chatAttachBtn.textContent = '💬 Use in Chat';
+  chatAttachBtn.title = 'Give Zaor this image as visual context in chat';
+  chatAttachBtn.addEventListener('click', () => {
+    attachChatImage(hostedUrl || src, src);
+    if (imageMode || editMode || videoMode || enhanceMode) setMode('chat');
   });
 
   // Retry button
@@ -4540,6 +4659,7 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   btnBar.appendChild(cloudBtn);
   btnBar.appendChild(copyPromptBtn);
   btnBar.appendChild(setTargetBtn);
+  btnBar.appendChild(chatAttachBtn);
   btnBar.appendChild(getStyleBtn);
   btnBar.appendChild(applyStyleBtn);
   btnBar.appendChild(retryImgBtn);
@@ -5425,6 +5545,7 @@ keyInput.addEventListener('keydown', e => { if (e.key === 'Enter') document.getE
 function showEditButton() {
   const row = document.getElementById('edit-btn-row');
   if (row) row.style.display = 'flex';
+  updateEditPinRow();
 }
 
 // ── Style Lock ──
