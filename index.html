@@ -1626,6 +1626,7 @@
         <button class="btn-secondary" id="clear-media-btn" style="flex:1;">🧹 Clear stored media</button>
         <button class="btn-secondary" id="clear-chats-btn" style="flex:1;">🗑 Clear all chats</button>
       </div>
+      <button class="btn-secondary" id="dump-idb-btn" style="width:100%;margin-top:8px;">🐛 Dump IndexedDB</button>
       <div style="font-size:11px;color:var(--text-dim);margin-top:6px;">Frees space if the app slows down. Your LoRAs, saved prompts, and keys are kept.</div>
     </div>
     </div>
@@ -1803,7 +1804,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.79';
+const APP_VERSION = '1.80';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2397,7 +2398,9 @@ const sidebarBack   = document.getElementById('sidebar-backdrop');
 // stored as ONE value under a single key (open-the-locker-once, save-as-one-piece),
 // which can't half-write or lose data mid-save. Boot awaits initThreadStorage()
 // before the first render (see the boot block lower in this file).
-const THREADS_KEY = 'gs_threads';
+const THREADS_KEY = 'gs_threads'; // legacy monolithic-blob key — kept only for one-time migration
+const THREAD_PREFIX = 'thread:';  // per-thread record key: THREAD_PREFIX + thread.id
+const THREAD_INDEX_KEY = 'gs_thread_index'; // ordered array of thread ids
 
 const idbKV = (() => {
   let dbPromise = null;
@@ -2428,35 +2431,68 @@ const idbKV = (() => {
       tx.onabort = () => reject(tx.error);
     }));
   }
+  function dumpAll() {
+    return openDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction('kv', 'readonly');
+      const store = tx.objectStore('kv');
+      const keysReq = store.getAllKeys();
+      const valsReq = store.getAll();
+      tx.oncomplete = () => {
+        const keys = keysReq.result || [];
+        const vals = valsReq.result || [];
+        const out = {};
+        keys.forEach((k, i) => { out[k] = vals[i]; });
+        resolve(out);
+      };
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    }));
+  }
   return {
     get: (k) => run('readonly',  s => s.get(k)),
     set: (k, v) => run('readwrite', s => s.put(v, k)),
     del: (k) => run('readwrite', s => s.delete(k)),
+    dumpAll,
   };
 })();
 
 let threadsCache = [];
 let idbReady = false;
 
-// One-time boot load + migration from legacy localStorage. Await before first render.
+// One-time boot load + migration. Await before first render.
+// Storage layout: each thread lives under its own IndexedDB key (THREAD_PREFIX + id),
+// plus a small THREAD_INDEX_KEY array giving thread order. This means a save only
+// ever writes the thread(s) that actually changed, not your entire chat history —
+// which is what made saves slow/fragile as media-heavy history grew.
 async function initThreadStorage() {
   try {
-    const stored = await idbKV.get(THREADS_KEY);
-    if (Array.isArray(stored)) {
-      threadsCache = stored;
+    const index = await idbKV.get(THREAD_INDEX_KEY);
+    if (Array.isArray(index)) {
+      // Already on the per-thread layout — load each record.
+      const loaded = await Promise.all(
+        index.map(id => idbKV.get(THREAD_PREFIX + id).catch(() => null))
+      );
+      threadsCache = loaded.filter(Boolean);
       idbReady = true;
       try { localStorage.removeItem(THREADS_KEY); } catch (e) {} // drop stale legacy copy
       return;
     }
-    // No IndexedDB data yet — migrate legacy localStorage threads if any exist.
-    let legacy = [];
-    try { legacy = JSON.parse(localStorage.getItem(THREADS_KEY) || '[]'); } catch (e) { legacy = []; }
+
+    // No per-thread index yet — check for the old monolithic blob (IndexedDB, then localStorage).
+    let legacy = null;
+    try { legacy = await idbKV.get(THREADS_KEY); } catch (e) { legacy = null; }
+    if (!Array.isArray(legacy)) {
+      try { legacy = JSON.parse(localStorage.getItem(THREADS_KEY) || '[]'); }
+      catch (e) { legacy = []; }
+    }
     threadsCache = Array.isArray(legacy) ? legacy : [];
     idbReady = true;
-    if (threadsCache.length) {
-      await idbKV.set(THREADS_KEY, threadsCache);          // copy old data into IndexedDB
-      try { localStorage.removeItem(THREADS_KEY); } catch (e) {} // free the old 5MB slot
-    }
+
+    // Migrate: write each thread as its own record, build the index, drop the old blob.
+    await Promise.all(threadsCache.map(t => idbKV.set(THREAD_PREFIX + t.id, t)));
+    await idbKV.set(THREAD_INDEX_KEY, threadsCache.map(t => t.id));
+    try { await idbKV.del(THREADS_KEY); } catch (e) {}
+    try { localStorage.removeItem(THREADS_KEY); } catch (e) {} // free the old 5MB slot
   } catch (e) {
     // IndexedDB blocked/unavailable (e.g. private mode) — fall back to localStorage.
     console.error('[Zaor storage init]', e && (e.stack || e.message));
@@ -2478,19 +2514,42 @@ function getThreads() {
 }
 
 function saveThreads(threads) {
-  threadsCache = Array.isArray(threads) ? threads : [];
-  if (idbReady) {
-    idbKV.set(THREADS_KEY, threadsCache).catch(e => {
-      console.error('[Zaor storage save]', e && (e.stack || e.message));
-      appendError('Could not save locally — your latest changes may not persist.');
-    });
-  } else {
+  const newList = Array.isArray(threads) ? threads : [];
+  const oldList = Array.isArray(threadsCache) ? threadsCache : [];
+  threadsCache = newList;
+
+  if (!idbReady) {
     // Fallback when IndexedDB is unavailable.
-    try { localStorage.setItem(THREADS_KEY, JSON.stringify(threadsCache)); }
+    try { localStorage.setItem(THREADS_KEY, JSON.stringify(newList)); }
     catch (e) {
       if (e.name === 'QuotaExceededError') appendError('Storage full — save images to Files to free space.');
     }
+    return;
   }
+
+  // Diff against the previous state so a save only writes the thread(s) that
+  // actually changed, instead of rewriting your entire chat history every time.
+  const oldById = new Map(oldList.map(t => [t.id, t]));
+  const newIds = newList.map(t => t.id);
+  const newIdSet = new Set(newIds);
+  const removedIds = oldList.map(t => t.id).filter(id => !newIdSet.has(id));
+
+  const toWrite = newList.filter(t => {
+    const old = oldById.get(t.id);
+    if (!old) return true; // new thread
+    try { return JSON.stringify(old) !== JSON.stringify(t); } catch (e) { return true; }
+  });
+
+  const tasks = [
+    idbKV.set(THREAD_INDEX_KEY, newIds),
+    ...toWrite.map(t => idbKV.set(THREAD_PREFIX + t.id, t)),
+    ...removedIds.map(id => idbKV.del(THREAD_PREFIX + id)),
+  ];
+
+  Promise.all(tasks).catch(e => {
+    console.error('[Zaor storage save]', e && (e.stack || e.message));
+    appendError('Could not save locally — your latest changes may not persist.');
+  });
 }
 
 function getThread(id) {
@@ -2607,9 +2666,39 @@ function clearStoredMedia() {
 }
 
 function clearAllChats() {
+  const ids = threadsCache.map(t => t.id);
   threadsCache = [];
-  if (idbReady) { idbKV.del(THREADS_KEY).catch(e => console.error('[Zaor clearAll]', e)); }
+  if (idbReady) {
+    Promise.all([
+      idbKV.set(THREAD_INDEX_KEY, []),
+      ...ids.map(id => idbKV.del(THREAD_PREFIX + id)),
+      idbKV.del(THREADS_KEY).catch(() => {}), // clean up legacy blob key too, if it still exists
+    ]).catch(e => console.error('[Zaor clearAll]', e));
+  }
   try { localStorage.removeItem('gs_threads'); } catch(e) {}
+}
+
+// Raw debug dump of every key in the IndexedDB 'kv' store (thread records, index,
+// anything else stashed there) — exactly what's on disk, no transformation.
+async function dumpIndexedDB() {
+  let dump = {};
+  try { dump = await idbKV.dumpAll(); }
+  catch (e) { console.error('[Zaor dumpIndexedDB]', e && (e.stack || e.message)); dump = { error: String(e) }; }
+
+  const json = JSON.stringify(dump);
+  const stamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+  const fname = `zaor-idb-dump_${stamp}.json`;
+  const file = new File([json], fname, { type: 'application/json' });
+
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: fname }); return; }
+    catch (e) { if (e.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = fname;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -4872,6 +4961,14 @@ document.getElementById('clear-chats-btn')?.addEventListener('click', () => {
   clearAllChats();
   updateStorageInfo();
   alert('All conversations cleared. Reload the app.');
+});
+document.getElementById('dump-idb-btn')?.addEventListener('click', async () => {
+  const b = document.getElementById('dump-idb-btn');
+  const o = b.textContent;
+  b.textContent = 'Dumping…';
+  try { await dumpIndexedDB(); }
+  catch (e) { console.error('[Zaor dump-idb-btn]', e); alert('Dump failed: ' + (e.message || e)); }
+  finally { b.textContent = o; }
 });
 
 // ═══════════════════════════════════════════════════════
