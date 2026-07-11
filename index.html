@@ -839,7 +839,8 @@
     }
     .cloud-thumb {
       position: relative;
-      aspect-ratio: 1;
+      padding-bottom: 100%; /* square height computed from width — reliable on iOS Safari where aspect-ratio collapses in scrolling grids */
+      height: 0;
       border-radius: 10px;
       overflow: hidden;
       cursor: pointer;
@@ -849,7 +850,7 @@
     }
     .cloud-thumb:hover { border-color: var(--lavender); }
     .cloud-thumb:active { transform: scale(0.96); }
-    .cloud-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .cloud-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
     #cloud-picker-status {
       font-size: 13px; color: var(--text-dim);
       text-align: center; padding: 28px 12px; line-height: 1.5;
@@ -1906,6 +1907,10 @@
   <div class="modal" style="max-width:560px;width:92%;max-height:82vh;display:flex;flex-direction:column;">
     <h2 style="margin-bottom:4px;">☁ Load from Cloudinary</h2>
     <p style="margin-bottom:10px;">Tap an image to bring it in. Only images saved from this app (tagged) appear here, and new saves can take up to a minute to show.</p>
+    <div id="cloud-sort-row" style="display:flex;gap:6px;margin-bottom:10px;flex-shrink:0;">
+      <button class="lib-filter active" data-sort="newest">Newest</button>
+      <button class="lib-filter" data-sort="oldest">Oldest</button>
+    </div>
     <div id="cloud-picker-grid"></div>
     <div id="cloud-picker-status"></div>
     <div class="modal-btns" style="margin-top:12px;flex-shrink:0;">
@@ -2082,7 +2087,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.92';
+const APP_VERSION = '1.93';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -3635,6 +3640,40 @@ async function openCloudPicker(target) {
   loadCloudPicker();
 }
 
+// Holds the last-fetched resource list so the sort toggle can re-order without re-fetching.
+let _cloudResources = [];
+let _cloudSort = 'newest';
+
+function renderCloudGrid() {
+  const grid = document.getElementById('cloud-picker-grid');
+  const status = document.getElementById('cloud-picker-status');
+  grid.innerHTML = '';
+  if (!_cloudResources.length) return;
+
+  const sorted = _cloudResources.slice().sort((a, b) => {
+    // created_at isn't always present in the client-side list payload;
+    // Cloudinary's `version` is the upload timestamp, so use it as a reliable fallback.
+    const ta = a.created_at ? Date.parse(a.created_at) : (Number(a.version) || 0);
+    const tb = b.created_at ? Date.parse(b.created_at) : (Number(b.version) || 0);
+    return _cloudSort === 'oldest' ? (ta - tb) : (tb - ta);
+  });
+
+  status.style.display = 'none';
+  for (const r of sorted) {
+    const full = _cloudFullUrl(r.public_id, r.version, r.format);
+    const thumb = _cloudThumbUrl(r.public_id, r.version, r.format);
+    const cell = document.createElement('div');
+    cell.className = 'cloud-thumb';
+    const im = document.createElement('img');
+    im.loading = 'lazy';
+    im.src = thumb;
+    im.alt = r.public_id;
+    cell.appendChild(im);
+    cell.addEventListener('click', () => { pickCloudImage(full); });
+    grid.appendChild(cell);
+  }
+}
+
 async function loadCloudPicker() {
   const grid = document.getElementById('cloud-picker-grid');
   const status = document.getElementById('cloud-picker-status');
@@ -3662,27 +3701,12 @@ async function loadCloudPicker() {
     }
     if (!res.ok) { status.textContent = 'Couldn\'t load (error ' + res.status + '). Try Refresh.'; return; }
     const data = await res.json().catch(() => ({}));
-    const resources = (data && data.resources) || [];
-    if (!resources.length) {
+    _cloudResources = (data && data.resources) || [];
+    if (!_cloudResources.length) {
       status.innerHTML = 'No images found yet under this tag. Save an image with ☁ Cloud first, then Refresh.';
       return;
     }
-    // Newest first when a timestamp is present
-    resources.sort((a, b) => (b.created_at ? Date.parse(b.created_at) : 0) - (a.created_at ? Date.parse(a.created_at) : 0));
-    status.style.display = 'none';
-    for (const r of resources) {
-      const full = _cloudFullUrl(r.public_id, r.version, r.format);
-      const thumb = _cloudThumbUrl(r.public_id, r.version, r.format);
-      const cell = document.createElement('div');
-      cell.className = 'cloud-thumb';
-      const im = document.createElement('img');
-      im.loading = 'lazy';
-      im.src = thumb;
-      im.alt = r.public_id;
-      cell.appendChild(im);
-      cell.addEventListener('click', () => { pickCloudImage(full); });
-      grid.appendChild(cell);
-    }
+    renderCloudGrid();
   } catch (e) {
     status.style.display = 'block';
     status.textContent = 'Network error loading your Cloudinary images. Check your connection and Refresh.';
@@ -3712,6 +3736,13 @@ function pickCloudImage(url) {
 
 document.getElementById('cloud-picker-close').addEventListener('click', () => _cloudPickerOverlay.classList.remove('open'));
 document.getElementById('cloud-picker-refresh').addEventListener('click', loadCloudPicker);
+document.querySelectorAll('#cloud-sort-row .lib-filter').forEach(btn => {
+  btn.addEventListener('click', () => {
+    _cloudSort = btn.dataset.sort;
+    document.querySelectorAll('#cloud-sort-row .lib-filter').forEach(b => b.classList.toggle('active', b === btn));
+    renderCloudGrid(); // re-order the cached list; no re-fetch
+  });
+});
 _cloudPickerOverlay.addEventListener('click', e => { if (e.target === _cloudPickerOverlay) _cloudPickerOverlay.classList.remove('open'); });
 
 function updateEditPinRow() {
