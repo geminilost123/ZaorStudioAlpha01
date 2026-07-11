@@ -2082,7 +2082,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.91';
+const APP_VERSION = '1.92';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -4750,6 +4750,11 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
 
 
 // Capture the final frame of a video to a JPEG data URL (in-browser via canvas).
+// Note: on iOS/mobile Safari, the 'seeked' event can fire before the decoder has
+// actually painted the frame, producing a solid-black canvas with no error thrown.
+// We prime the decoder with a muted play/pause, then wait for an actual painted
+// frame (requestVideoFrameCallback where supported) before drawing, and verify
+// the result isn't blank before accepting it.
 function captureLastFrame(videoSrc) {
   return new Promise((resolve, reject) => {
     const v = document.createElement('video');
@@ -4760,24 +4765,73 @@ function captureLastFrame(videoSrc) {
     let done = false;
     const cleanup = () => { try { v.removeAttribute('src'); v.load(); } catch (e) {} };
     const fail = (msg) => { if (done) return; done = true; cleanup(); reject(new Error(msg)); };
+
+    const drawFrame = () => {
+      if (done) return;
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = v.videoWidth;
+        canvas.height = v.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+
+        // Sanity-check: sample a few pixels to catch an all-black paint.
+        let blank = true;
+        try {
+          const w = canvas.width, h = canvas.height;
+          const pts = [[w>>1,h>>1],[4,4],[w-4,4],[4,h-4],[w-4,h-4]];
+          for (const [px,py] of pts) {
+            const d = ctx.getImageData(Math.max(0,px), Math.max(0,py), 1, 1).data;
+            if (d[0] > 8 || d[1] > 8 || d[2] > 8) { blank = false; break; }
+          }
+        } catch (e) { blank = false; } // getImageData blocked (CORS) — trust the draw
+
+        if (blank && !v._zaorRetried) {
+          // Frame wasn't actually painted yet — nudge the decoder and retry once.
+          v._zaorRetried = true;
+          const nudge = Math.max(0, v.currentTime - 0.08);
+          v.addEventListener('seeked', scheduleDraw, { once: true });
+          v.currentTime = nudge;
+          return;
+        }
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        done = true; cleanup(); resolve(dataUrl);
+      } catch (err) {
+        fail(err && err.name === 'SecurityError' ? 'the video host doesn\'t allow frame capture (CORS)' : (err.message || 'capture failed'));
+      }
+    };
+
+    // Wait for the decoder to actually paint the current frame before drawing.
+    const scheduleDraw = () => {
+      if (done) return;
+      if (typeof v.requestVideoFrameCallback === 'function') {
+        v.requestVideoFrameCallback(() => drawFrame());
+      } else {
+        // Fallback: a couple of animation-frame ticks gives the decoder time to paint.
+        requestAnimationFrame(() => requestAnimationFrame(drawFrame));
+      }
+    };
+
     v.addEventListener('error', () => fail('video could not be loaded (the source may not allow cross-origin reads)'));
     v.addEventListener('loadedmetadata', () => {
       if (!isFinite(v.duration) || v.duration === 0) return fail('video duration unavailable');
-      const target = Math.max(0, v.duration - 0.05);
-      v.addEventListener('seeked', () => {
-        if (done) return;
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = v.videoWidth;
-          canvas.height = v.videoHeight;
-          canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-          done = true; cleanup(); resolve(dataUrl);
-        } catch (err) {
-          fail(err && err.name === 'SecurityError' ? 'the video host doesn\'t allow frame capture (CORS)' : (err.message || 'capture failed'));
-        }
-      }, { once: true });
-      try { v.currentTime = target; } catch (e) { fail('could not seek to the end of the video'); }
+      const target = Math.max(0, v.duration - 0.1);
+
+      const seekToTarget = () => {
+        v.addEventListener('seeked', scheduleDraw, { once: true });
+        try { v.currentTime = target; } catch (e) { fail('could not seek to the end of the video'); }
+      };
+
+      // Prime the decoder: a brief muted play/pause wakes up hardware decode paths
+      // that a bare seek on an untouched <video> can leave cold on mobile Safari.
+      const playPromise = v.play();
+      if (playPromise && typeof playPromise.then === 'function') {
+        playPromise.then(() => { v.pause(); seekToTarget(); })
+                   .catch(() => seekToTarget());
+      } else {
+        seekToTarget();
+      }
     }, { once: true });
     setTimeout(() => fail('timed out reading the video'), 20000);
     v.src = videoSrc;
