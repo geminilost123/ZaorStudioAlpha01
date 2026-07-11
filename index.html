@@ -2098,7 +2098,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.95';
+const APP_VERSION = '1.96';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -5157,11 +5157,11 @@ function renderImage(src, altText, animate = true, hostedUrl = null, modelLabel 
   saveBtn.innerHTML = '&#8681; Save';
   saveBtn.addEventListener('click', () => saveImageToFiles(src, altText));
 
-  // Cloud (Cloudinary) save button — uploads to the user's Cloudinary instead of the device
+  // Cloud (B2 / Cloudinary) save button — uploads to the user's B2 or Cloudinary instead of the device
   const cloudBtn = document.createElement('button');
   cloudBtn.className = 'save-btn';
   cloudBtn.innerHTML = '☁ Cloud';
-  cloudBtn.addEventListener('click', () => uploadToCloudinary(src, altText, cloudBtn));
+  cloudBtn.addEventListener('click', () => uploadToCloudinary(img, altText, cloudBtn));
 
   // Copy prompt button
   const copyPromptBtn = document.createElement('button');
@@ -5592,10 +5592,54 @@ async function _b2GenThumb(srcUrl) {
 // Full save flow: upload the original, then (images only) generate + upload a
 // thumbnail alongside it at "<prefix>thumbs/<name>.jpg". Thumbnail failure is
 // non-fatal — the picker just falls back to the full image for that item.
+// Accepts: URL string, blob, ArrayBuffer, or a DOM <img> element (drawn via canvas).
 async function b2SaveMedia(src, mediaType) {
-  let fileVal = src;
-  if (typeof src === 'string' && src.startsWith('blob:')) fileVal = await (await fetch(src)).blob();
-  const blob = fileVal instanceof Blob ? fileVal : new Blob([fileVal]);
+  let blob;
+
+  if (src instanceof HTMLImageElement) {
+    // DOM image element: draw to canvas to get bytes. Works even for referer-locked
+    // Atlas images since the <img> is already rendered. Canvas will taint if the host
+    // omits CORS; we'll throw and the caller can fall back to Cloudinary.
+    const canvas = document.createElement('canvas');
+    canvas.width = src.naturalWidth || src.width || 1;
+    canvas.height = src.naturalHeight || src.height || 1;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(src, 0, 0);
+    blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('canvas export failed')), 'image/jpeg', 0.95);
+    });
+  } else if (typeof src === 'string') {
+    // URL string: try fetch first (works for same-origin or CORS-enabled hosts).
+    // If it fails (Atlas referer-lock, CORS block), fall back to rendering a temp
+    // <img> and drawing it to canvas instead.
+    try {
+      const res = await fetch(src);
+      if (!res.ok) throw new Error(res.status);
+      blob = await res.blob();
+    } catch (fetchErr) {
+      // Fetch failed (likely referer-lock or CORS). Try canvas approach:
+      // render the URL to a temporary <img>, then draw it.
+      const tmpImg = new Image();
+      tmpImg.crossOrigin = 'anonymous'; // hint, but referer-locked hosts ignore it
+      tmpImg.referrerPolicy = 'no-referrer'; // match what Atlas images use
+      await new Promise((resolve, reject) => {
+        tmpImg.onload = resolve;
+        tmpImg.onerror = () => reject(new Error(`Canvas fallback: image failed to load. Original fetch error: ${fetchErr.message}`));
+        tmpImg.src = src;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = tmpImg.naturalWidth || tmpImg.width || 1;
+      canvas.height = tmpImg.naturalHeight || tmpImg.height || 1;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(tmpImg, 0, 0);
+      blob = await new Promise((resolve, reject) => {
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error('canvas export failed (tainted canvas — host may not allow cross-origin reads)')), 'image/jpeg', 0.95);
+      });
+    }
+  } else {
+    // Blob, ArrayBuffer, or other: use as-is
+    blob = src instanceof Blob ? src : new Blob([src]);
+  }
 
   const ts = Date.now();
   const ext = mediaType === 'video' ? 'mp4' : 'jpg';
@@ -5630,16 +5674,20 @@ async function uploadToCloudinary(src, altText, btn, mediaType = 'image') {
     return;
   }
   if (!cloudinaryCloud || !cloudinaryPreset) {
-    appendError('Cloudinary isn\'t set up yet. Tap "Set API Key" and add your Cloudinary cloud name + unsigned upload preset.');
+    appendError('Neither B2 nor Cloudinary is set up yet. Tap "Set API Key" and add your B2 credentials.');
     return;
   }
   const orig = btn ? btn.innerHTML : '';
   if (btn) { btn.innerHTML = '☁ Uploading…'; btn.disabled = true; }
   try {
     let fileVal = src;
+    // If src is a DOM img element, extract its src URL or draw to canvas
+    if (src instanceof HTMLImageElement) {
+      fileVal = src.src;
+    }
     // blob: URLs are browser-local — Cloudinary can't fetch them, so send the bytes
-    if (typeof src === 'string' && src.startsWith('blob:')) {
-      fileVal = await (await fetch(src)).blob();
+    if (typeof fileVal === 'string' && fileVal.startsWith('blob:')) {
+      fileVal = await (await fetch(fileVal)).blob();
     }
     const form = new FormData();
     form.append('file', fileVal);
