@@ -1879,6 +1879,17 @@
     <input type="text" id="cloudinary-tag-input" placeholder="zaorlib_…" autocomplete="off" spellcheck="false" />
     <div style="font-size:11px;color:var(--text-dim);margin:-4px 0 14px;line-height:1.4;">Auto-stamped on every Cloud save so ☁ Load can find them. Requires "Resource list" enabled in Cloudinary → Settings → Security. Keep it non-obvious.</div>
     <div style="border-top:1px solid rgba(255,255,255,0.1);margin-top:8px;padding-top:12px;">
+      <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Backblaze B2 — key ID (S3 access key)</label>
+      <input type="text" id="b2-keyid-input" placeholder="00xxxxxxxxxxxxx0000000001" autocomplete="off" spellcheck="false" />
+      <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Backblaze B2 — application key (S3 secret)</label>
+      <input type="password" id="b2-appkey-input" placeholder="K0xxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false" />
+      <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Backblaze B2 — bucket name (public)</label>
+      <input type="text" id="b2-bucket-input" placeholder="zaor-lib" autocomplete="off" spellcheck="false" />
+      <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Backblaze B2 — region</label>
+      <input type="text" id="b2-region-input" placeholder="us-west-004" autocomplete="off" spellcheck="false" />
+      <div style="font-size:11px;color:var(--text-dim);margin:-4px 0 4px;line-height:1.4;">Bucket-scoped key with read/list/write. Bucket must be Public and have a CORS rule allowing s3_get/s3_put from this origin (so ☁ Load and canvas reads work). The key is used only for uploads + the ☁ Load list; reads are unsigned public URLs.</div>
+    </div>
+    <div style="border-top:1px solid rgba(255,255,255,0.1);margin-top:8px;padding-top:12px;">
       <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Storage</label>
       <div id="storage-usage-modal" style="font-size:12px;color:var(--text-dim);margin-bottom:8px;"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -2087,7 +2098,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.93';
+const APP_VERSION = '1.95';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2402,6 +2413,14 @@ if (!cloudinaryListTag) {
   cloudinaryListTag = 'zaorlib_' + Math.random().toString(36).slice(2, 10);
   localStorage.setItem('cloudinary_list_tag', cloudinaryListTag);
 }
+// ── Backblaze B2 (S3-compatible, public-read bucket + one bucket-scoped key) ──
+// Migrating off Cloudinary. Delivery reads are unsigned public GETs; uploads and
+// the ☁ Load listing are SigV4-signed with a key scoped to a single bucket.
+let b2KeyId  = localStorage.getItem('b2_key_id')  || ''; // S3 access key id  (= B2 keyID)
+let b2AppKey = localStorage.getItem('b2_app_key') || ''; // S3 secret         (= B2 applicationKey)
+let b2Bucket = localStorage.getItem('b2_bucket')  || '';
+let b2Region = localStorage.getItem('b2_region')  || ''; // e.g. us-west-004
+let b2Prefix = localStorage.getItem('b2_prefix')  || 'zaorlib/'; // keeps saves grouped for ☁ Load
 let lastAtlasRaw = ''; // captured raw Atlas response for on-screen debugging
 
 // ═══════════════════════════════════════════════════════
@@ -3651,26 +3670,40 @@ function renderCloudGrid() {
   if (!_cloudResources.length) return;
 
   const sorted = _cloudResources.slice().sort((a, b) => {
-    // created_at isn't always present in the client-side list payload;
-    // Cloudinary's `version` is the upload timestamp, so use it as a reliable fallback.
-    const ta = a.created_at ? Date.parse(a.created_at) : (Number(a.version) || 0);
-    const tb = b.created_at ? Date.parse(b.created_at) : (Number(b.version) || 0);
+    // B2 entries carry a numeric .ts (ms). Cloudinary entries fall back to
+    // created_at, or .version (its upload timestamp) when created_at is absent.
+    const ta = typeof a.ts === 'number' ? a.ts : (a.created_at ? Date.parse(a.created_at) : (Number(a.version) || 0));
+    const tb = typeof b.ts === 'number' ? b.ts : (b.created_at ? Date.parse(b.created_at) : (Number(b.version) || 0));
     return _cloudSort === 'oldest' ? (ta - tb) : (tb - ta);
   });
 
   status.style.display = 'none';
   for (const r of sorted) {
-    const full = _cloudFullUrl(r.public_id, r.version, r.format);
-    const thumb = _cloudThumbUrl(r.public_id, r.version, r.format);
     const cell = document.createElement('div');
     cell.className = 'cloud-thumb';
     const im = document.createElement('img');
     im.loading = 'lazy';
-    im.src = thumb;
-    im.alt = r.public_id;
     cell.appendChild(im);
-    cell.addEventListener('click', () => { pickCloudImage(full); });
     grid.appendChild(cell);
+
+    if (r.key) {
+      // B2 item: sign the thumbnail (falls back to the full-res object if no
+      // thumbnail was generated for it, e.g. saved before this feature shipped).
+      const thumbKey = r.key.replace(/^(.*?)([^/]+)\.\w+$/, (m, dir, base) => `${dir}thumbs/${base}.jpg`);
+      im.alt = r.key;
+      b2SignedUrl(thumbKey).then(u => { im.src = u; })
+        .catch(() => { b2SignedUrl(r.key).then(u => { im.src = u; }).catch(() => {}); });
+      cell.addEventListener('click', async () => {
+        try { pickCloudImage(await b2SignedUrl(r.key)); }
+        catch (e) { appendError('Could not open image: ' + e.message); }
+      });
+    } else {
+      // Cloudinary fallback item.
+      const full = _cloudFullUrl(r.public_id, r.version, r.format);
+      im.src = _cloudThumbUrl(r.public_id, r.version, r.format);
+      im.alt = r.public_id;
+      cell.addEventListener('click', () => { pickCloudImage(full); });
+    }
   }
 }
 
@@ -3680,8 +3713,26 @@ async function loadCloudPicker() {
   grid.innerHTML = '';
   status.style.display = 'block';
 
+  // Prefer B2 when configured; Cloudinary is legacy fallback only.
+  if (b2Ready()) {
+    status.textContent = 'Loading…';
+    try {
+      _cloudResources = await b2List(b2Prefix);
+      // Thumbnails live under "<prefix>thumbs/" — exclude them from the grid itself.
+      _cloudResources = _cloudResources.filter(r => !r.key.includes('/thumbs/'));
+      if (!_cloudResources.length) {
+        status.innerHTML = 'No images found yet. Save an image with ☁ Cloud first, then Refresh.';
+        return;
+      }
+      renderCloudGrid();
+    } catch (e) {
+      status.textContent = 'B2 list failed: ' + e.message + '. Check your connection and Refresh.';
+    }
+    return;
+  }
+
   if (!cloudinaryCloud || !cloudinaryListTag) {
-    status.innerHTML = 'Cloudinary isn\'t set up. Tap 🔑 API Keys and add your cloud name (the library tag is filled in automatically).';
+    status.innerHTML = 'Nothing set up yet. Tap 🔑 API Keys and add your B2 credentials.';
     return;
   }
   status.textContent = 'Loading…';
@@ -3713,10 +3764,12 @@ async function loadCloudPicker() {
   }
 }
 
-// A picked Cloudinary image is already a hosted https URL, so it flows straight into
-// vision / edit / animate with no re-upload, and stores in the thread as a URL (not base64).
+// A picked image is already a hosted https URL (B2 signed URL, or Cloudinary URL),
+// so it flows straight into vision / edit / animate with no re-upload. Note: B2
+// signed URLs expire (24h) — fine for immediate use, but stale in old saved threads.
 function pickCloudImage(url) {
   _cloudPickerOverlay.classList.remove('open');
+  const source = b2Ready() ? 'B2' : 'Cloudinary';
 
   if (_cloudPickerFor === 'chat') {
     attachChatImage(url, url);
@@ -3725,8 +3778,8 @@ function pickCloudImage(url) {
   // edit target
   if (!currentThreadId) createThread('New Game');
   document.getElementById('empty-state')?.remove();
-  addMessageToThread({ role: 'user', type: 'image', src: url, hostedUrl: url, alt: 'From Cloudinary', modelLabel: 'Cloudinary' });
-  renderImage(url, 'From Cloudinary', true, url, 'Cloudinary');
+  addMessageToThread({ role: 'user', type: 'image', src: url, hostedUrl: url, alt: `From ${source}`, modelLabel: source });
+  renderImage(url, `From ${source}`, true, url, source);
   lastImageUrl = url;
   activeEditTarget = url;
   updateEditPinRow();
@@ -5392,7 +5445,190 @@ function setLoading(val) { isLoading = val; sendBtn.disabled = val; }
 // ═══════════════════════════════════════════════════════
 // SAVE TO FILES
 // ═══════════════════════════════════════════════════════
+// ══ Backblaze B2 (S3-compatible, PRIVATE bucket) ═══════════════════════════
+// Private bucket + one bucket-scoped key signs uploads, listing, AND downloads.
+// Reads use short-lived signed URLs (SigV4 query-auth, 24h expiry) since the
+// bucket has no public access. Signer verified against AWS's published test
+// vector before shipping. Requires s3_get/s3_put/s3_head CORS on the bucket.
+function b2Ready() { return !!(b2KeyId && b2AppKey && b2Bucket && b2Region); }
+function b2Host()  { return `${b2Bucket}.s3.${b2Region}.backblazeb2.com`; }
+
+const _b2enc = new TextEncoder();
+async function _b2sha256Hex(data) {
+  const buf = typeof data === 'string' ? _b2enc.encode(data) : data;
+  const d = await crypto.subtle.digest('SHA-256', buf);
+  return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function _b2hmac(key, data) {
+  const k = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return new Uint8Array(await crypto.subtle.sign('HMAC', k, _b2enc.encode(data)));
+}
+const _b2hex = bytes => [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+async function _b2SigningKey(dateStamp, region, service) {
+  let sk = await _b2hmac(_b2enc.encode('AWS4' + b2AppKey), dateStamp);
+  sk = await _b2hmac(sk, region);
+  sk = await _b2hmac(sk, service);
+  sk = await _b2hmac(sk, 'aws4_request');
+  return sk;
+}
+
+// Sign + send one header-auth S3 request (used for PUT upload and GET list).
+async function _b2s3Fetch(method, key, { query = {}, body = null, contentType } = {}) {
+  const host = b2Host(), region = b2Region, service = 's3';
+  const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, ''); // YYYYMMDDTHHMMSSZ
+  const dateStamp = amzDate.slice(0, 8);
+
+  const canonicalUri = '/' + String(key).split('/').map(encodeURIComponent).join('/');
+  const canonicalQuery = Object.keys(query).sort()
+    .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(query[k])).join('&');
+
+  const payload = body == null ? '' : (body instanceof ArrayBuffer ? new Uint8Array(body) : body);
+  const payloadHash = await _b2sha256Hex(payload);
+
+  const hdr = { host, 'x-amz-content-sha256': payloadHash, 'x-amz-date': amzDate };
+  if (contentType) hdr['content-type'] = contentType;
+  const signedKeys = Object.keys(hdr).sort();
+  const canonicalHeaders = signedKeys.map(h => `${h}:${hdr[h]}\n`).join('');
+  const signedHeaders = signedKeys.join(';');
+
+  const canonicalRequest =
+    `${method}\n${canonicalUri}\n${canonicalQuery}\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
+  const scope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const stringToSign =
+    `AWS4-HMAC-SHA256\n${amzDate}\n${scope}\n${await _b2sha256Hex(canonicalRequest)}`;
+
+  const sk = await _b2SigningKey(dateStamp, region, service);
+  const signature = _b2hex(await _b2hmac(sk, stringToSign));
+
+  const authorization =
+    `AWS4-HMAC-SHA256 Credential=${b2KeyId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  const url = `https://${host}${canonicalUri}` + (canonicalQuery ? '?' + canonicalQuery : '');
+  const fetchHeaders = { Authorization: authorization, 'x-amz-content-sha256': payloadHash, 'x-amz-date': amzDate };
+  if (contentType) fetchHeaders['Content-Type'] = contentType;
+  return fetch(url, { method, headers: fetchHeaders, body: body == null ? undefined : payload });
+}
+
+// Build a signed (query-auth) GET URL for a private object. Valid 24h by default.
+// Used everywhere the app needs a plain <img src> / fetch()-able URL: the picker
+// grid, thumbnails, canvas reads, and links copied to the clipboard.
+async function b2SignedUrl(key, expirySeconds = 86400) {
+  const host = b2Host(), region = b2Region, service = 's3';
+  const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.slice(0, 8);
+  const scope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const canonicalUri = '/' + String(key).split('/').map(encodeURIComponent).join('/');
+
+  const query = {
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Credential': `${b2KeyId}/${scope}`,
+    'X-Amz-Date': amzDate,
+    'X-Amz-Expires': String(expirySeconds),
+    'X-Amz-SignedHeaders': 'host',
+  };
+  const canonicalQuery = Object.keys(query).sort()
+    .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(query[k])).join('&');
+
+  const canonicalRequest =
+    `GET\n${canonicalUri}\n${canonicalQuery}\nhost:${host}\n\nhost\nUNSIGNED-PAYLOAD`;
+  const stringToSign =
+    `AWS4-HMAC-SHA256\n${amzDate}\n${scope}\n${await _b2sha256Hex(canonicalRequest)}`;
+
+  const sk = await _b2SigningKey(dateStamp, region, service);
+  const signature = _b2hex(await _b2hmac(sk, stringToSign));
+
+  return `https://${host}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+}
+
+// Upload bytes (Blob/ArrayBuffer/Uint8Array) to <key>. Returns a signed download URL.
+async function b2Upload(data, key, contentType) {
+  const buf = data instanceof Blob ? new Uint8Array(await data.arrayBuffer()) : data;
+  const res = await _b2s3Fetch('PUT', key, { body: buf, contentType: contentType || 'application/octet-stream' });
+  if (!res.ok) throw new Error('B2 upload failed (' + res.status + ')');
+  return await b2SignedUrl(key);
+}
+
+// List objects under a prefix for ☁ Load. Returns [{ key, ts, size }].
+async function b2List(prefix) {
+  const out = [];
+  let token = null;
+  do {
+    const query = { 'list-type': '2', 'max-keys': '1000', prefix: prefix || '' };
+    if (token) query['continuation-token'] = token;
+    const res = await _b2s3Fetch('GET', '', { query });
+    if (!res.ok) throw new Error('B2 list failed (' + res.status + ')');
+    const doc = new DOMParser().parseFromString(await res.text(), 'application/xml');
+    for (const c of doc.getElementsByTagName('Contents')) {
+      const key = c.getElementsByTagName('Key')[0]?.textContent || '';
+      const lm  = c.getElementsByTagName('LastModified')[0]?.textContent || '';
+      const sz  = c.getElementsByTagName('Size')[0]?.textContent || '0';
+      if (key && !key.endsWith('/')) out.push({ key, ts: Date.parse(lm) || 0, size: Number(sz) });
+    }
+    const truncated = doc.getElementsByTagName('IsTruncated')[0]?.textContent === 'true';
+    token = truncated ? (doc.getElementsByTagName('NextContinuationToken')[0]?.textContent || null) : null;
+  } while (token);
+  return out;
+}
+
+// Thumbnail: shrink to a 320px-longest-edge JPEG at 72% quality. Visible enough
+// to pick an image out of a grid on a phone screen, light enough to load fast
+// over cellular. Source can be a blob: URL or a signed https URL.
+async function _b2GenThumb(srcUrl) {
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  await new Promise((resolve, reject) => {
+    img.onload = resolve; img.onerror = () => reject(new Error('thumb source failed to load'));
+    img.src = srcUrl;
+  });
+  const longest = Math.max(img.naturalWidth, img.naturalHeight) || 1;
+  const scale = Math.min(1, 320 / longest);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+  return await new Promise((resolve, reject) =>
+    canvas.toBlob(b => b ? resolve(b) : reject(new Error('thumb encode failed')), 'image/jpeg', 0.72));
+}
+
+// Full save flow: upload the original, then (images only) generate + upload a
+// thumbnail alongside it at "<prefix>thumbs/<name>.jpg". Thumbnail failure is
+// non-fatal — the picker just falls back to the full image for that item.
+async function b2SaveMedia(src, mediaType) {
+  let fileVal = src;
+  if (typeof src === 'string' && src.startsWith('blob:')) fileVal = await (await fetch(src)).blob();
+  const blob = fileVal instanceof Blob ? fileVal : new Blob([fileVal]);
+
+  const ts = Date.now();
+  const ext = mediaType === 'video' ? 'mp4' : 'jpg';
+  const key = `${b2Prefix}${ts}.${ext}`;
+  const url = await b2Upload(blob, key, blob.type || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg'));
+
+  if (mediaType === 'image') {
+    try {
+      const thumbBlob = await _b2GenThumb(url);
+      await b2Upload(thumbBlob, `${b2Prefix}thumbs/${ts}.jpg`, 'image/jpeg');
+    } catch (e) {
+      console.warn('B2 thumbnail generation skipped:', e.message);
+    }
+  }
+  return url;
+}
+// ═══════════════════════════════════════════════════════════════════════════
+
 async function uploadToCloudinary(src, altText, btn, mediaType = 'image') {
+  // Route to B2 when configured — Cloudinary is legacy fallback only.
+  if (b2Ready()) {
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) { btn.innerHTML = '☁ Uploading…'; btn.disabled = true; }
+    try {
+      const url = await b2SaveMedia(src, mediaType);
+      try { await navigator.clipboard.writeText(url); } catch (e) {}
+      if (btn) { btn.innerHTML = '✓ Saved · link copied'; setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 2500); }
+    } catch (e) {
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+      appendError('B2 upload failed: ' + e.message);
+    }
+    return;
+  }
   if (!cloudinaryCloud || !cloudinaryPreset) {
     appendError('Cloudinary isn\'t set up yet. Tap "Set API Key" and add your Cloudinary cloud name + unsigned upload preset.');
     return;
@@ -5424,11 +5660,15 @@ async function uploadToCloudinary(src, altText, btn, mediaType = 'image') {
 }
 
 // Returns a hosted https URL for a source. If it's already hosted, returns as-is.
-// If it's a data:/blob: image (e.g. some Atlas/Z-Image outputs), uploads to Cloudinary to get one.
+// If it's a data:/blob: image (e.g. some Atlas/Z-Image outputs), uploads to B2
+// (or Cloudinary, if B2 isn't configured) to get one.
 async function ensureHostedUrl(src) {
   if (typeof src === 'string' && /^https?:\/\//i.test(src)) return src;
+  if (b2Ready()) {
+    return await b2SaveMedia(src, 'image');
+  }
   if (!cloudinaryCloud || !cloudinaryPreset) {
-    throw new Error('This frame isn\'t a hosted URL yet. Set up Cloudinary (Set API Key), or tap ☁ Cloud on the frame first, then animate.');
+    throw new Error('This frame isn\'t a hosted URL yet. Set up B2 or Cloudinary (Set API Key), or tap ☁ Cloud on the frame first, then animate.');
   }
   let fileVal = src;
   if (typeof src === 'string' && src.startsWith('blob:')) fileVal = await (await fetch(src)).blob();
@@ -6250,6 +6490,10 @@ function openModal(type) {
     document.getElementById('cloudinary-cloud-input').value = cloudinaryCloud;
     document.getElementById('cloudinary-preset-input').value = cloudinaryPreset;
     document.getElementById('cloudinary-tag-input').value = cloudinaryListTag;
+    document.getElementById('b2-keyid-input').value = b2KeyId;
+    document.getElementById('b2-appkey-input').value = b2AppKey;
+    document.getElementById('b2-bucket-input').value = b2Bucket;
+    document.getElementById('b2-region-input').value = b2Region;
     modalOverlay.classList.add('open');
     updateStorageInfo();
     setTimeout(() => keyInput.focus(), 100);
@@ -6290,6 +6534,11 @@ document.getElementById('modal-save').addEventListener('click', () => {
   if (!tagVal) tagVal = 'zaorlib_' + Math.random().toString(36).slice(2, 10);
   cloudinaryListTag = tagVal;
   localStorage.setItem('cloudinary_list_tag', cloudinaryListTag);
+  // Backblaze B2 (S3-compatible) — saved as-is so they can be updated or cleared.
+  b2KeyId  = document.getElementById('b2-keyid-input').value.trim();  localStorage.setItem('b2_key_id',  b2KeyId);
+  b2AppKey = document.getElementById('b2-appkey-input').value.trim(); localStorage.setItem('b2_app_key', b2AppKey);
+  b2Bucket = document.getElementById('b2-bucket-input').value.trim(); localStorage.setItem('b2_bucket',  b2Bucket);
+  b2Region = document.getElementById('b2-region-input').value.trim().replace(/^https?:\/\/|\.backblazeb2\.com.*$|^s3\./g, ''); localStorage.setItem('b2_region', b2Region);
   // Clear clipboard so keys don't linger
   try { navigator.clipboard.writeText(' ').catch(()=>{}); } catch(e) {}
   modalOverlay.classList.remove('open');
