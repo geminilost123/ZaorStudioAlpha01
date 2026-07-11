@@ -800,6 +800,61 @@
     .modal-btns button:hover { opacity: 0.85; }
     .btn-primary { background: var(--lavender); color: #1a1a2e; }
     .btn-secondary { background: var(--surface2); color: var(--text-dim); }
+
+    /* ── Upload source menu (Device / From Cloudinary) ── */
+    .src-menu {
+      display: none;
+      position: absolute;
+      z-index: 60;
+      background: var(--surface2);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 5px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+      min-width: 178px;
+    }
+    .src-menu.open { display: block; }
+    .src-menu button {
+      display: flex; align-items: center; gap: 8px;
+      width: 100%;
+      background: transparent; border: none;
+      color: var(--text);
+      font-family: 'Inter', sans-serif; font-size: 13px;
+      padding: 10px 12px; border-radius: 8px;
+      cursor: pointer; text-align: left;
+      transition: background 0.15s;
+    }
+    .src-menu button:hover { background: rgba(201,184,232,0.14); }
+
+    /* ── Cloudinary picker grid ── */
+    #cloud-picker-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+      gap: 8px;
+      overflow-y: auto;
+      flex: 1;
+      margin: 4px -4px 0;
+      padding: 4px;
+      align-content: start;
+    }
+    .cloud-thumb {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      background: var(--bg);
+      border: 1px solid rgba(255,255,255,0.08);
+      transition: border-color 0.15s, transform 0.1s;
+    }
+    .cloud-thumb:hover { border-color: var(--lavender); }
+    .cloud-thumb:active { transform: scale(0.96); }
+    .cloud-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    #cloud-picker-status {
+      font-size: 13px; color: var(--text-dim);
+      text-align: center; padding: 28px 12px; line-height: 1.5;
+    }
+    #cloud-picker-status a { color: var(--lavender); }
     .exp-lbl { font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:5px; }
     .btn-danger { background: rgba(196,122,138,0.2); color: var(--rose); border: 1px solid rgba(196,122,138,0.3) !important; }
 
@@ -1819,6 +1874,9 @@
     <input type="text" id="cloudinary-cloud-input" placeholder="your-cloud-name" autocomplete="off" spellcheck="false" />
     <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Cloudinary — unsigned upload preset</label>
     <input type="text" id="cloudinary-preset-input" placeholder="unsigned preset name" autocomplete="off" spellcheck="false" />
+    <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Cloudinary — library tag (for ☁ Load)</label>
+    <input type="text" id="cloudinary-tag-input" placeholder="zaorlib_…" autocomplete="off" spellcheck="false" />
+    <div style="font-size:11px;color:var(--text-dim);margin:-4px 0 14px;line-height:1.4;">Auto-stamped on every Cloud save so ☁ Load can find them. Requires "Resource list" enabled in Cloudinary → Settings → Security. Keep it non-obvious.</div>
     <div style="border-top:1px solid rgba(255,255,255,0.1);margin-top:8px;padding-top:12px;">
       <label style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;display:block;margin-bottom:5px;">Storage</label>
       <div id="storage-usage-modal" style="font-size:12px;color:var(--text-dim);margin-bottom:8px;"></div>
@@ -1833,6 +1891,26 @@
     <div class="modal-btns" style="flex-shrink:0;margin-top:14px;">
       <button class="btn-secondary" id="modal-cancel">Cancel</button>
       <button class="btn-primary" id="modal-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload source menu (shared by edit + chat buttons) -->
+<div id="upload-src-menu" class="src-menu">
+  <button id="src-device">📱 Device file</button>
+  <button id="src-cloud">☁ From Cloudinary</button>
+</div>
+
+<!-- Cloudinary picker modal -->
+<div class="modal-overlay" id="cloud-picker-overlay">
+  <div class="modal" style="max-width:560px;width:92%;max-height:82vh;display:flex;flex-direction:column;">
+    <h2 style="margin-bottom:4px;">☁ Load from Cloudinary</h2>
+    <p style="margin-bottom:10px;">Tap an image to bring it in. Only images saved from this app (tagged) appear here, and new saves can take up to a minute to show.</p>
+    <div id="cloud-picker-grid"></div>
+    <div id="cloud-picker-status"></div>
+    <div class="modal-btns" style="margin-top:12px;flex-shrink:0;">
+      <button class="btn-secondary" id="cloud-picker-close">Close</button>
+      <button class="btn-primary" id="cloud-picker-refresh">↻ Refresh</button>
     </div>
   </div>
 </div>
@@ -2004,7 +2082,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.90';
+const APP_VERSION = '1.91';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2310,6 +2388,15 @@ let pendingDeleteId = null;
 let atlasKey = localStorage.getItem('atlas_key') || '';
 let cloudinaryCloud = localStorage.getItem('cloudinary_cloud') || '';
 let cloudinaryPreset = localStorage.getItem('cloudinary_preset') || '';
+// Tag stamped on every ☁ Cloud save so the client-side resource-list endpoint
+// (res.cloudinary.com/<cloud>/image/list/<tag>.json) can enumerate them for the picker.
+// A random suffix keeps it non-guessable — the tag never appears in delivery URLs, so it's
+// the one secret guarding enumeration once "Resource list" is enabled in Cloudinary.
+let cloudinaryListTag = localStorage.getItem('cloudinary_list_tag') || '';
+if (!cloudinaryListTag) {
+  cloudinaryListTag = 'zaorlib_' + Math.random().toString(36).slice(2, 10);
+  localStorage.setItem('cloudinary_list_tag', cloudinaryListTag);
+}
 let lastAtlasRaw = ''; // captured raw Atlas response for on-screen debugging
 
 // ═══════════════════════════════════════════════════════
@@ -3320,9 +3407,8 @@ document.getElementById('edit-toggle')?.addEventListener('click', () => {
 });
 
 // ── Upload image for editing/animating ──
-document.getElementById('upload-img-btn').addEventListener('click', () => {
-  pendingUploadTarget = 'edit';
-  document.getElementById('img-file-input').click();
+document.getElementById('upload-img-btn').addEventListener('click', (e) => {
+  openSourceMenu(e.currentTarget, 'edit');
 });
 
 document.getElementById('img-file-input').addEventListener('change', async (e) => {
@@ -3478,10 +3564,155 @@ document.getElementById('chat-pin-clear')?.addEventListener('click', () => {
   chatAttachedImage = null;
   updateChatPinRow();
 });
-document.getElementById('chat-attach-btn')?.addEventListener('click', () => {
-  pendingUploadTarget = 'chat';
+document.getElementById('chat-attach-btn')?.addEventListener('click', (e) => {
+  openSourceMenu(e.currentTarget, 'chat');
+});
+
+// ═══════════════════════════════════════════════════════
+// UPLOAD SOURCE MENU + CLOUDINARY PICKER
+// ═══════════════════════════════════════════════════════
+// Both the edit "🖼 Upload Image" and chat "📎 Attach" buttons open a small
+// menu: Device (existing file picker) or From Cloudinary (thumbnail picker).
+// pickerTarget mirrors pendingUploadTarget so a chosen image lands in the
+// right flow ('edit' → edit target + feed; 'chat' → vision attachment).
+let pickerTarget = 'edit';
+const _srcMenu = document.getElementById('upload-src-menu');
+
+function openSourceMenu(anchorEl, target) {
+  pickerTarget = target;
+  const r = anchorEl.getBoundingClientRect();
+  _srcMenu.style.visibility = 'hidden';
+  _srcMenu.classList.add('open');
+  // Measure then position: prefer opening upward from the button (input sits at screen bottom)
+  const mh = _srcMenu.offsetHeight, mw = _srcMenu.offsetWidth;
+  let top = r.top - mh - 6;
+  if (top < 8) top = r.bottom + 6;               // not enough room above → drop below
+  let left = r.left;
+  if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
+  _srcMenu.style.top = top + 'px';
+  _srcMenu.style.left = Math.max(8, left) + 'px';
+  _srcMenu.style.position = 'fixed';
+  _srcMenu.style.visibility = 'visible';
+}
+function closeSourceMenu() { _srcMenu.classList.remove('open'); }
+
+// Dismiss the menu on any outside tap
+document.addEventListener('click', (e) => {
+  if (_srcMenu.classList.contains('open') &&
+      !_srcMenu.contains(e.target) &&
+      e.target.id !== 'upload-img-btn' && !e.target.closest('#upload-img-btn') &&
+      e.target.id !== 'chat-attach-btn' && !e.target.closest('#chat-attach-btn')) {
+    closeSourceMenu();
+  }
+});
+
+document.getElementById('src-device').addEventListener('click', () => {
+  closeSourceMenu();
+  pendingUploadTarget = pickerTarget;
   document.getElementById('img-file-input').click();
 });
+document.getElementById('src-cloud').addEventListener('click', () => {
+  closeSourceMenu();
+  openCloudPicker(pickerTarget);
+});
+
+// ── Cloudinary picker ──
+const _cloudPickerOverlay = document.getElementById('cloud-picker-overlay');
+let _cloudPickerFor = 'edit';
+
+function _cloudThumbUrl(pubId, ver, fmt) {
+  const v = ver ? ('v' + ver + '/') : '';
+  return `https://res.cloudinary.com/${cloudinaryCloud}/image/upload/c_fill,w_200,h_200,q_auto,f_auto/${v}${pubId}.${fmt || 'jpg'}`;
+}
+function _cloudFullUrl(pubId, ver, fmt) {
+  const v = ver ? ('v' + ver + '/') : '';
+  return `https://res.cloudinary.com/${cloudinaryCloud}/image/upload/${v}${pubId}.${fmt || 'jpg'}`;
+}
+
+async function openCloudPicker(target) {
+  _cloudPickerFor = target;
+  _cloudPickerOverlay.classList.add('open');
+  loadCloudPicker();
+}
+
+async function loadCloudPicker() {
+  const grid = document.getElementById('cloud-picker-grid');
+  const status = document.getElementById('cloud-picker-status');
+  grid.innerHTML = '';
+  status.style.display = 'block';
+
+  if (!cloudinaryCloud || !cloudinaryListTag) {
+    status.innerHTML = 'Cloudinary isn\'t set up. Tap 🔑 API Keys and add your cloud name (the library tag is filled in automatically).';
+    return;
+  }
+  status.textContent = 'Loading…';
+
+  // no-store so ↻ Refresh isn't defeated by the browser cache. Cloudinary's own
+  // 60s server cache still applies, so brand-new saves may lag by up to a minute.
+  const url = `https://res.cloudinary.com/${cloudinaryCloud}/image/list/${cloudinaryListTag}.json`;
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (res.status === 401 || res.status === 403) {
+      status.innerHTML = 'Cloudinary returned "not authorized". Enable it: <b>Cloudinary → Settings → Security → Restricted media types</b>, then <b>uncheck "Resource list"</b> and save.';
+      return;
+    }
+    if (res.status === 404) {
+      status.innerHTML = 'No images found yet under this tag. Save an image with ☁ Cloud first (new saves can take up to a minute to appear), then Refresh.';
+      return;
+    }
+    if (!res.ok) { status.textContent = 'Couldn\'t load (error ' + res.status + '). Try Refresh.'; return; }
+    const data = await res.json().catch(() => ({}));
+    const resources = (data && data.resources) || [];
+    if (!resources.length) {
+      status.innerHTML = 'No images found yet under this tag. Save an image with ☁ Cloud first, then Refresh.';
+      return;
+    }
+    // Newest first when a timestamp is present
+    resources.sort((a, b) => (b.created_at ? Date.parse(b.created_at) : 0) - (a.created_at ? Date.parse(a.created_at) : 0));
+    status.style.display = 'none';
+    for (const r of resources) {
+      const full = _cloudFullUrl(r.public_id, r.version, r.format);
+      const thumb = _cloudThumbUrl(r.public_id, r.version, r.format);
+      const cell = document.createElement('div');
+      cell.className = 'cloud-thumb';
+      const im = document.createElement('img');
+      im.loading = 'lazy';
+      im.src = thumb;
+      im.alt = r.public_id;
+      cell.appendChild(im);
+      cell.addEventListener('click', () => { pickCloudImage(full); });
+      grid.appendChild(cell);
+    }
+  } catch (e) {
+    status.style.display = 'block';
+    status.textContent = 'Network error loading your Cloudinary images. Check your connection and Refresh.';
+  }
+}
+
+// A picked Cloudinary image is already a hosted https URL, so it flows straight into
+// vision / edit / animate with no re-upload, and stores in the thread as a URL (not base64).
+function pickCloudImage(url) {
+  _cloudPickerOverlay.classList.remove('open');
+
+  if (_cloudPickerFor === 'chat') {
+    attachChatImage(url, url);
+    return;
+  }
+  // edit target
+  if (!currentThreadId) createThread('New Game');
+  document.getElementById('empty-state')?.remove();
+  addMessageToThread({ role: 'user', type: 'image', src: url, hostedUrl: url, alt: 'From Cloudinary', modelLabel: 'Cloudinary' });
+  renderImage(url, 'From Cloudinary', true, url, 'Cloudinary');
+  lastImageUrl = url;
+  activeEditTarget = url;
+  updateEditPinRow();
+  showEditButton();
+  setEditMode(true);
+}
+
+document.getElementById('cloud-picker-close').addEventListener('click', () => _cloudPickerOverlay.classList.remove('open'));
+document.getElementById('cloud-picker-refresh').addEventListener('click', loadCloudPicker);
+_cloudPickerOverlay.addEventListener('click', e => { if (e.target === _cloudPickerOverlay) _cloudPickerOverlay.classList.remove('open'); });
 
 function updateEditPinRow() {
   const empty = document.getElementById('edit-pin-empty');
@@ -5092,6 +5323,7 @@ async function uploadToCloudinary(src, altText, btn, mediaType = 'image') {
     const form = new FormData();
     form.append('file', fileVal);
     form.append('upload_preset', cloudinaryPreset);
+    if (cloudinaryListTag) form.append('tags', cloudinaryListTag); // makes it findable via ☁ Load
     const endpoint = mediaType === 'video' ? 'video' : 'image';
     const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudinaryCloud}/${endpoint}/upload`, { method: 'POST', body: form });
     const data = await res.json().catch(() => ({}));
@@ -5118,6 +5350,7 @@ async function ensureHostedUrl(src) {
   const form = new FormData();
   form.append('file', fileVal);
   form.append('upload_preset', cloudinaryPreset);
+  if (cloudinaryListTag) form.append('tags', cloudinaryListTag); // keep hosted images findable via ☁ Load
   const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudinaryCloud}/image/upload`, { method: 'POST', body: form });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.secure_url) throw new Error('Cloudinary upload failed: ' + (data.error?.message || res.status));
@@ -5931,6 +6164,7 @@ function openModal(type) {
     document.getElementById('hf-key-input').value = hfKey;
     document.getElementById('cloudinary-cloud-input').value = cloudinaryCloud;
     document.getElementById('cloudinary-preset-input').value = cloudinaryPreset;
+    document.getElementById('cloudinary-tag-input').value = cloudinaryListTag;
     modalOverlay.classList.add('open');
     updateStorageInfo();
     setTimeout(() => keyInput.focus(), 100);
@@ -5966,6 +6200,11 @@ document.getElementById('modal-save').addEventListener('click', () => {
   localStorage.setItem('cloudinary_cloud', cloudinaryCloud);
   cloudinaryPreset = document.getElementById('cloudinary-preset-input').value.trim();
   localStorage.setItem('cloudinary_preset', cloudinaryPreset);
+  // Library tag — if the user blanks it, regenerate so ☁ Load always has something to query.
+  let tagVal = document.getElementById('cloudinary-tag-input').value.trim().replace(/[^a-zA-Z0-9_\-]/g, '');
+  if (!tagVal) tagVal = 'zaorlib_' + Math.random().toString(36).slice(2, 10);
+  cloudinaryListTag = tagVal;
+  localStorage.setItem('cloudinary_list_tag', cloudinaryListTag);
   // Clear clipboard so keys don't linger
   try { navigator.clipboard.writeText(' ').catch(()=>{}); } catch(e) {}
   modalOverlay.classList.remove('open');
