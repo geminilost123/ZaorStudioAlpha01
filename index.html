@@ -2098,7 +2098,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.96';
+const APP_VERSION = '1.97';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -5453,6 +5453,13 @@ function setLoading(val) { isLoading = val; sendBtn.disabled = val; }
 function b2Ready() { return !!(b2KeyId && b2AppKey && b2Bucket && b2Region); }
 function b2Host()  { return `${b2Bucket}.s3.${b2Region}.backblazeb2.com`; }
 
+// Cloudflare Worker image proxy. Some generation hosts (WaveSpeed's CloudFront,
+// Atlas's OSS bucket) serve images without CORS headers, so the browser can
+// neither fetch() their bytes nor read them back off a canvas. The Worker
+// fetches server-side and re-serves with Access-Control-Allow-Origin, which
+// makes those images readable. Allowed hosts are whitelisted in the Worker.
+const B2_PROXY = 'https://little-tree-c92c.zaor.workers.dev/img?u=';
+
 const _b2enc = new TextEncoder();
 async function _b2sha256Hex(data) {
   const buf = typeof data === 'string' ? _b2enc.encode(data) : data;
@@ -5617,14 +5624,24 @@ async function b2SaveMedia(src, mediaType) {
       if (!res.ok) throw new Error(res.status);
       blob = await res.blob();
     } catch (fetchErr) {
-      // Fetch failed (likely referer-lock or CORS). Try canvas approach:
-      // render the URL to a temporary <img>, then draw it.
+      // Direct fetch was blocked — the host almost certainly omits CORS headers
+      // (WaveSpeed, Atlas). Retry through the Worker proxy, which fetches the
+      // bytes server-side and re-serves them with Access-Control-Allow-Origin.
+      try {
+        const pres = await fetch(B2_PROXY + encodeURIComponent(src));
+        if (!pres.ok) throw new Error('proxy ' + pres.status);
+        blob = await pres.blob();
+      } catch (proxyErr) {
+      // Proxy failed too (host not whitelisted in the Worker, or upstream error).
+      // Last resort: render the URL to a temporary <img> and draw it to canvas.
+      // This taints on CORS-less hosts and will usually throw, but costs nothing
+      // to try and still works for any host that does send headers.
       const tmpImg = new Image();
       tmpImg.crossOrigin = 'anonymous'; // hint, but referer-locked hosts ignore it
       tmpImg.referrerPolicy = 'no-referrer'; // match what Atlas images use
       await new Promise((resolve, reject) => {
         tmpImg.onload = resolve;
-        tmpImg.onerror = () => reject(new Error(`Canvas fallback: image failed to load. Original fetch error: ${fetchErr.message}`));
+        tmpImg.onerror = () => reject(new Error(`Canvas fallback: image failed to load. Fetch error: ${fetchErr.message}. Proxy error: ${proxyErr.message}`));
         tmpImg.src = src;
       });
       const canvas = document.createElement('canvas');
@@ -5635,6 +5652,7 @@ async function b2SaveMedia(src, mediaType) {
       blob = await new Promise((resolve, reject) => {
         canvas.toBlob(b => b ? resolve(b) : reject(new Error('canvas export failed (tainted canvas — host may not allow cross-origin reads)')), 'image/jpeg', 0.95);
       });
+      }
     }
   } else {
     // Blob, ArrayBuffer, or other: use as-is
