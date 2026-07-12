@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>B2 CORS Setup (one-shot)</title>
+<style>
+  body { font-family: -apple-system, sans-serif; background: #1a1a24; color: #e8e8f0; padding: 20px; max-width: 480px; margin: 0 auto; }
+  h1 { font-size: 1.2rem; }
+  label { display: block; margin: 14px 0 4px; font-size: .9rem; color: #aab; }
+  input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #12121a; color: #fff; font-size: 16px; box-sizing: border-box; }
+  button { margin-top: 18px; width: 100%; padding: 14px; border-radius: 10px; border: none; background: #b9aef7; color: #1a1a24; font-size: 1rem; font-weight: 600; }
+  button:disabled { opacity: .5; }
+  pre { background: #12121a; border-radius: 8px; padding: 12px; white-space: pre-wrap; word-break: break-all; font-size: .8rem; margin-top: 16px; }
+  .ok { color: #7fdb8f; } .err { color: #f08a8a; }
+</style>
+</head>
+<body>
+<h1>zaor-lib CORS setup (run once, then delete this file)</h1>
+<label>Key ID</label>
+<input id="kid" autocomplete="off" placeholder="005ce...">
+<label>Application Key</label>
+<input id="key" autocomplete="off" placeholder="K005...">
+<button id="go" onclick="run()">Apply CORS rules</button>
+<pre id="log">Ready.</pre>
+<script>
+const log = (m, cls) => {
+  const el = document.getElementById('log');
+  el.innerHTML += '\n' + (cls ? '<span class="' + cls + '">' + m + '</span>' : m);
+};
+
+async function run() {
+  const kid = document.getElementById('kid').value.trim();
+  const key = document.getElementById('key').value.trim();
+  if (!kid || !key) { log('Enter both fields.', 'err'); return; }
+  document.getElementById('go').disabled = true;
+  try {
+    // 1. Authorize
+    log('Authorizing…');
+    const authRes = await fetch('https://api.backblazeb2.com/b2api/v3/b2_authorize_account', {
+      headers: { Authorization: 'Basic ' + btoa(kid + ':' + key) }
+    });
+    if (!authRes.ok) throw new Error('Auth failed: ' + authRes.status + ' ' + await authRes.text());
+    const auth = await authRes.json();
+    const apiUrl = auth.apiInfo.storageApi.apiUrl;
+    const token = auth.authorizationToken;
+    const bucketId = auth.apiInfo.storageApi.bucketId;
+    const accountId = auth.accountId;
+    if (!bucketId) throw new Error('Key is not bucket-scoped and no bucketId returned — paste the bucketId manually into the code.');
+    log('Authorized. bucketId: ' + bucketId, 'ok');
+
+    // 2. Update bucket CORS
+    log('Applying CORS rules…');
+    const corsRules = [{
+      corsRuleName: 'zaorPWA',
+      allowedOrigins: ['*'],
+      allowedOperations: [
+        's3_head', 's3_get', 's3_put', 's3_post', 's3_delete',
+        'b2_download_file_by_name', 'b2_download_file_by_id'
+      ],
+      allowedHeaders: ['*'],
+      exposeHeaders: ['etag', 'x-amz-request-id', 'x-amz-version-id'],
+      maxAgeSeconds: 3600
+    }];
+    const updRes = await fetch(apiUrl + '/b2api/v3/b2_update_bucket', {
+      method: 'POST',
+      headers: { Authorization: token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId, bucketId, corsRules })
+    });
+    const updBody = await updRes.text();
+    if (!updRes.ok) throw new Error('Update failed: ' + updRes.status + ' ' + updBody);
+    log('CORS rules applied successfully.', 'ok');
+    log('Response:\n' + updBody);
+    log('\nNow: retest ☁ Cloud upload in the app, then DELETE this file from the repo.', 'ok');
+  } catch (e) {
+    log(String(e), 'err');
+  } finally {
+    document.getElementById('go').disabled = false;
+  }
+}
+</script>
+</body>
+</html>
