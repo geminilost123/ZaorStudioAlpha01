@@ -2098,7 +2098,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.97';
+const APP_VERSION = '1.98';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -5603,22 +5603,32 @@ async function _b2GenThumb(srcUrl) {
 async function b2SaveMedia(src, mediaType) {
   let blob;
 
+  // A DOM <img> is just a wrapper around a URL. Unwrap it so it takes the same
+  // fetch → proxy → canvas ladder as a bare URL string. Drawing it straight to
+  // canvas (the old behaviour) taints on any host that omits CORS headers —
+  // which is every image host we generate from — and throws "operation is
+  // insecure". Only blob:/data: sources, whose bytes are already local and
+  // therefore never taint, keep the direct-canvas shortcut.
   if (src instanceof HTMLImageElement) {
-    // DOM image element: draw to canvas to get bytes. Works even for referer-locked
-    // Atlas images since the <img> is already rendered. Canvas will taint if the host
-    // omits CORS; we'll throw and the caller can fall back to Cloudinary.
-    const canvas = document.createElement('canvas');
-    canvas.width = src.naturalWidth || src.width || 1;
-    canvas.height = src.naturalHeight || src.height || 1;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(src, 0, 0);
-    blob = await new Promise((resolve, reject) => {
-      canvas.toBlob(b => b ? resolve(b) : reject(new Error('canvas export failed')), 'image/jpeg', 0.95);
-    });
-  } else if (typeof src === 'string') {
-    // URL string: try fetch first (works for same-origin or CORS-enabled hosts).
-    // If it fails (Atlas referer-lock, CORS block), fall back to rendering a temp
-    // <img> and drawing it to canvas instead.
+    const elSrc = src.currentSrc || src.src || '';
+    if (elSrc.startsWith('blob:') || elSrc.startsWith('data:')) {
+      const canvas = document.createElement('canvas');
+      canvas.width = src.naturalWidth || src.width || 1;
+      canvas.height = src.naturalHeight || src.height || 1;
+      canvas.getContext('2d').drawImage(src, 0, 0);
+      blob = await new Promise((resolve, reject) => {
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error('canvas export failed')), 'image/jpeg', 0.95);
+      });
+      src = null; // handled
+    } else {
+      src = elSrc; // fall through to the URL path below
+    }
+  }
+
+  if (blob) {
+    // already resolved above
+  } else if (typeof src === 'string' && src) {
+    // URL string: try a direct fetch first (same-origin or CORS-enabled hosts).
     try {
       const res = await fetch(src);
       if (!res.ok) throw new Error(res.status);
@@ -5632,26 +5642,24 @@ async function b2SaveMedia(src, mediaType) {
         if (!pres.ok) throw new Error('proxy ' + pres.status);
         blob = await pres.blob();
       } catch (proxyErr) {
-      // Proxy failed too (host not whitelisted in the Worker, or upstream error).
-      // Last resort: render the URL to a temporary <img> and draw it to canvas.
-      // This taints on CORS-less hosts and will usually throw, but costs nothing
-      // to try and still works for any host that does send headers.
-      const tmpImg = new Image();
-      tmpImg.crossOrigin = 'anonymous'; // hint, but referer-locked hosts ignore it
-      tmpImg.referrerPolicy = 'no-referrer'; // match what Atlas images use
-      await new Promise((resolve, reject) => {
-        tmpImg.onload = resolve;
-        tmpImg.onerror = () => reject(new Error(`Canvas fallback: image failed to load. Fetch error: ${fetchErr.message}. Proxy error: ${proxyErr.message}`));
-        tmpImg.src = src;
-      });
-      const canvas = document.createElement('canvas');
-      canvas.width = tmpImg.naturalWidth || tmpImg.width || 1;
-      canvas.height = tmpImg.naturalHeight || tmpImg.height || 1;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(tmpImg, 0, 0);
-      blob = await new Promise((resolve, reject) => {
-        canvas.toBlob(b => b ? resolve(b) : reject(new Error('canvas export failed (tainted canvas — host may not allow cross-origin reads)')), 'image/jpeg', 0.95);
-      });
+        // Proxy failed too (host not whitelisted in the Worker, or upstream error).
+        // Last resort: render to a temp <img> and draw it. Taints on CORS-less
+        // hosts and will usually throw, but still works for any host that does
+        // send headers.
+        const tmpImg = new Image();
+        tmpImg.crossOrigin = 'anonymous';
+        await new Promise((resolve, reject) => {
+          tmpImg.onload = resolve;
+          tmpImg.onerror = () => reject(new Error(`image failed to load. Fetch: ${fetchErr.message}. Proxy: ${proxyErr.message}`));
+          tmpImg.src = src;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = tmpImg.naturalWidth || tmpImg.width || 1;
+        canvas.height = tmpImg.naturalHeight || tmpImg.height || 1;
+        canvas.getContext('2d').drawImage(tmpImg, 0, 0);
+        blob = await new Promise((resolve, reject) => {
+          canvas.toBlob(b => b ? resolve(b) : reject(new Error('canvas export failed (tainted canvas — host not proxied and sends no CORS headers)')), 'image/jpeg', 0.95);
+        });
       }
     }
   } else {
