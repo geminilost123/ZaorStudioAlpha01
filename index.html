@@ -898,6 +898,12 @@
       max-width: 480px;
     }
 
+    .vid-media-box {
+      position: relative;
+      display: block;
+      width: 100%;
+    }
+
     .gen-video {
       width: 100%;
       height: auto;
@@ -928,7 +934,9 @@
       display: flex; gap: 6px; flex-wrap: wrap;
       justify-content: flex-end;
       max-width: calc(100% - 20px);
+      pointer-events: none; /* let taps in the bar's transparent gaps reach the video controls under it */
     }
+    .vid-btn-bar > * { pointer-events: auto; }
     .vid-save-btn:hover { background: rgba(100,180,255,0.18); border-color: #64b4ff; color: #64b4ff; }
 
     /* Image button bar — sits below image, not on top of it */
@@ -2108,7 +2116,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '2.00';
+const APP_VERSION = '2.01';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -4881,14 +4889,22 @@ function renderVideo(src, altText, animate = true, engineLabel = 'Aurora', store
     retryVidBtn.disabled = false;
   });
 
-  wrapper.appendChild(video);
   const vidBtnBar = document.createElement('div');
   vidBtnBar.className = 'vid-btn-bar';
   vidBtnBar.appendChild(saveBtn);
   vidBtnBar.appendChild(vidCloudBtn);
   vidBtnBar.appendChild(lastFrameBtn);
   vidBtnBar.appendChild(makeDeleteBtn(() => div, src, null, 'vid-save-btn'));
-  wrapper.appendChild(vidBtnBar);
+
+  // media-box scopes the bar's absolute positioning to just the video itself.
+  // Without this, .vid-btn-bar (bottom:10px, absolute) anchors to the whole
+  // .vid-wrapper — which also contains Extend/Retry below the video — so the
+  // bar's invisible box stretches down over those buttons and swallows taps.
+  const mediaBox = document.createElement('div');
+  mediaBox.className = 'vid-media-box';
+  mediaBox.appendChild(video);
+  mediaBox.appendChild(vidBtnBar);
+  wrapper.appendChild(mediaBox);
   wrapper.appendChild(extendBtn);
   wrapper.appendChild(retryVidBtn);
   div.appendChild(label);
