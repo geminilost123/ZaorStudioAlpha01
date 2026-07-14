@@ -1585,6 +1585,7 @@
       <div id="upload-edit-row" style="display:flex;gap:6px;margin-bottom:6px;padding:0 4px;flex-wrap:wrap;align-items:center;">
       </div>
       <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/webp" style="display:none;" />
+      <input type="file" id="vid-file-input" accept="video/*" style="display:none;" />
       <div class="input-row">
         <textarea id="prompt" rows="1" placeholder="Say something…"></textarea>
         <div class="composer-bar">
@@ -1793,6 +1794,7 @@
               <option value="original">Original (lighter)</option>
             </select>
           </div>
+          <button id="vid-upload-btn" title="Upload a video from this device to B2, then extend or edit it" style="background:transparent;border:1px solid rgba(255,255,255,0.14);color:var(--text-dim);font-size:12px;padding:3px 10px;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;">🎞 Load video</button>
         </div>
         <div id="vid-pin-row" class="ref-pin-row" style="display:none;">
           <span id="vid-pin-empty" class="ref-pin-empty">📌 Tap an image in the thread to animate it here.</span>
@@ -2106,7 +2108,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.99';
+const APP_VERSION = '2.00';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -3646,6 +3648,43 @@ document.getElementById('src-device').addEventListener('click', () => {
 document.getElementById('src-cloud').addEventListener('click', () => {
   closeSourceMenu();
   openCloudPicker(pickerTarget);
+});
+
+// ── Local video upload (upload-first: card is born with a real B2 URL, so
+// Extend / Last-frame / video-edit all work with no blob-URL special-casing) ──
+document.getElementById('vid-upload-btn').addEventListener('click', () => {
+  if (!b2Ready()) {
+    appendError('Video upload needs B2 configured — tap 🔑 API Keys and add your B2 credentials first.');
+    return;
+  }
+  document.getElementById('vid-file-input').click();
+});
+
+document.getElementById('vid-file-input').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = ''; // allow re-picking the same file later
+  if (!file) return;
+
+  const btn = document.getElementById('vid-upload-btn');
+  const btnLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Uploading…';
+
+  try {
+    // b2SaveMedia accepts a Blob directly (File is a Blob) — no canvas/proxy
+    // ladder involved, bytes go straight to b2Upload with the file's own type.
+    const url = await b2SaveMedia(file, 'video');
+
+    if (!currentThreadId) createThread('New Game');
+    document.getElementById('empty-state')?.remove();
+    addMessageToThread({ role: 'user', type: 'video', src: url, alt: file.name || 'Uploaded video', engineLabel: 'Upload' });
+    renderVideo(url, file.name || 'Uploaded video', true, 'Upload', null, null);
+  } catch (err) {
+    appendError('Video upload failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = btnLabel;
+  }
 });
 
 // ── Cloudinary picker ──
