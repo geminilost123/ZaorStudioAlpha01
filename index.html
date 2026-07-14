@@ -1750,6 +1750,7 @@
                 <option value="wan22spicylora">Wan 2.2 Spicy LoRA · WaveSpeed — from $0.20</option>
                 <option value="wan26spicy">Wan 2.7 Spicy · WaveSpeed — from $0.50</option>
                 <option value="ltx23spicy">LTX 2.3 Spicy (+audio) · WaveSpeed — from $0.10</option>
+                <option value="ltx23spicylora">LTX 2.3 Spicy LoRA (+audio) · WaveSpeed — from $0.15</option>
               </optgroup>
               <optgroup label="── Extend (needs video) ──">
                 <option value="aurora_extend">Aurora Extend · xAI — $0.05/s</option>
@@ -1783,6 +1784,13 @@
             <select id="vid-res-select" class="img-control-select">
               <option value="480p" selected>480p</option>
               <option value="720p">720p</option>
+            </select>
+          </div>
+          <div class="img-control-group" id="ltx-lora-preset-wrap" style="display:none;">
+            <span class="mode-label">LoRA preset</span>
+            <select id="ltx-lora-preset-select" class="img-control-select" title="Built-in LTX 2.3 LoRA stack — 'tuned' is the recommended default, 'original' is lighter styling. Not your custom LoRA library.">
+              <option value="tuned" selected>Tuned (recommended)</option>
+              <option value="original">Original (lighter)</option>
             </select>
           </div>
         </div>
@@ -2098,7 +2106,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '1.98';
+const APP_VERSION = '1.99';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -3865,6 +3873,15 @@ document.getElementById('vid-pin-clear')?.addEventListener('click', () => {
   updateVideoPinRow();
 });
 
+// Show the LTX LoRA preset toggle only when the LTX 2.3 Spicy LoRA engine is selected.
+// This is WaveSpeed's built-in curated LoRA stack (preset: tuned/original), NOT the
+// custom activeLoras() library used by Wan — LTX's LoRA endpoint doesn't accept custom URLs.
+function syncLtxLoraPresetVisibility() {
+  const v = document.getElementById('vid-engine-select')?.value || '';
+  const wrap = document.getElementById('ltx-lora-preset-wrap');
+  if (wrap) wrap.style.display = (v === 'ltx23spicylora') ? 'flex' : 'none';
+}
+
 // When engine changes in main video mode, update duration/resolution/ratio options + pin row
 document.getElementById('vid-engine-select')?.addEventListener('change', () => {
   const engine = document.getElementById('vid-engine-select').value;
@@ -3875,7 +3892,9 @@ document.getElementById('vid-engine-select')?.addEventListener('change', () => {
   applyModelConstraints(engine, durEl, resEl, ratioEl, kind === 'extend', true, kind === 'i2v');
   updateVideoPinRow();
   updateCostEstimate();
+  syncLtxLoraPresetVisibility();
 });
+syncLtxLoraPresetVisibility();
 
 // Show the Z-Image strength slider only when a Z-Image image-to-image model is selected.
 function syncZimgStrengthVisibility() {
@@ -4504,6 +4523,13 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
       // No aspect_ratio param: output follows the input image's aspect ratio.
       modelPath = 'wavespeed-ai/ltx-2.3-spicy/image-to-video';
       body = { prompt, image: imageDataUrl, resolution: res, duration: Math.min(Math.max(duration, 5), 20), seed: -1, enable_safety_checker: false };
+    } else if (engine === 'ltx23spicylora') {
+      // LTX 2.3 Spicy LoRA I2V — WaveSpeed's built-in curated LoRA stack (NOT the
+      // custom activeLoras() library — this endpoint only takes named built-in keys
+      // via a preset, no custom .safetensors URLs). Same base pipeline as ltx23spicy.
+      modelPath = 'wavespeed-ai/ltx-2.3-spicy/image-to-video-lora';
+      const ltxPreset = document.getElementById('ltx-lora-preset-select')?.value || 'tuned';
+      body = { prompt, image: imageDataUrl, resolution: res, duration: Math.min(Math.max(duration, 5), 20), seed: -1, enable_safety_checker: false, preset: ltxPreset };
     } else {
       modelPath = 'wavespeed-ai/wan-2.2-spicy/image-to-video';
       body = { prompt, image: imageDataUrl, resolution: res, duration: (duration === 8 ? 8 : 5), aspect_ratio: ratio, seed: -1 };
@@ -4549,7 +4575,7 @@ async function generateVideoWaveSpeed(prompt, imageDataUrl, extendVideoUrl, engi
 
   if (videoUrl) {
     addSpend(videoCostNum(engine, duration, res));
-    const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan22spicylora: 'Wan 2.2 Spicy LoRA', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', seedance15spicy: 'Seedance 1.5 Spicy', seedance15t2v: 'Seedance 1.5 T2V', ltx23spicy: 'LTX 2.3 Spicy', aurora: 'Aurora', 'aurora_extend': 'Aurora Extend' };
+    const engineLabels = { wan22spicy: 'Wan 2.2 Spicy', wan22spicylora: 'Wan 2.2 Spicy LoRA', wan26spicy: 'Wan 2.7 Spicy', wan26t2v: 'Wan 2.6', seedance15spicy: 'Seedance 1.5 Spicy', seedance15t2v: 'Seedance 1.5 T2V', ltx23spicy: 'LTX 2.3 Spicy', ltx23spicylora: 'LTX 2.3 Spicy LoRA', aurora: 'Aurora', 'aurora_extend': 'Aurora Extend' };
     const vidLabel = engineLabels[engine] || engine;
     addMessageToThread({ role: 'assistant', type: 'video', src: videoUrl, alt: prompt, engineLabel: vidLabel, storedDuration: duration, storedRes: res });
     renderVideo(videoUrl, prompt, true, vidLabel, duration, res);
@@ -6784,6 +6810,8 @@ const MODEL_CONSTRAINTS = {
   seedance15spicy: { durations: [4,5,6,7,8,9,10,11,12], resolutions: ['480p','720p','1080p'], hasRatio: true, maxDur: 12, defaultDur: 4,  defaultRes: '480p' },
   // LTX 2.3 Spicy: API minimum is 5s, not 3s.
   ltx23spicy: { durations: [5,8,10,15,20], resolutions: ['480p','720p','1080p'], hasRatio: false, maxDur: 20, defaultDur: 5, defaultRes: '480p' },
+  // LTX 2.3 Spicy LoRA: same duration/res envelope as base spicy, priced higher.
+  ltx23spicylora: { durations: [5,8,10,15,20], resolutions: ['480p','720p','1080p'], hasRatio: false, maxDur: 20, defaultDur: 5, defaultRes: '480p' },
   // extend variants
   aurora_extend:        { durations: [4,6,8,10],       resolutions: ['480p','720p'],        hasRatio: false, maxDur: 10, defaultDur: 4,  defaultRes: '480p' },
   // Wan 2.2 Spicy Extend: same 5/8s constraint as its I2V sibling — not fixed to 5.
@@ -6870,6 +6898,10 @@ function estimateVideoCost(engine, duration, res) {
     case 'ltx23spicy': {                  // LTX 2.3 Spicy: 480p $0.02/s, 720p $0.04/s, 1080p $0.06/s; min 5s billed
       const rate = res === '1080p' ? 0.06 : (res === '720p' ? 0.04 : 0.02);
       return `~$${Math.max(0.10, rate * Math.max(5, d)).toFixed(2)}`;
+    }
+    case 'ltx23spicylora': {              // LTX 2.3 Spicy LoRA: 480p $0.03/s, 720p $0.05/s, 1080p $0.07/s; min 5s billed
+      const rate = res === '1080p' ? 0.07 : (res === '720p' ? 0.05 : 0.03);
+      return `~$${Math.max(0.15, rate * Math.max(5, d)).toFixed(2)}`;
     }
     case 'wan27extend':                  // Wan 2.7 extend (approx base)
       return `~$${(0.10 * d).toFixed(2)}`;
