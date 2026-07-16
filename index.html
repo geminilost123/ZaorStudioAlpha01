@@ -2116,7 +2116,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '2.01';
+const APP_VERSION = '2.02';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -6612,6 +6612,18 @@ document.getElementById('savegame-confirm-no')?.addEventListener('click', () => 
   pendingSnapshot = null;
   document.getElementById('savegame-confirm').style.display = 'none';
 });
+
+// Open / close the Save-Load modal (mirrors the lora/library modal wiring).
+// Without these the menu item only closed the overflow menu and never opened
+// the modal — the whole snapshot feature looked dead.
+document.getElementById('savegame-btn')?.addEventListener('click', () => {
+  document.getElementById('savegame-overlay').classList.add('open');
+});
+document.getElementById('savegame-close')?.addEventListener('click', () => {
+  document.getElementById('savegame-overlay').classList.remove('open');
+});
+const _sgOverlay = document.getElementById('savegame-overlay');
+_sgOverlay?.addEventListener('click', e => { if (e.target === _sgOverlay) _sgOverlay.classList.remove('open'); });
 
 
 // ── Overflow ("More") menu — header declutter (v0.94) ──
