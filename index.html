@@ -2116,7 +2116,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '2.02';
+const APP_VERSION = '2.03';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -6521,6 +6521,8 @@ function buildFullSnapshot() {
   const ls = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
+    // Prompt library is a device-global; snapshots never carry it (v2.03).
+    if (k === 'zaor_user_prompts') continue;
     ls[k] = localStorage.getItem(k);
   }
   // All threads with media stripped: image/video messages become text placeholders keeping their prompts.
@@ -6557,11 +6559,15 @@ async function saveSnapshotToFile() {
 let pendingSnapshot = null;
 
 function applySnapshot(snap) {
+  // Prompt library is a device-global — preserve it across the wipe/restore (v2.03).
+  const keepPrompts = localStorage.getItem('zaor_user_prompts');
   // Restore localStorage wholesale.
   localStorage.clear();
   for (const [k, v] of Object.entries(snap.localStorage || {})) {
     try { localStorage.setItem(k, v); } catch (e) { console.error('[Zaor load] localStorage restore failed for', k, e); }
   }
+  // Re-apply the preserved library (snapshots never contain this key, so no clobber).
+  if (keepPrompts !== null) { try { localStorage.setItem('zaor_user_prompts', keepPrompts); } catch (e) {} }
   // Restore threads, then reload so every subsystem re-initialises from the restored state.
   saveThreads(Array.isArray(snap.threads) ? snap.threads : []);
   setTimeout(() => location.reload(), 300);
