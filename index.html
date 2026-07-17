@@ -2058,9 +2058,14 @@
 <div class="modal-overlay" id="savegame-overlay">
   <div class="modal" style="max-width:520px;width:92%;max-height:85vh;overflow-y:auto;">
     <h2 style="margin-bottom:4px;">💾 Save / Load</h2>
-    <p style="margin-bottom:12px;">Save a snapshot file of <b>everything</b> — all threads, cast, setup, settings, LoRAs, and API keys. Generated images/videos are not included (their prompts are kept). Use the share sheet to choose where the file goes (e.g. Files).</p>
-    <button class="btn-primary" id="savegame-make" style="width:100%;">💾 Save snapshot to file</button>
-    <button class="btn-primary" id="savegame-load" style="width:100%;margin-top:10px;">📂 Load snapshot from file…</button>
+    <p style="margin-bottom:12px;">Save a snapshot of <b>everything</b> — all threads, cast, setup, settings, LoRAs, and API keys. Generated images/videos aren't included (their prompts are kept). Your prompt library is left untouched by loads.</p>
+    <button class="btn-primary" id="savegame-cloud-save" style="width:100%;">☁ Save to Cloud</button>
+    <button class="btn-primary" id="savegame-cloud-load" style="width:100%;margin-top:10px;">☁ Load from Cloud…</button>
+    <div id="savegame-cloud-list" style="display:none;margin-top:12px;"></div>
+    <div style="border-top:1px solid var(--border,#333);margin:16px 0 10px;"></div>
+    <div style="font-size:11px;color:var(--text-dim);letter-spacing:0.04em;text-transform:uppercase;margin-bottom:8px;">Local file — offline fallback</div>
+    <button class="btn-secondary" id="savegame-make" style="width:100%;">💾 Save snapshot to file</button>
+    <button class="btn-secondary" id="savegame-load" style="width:100%;margin-top:10px;">📂 Load snapshot from file…</button>
     <input type="file" id="savegame-file-input" accept=".json,application/json" style="display:none;">
     <div id="savegame-confirm" style="display:none;margin-top:12px;padding:10px;border:1px solid #c0392b;border-radius:8px;">
       <p style="margin-bottom:10px;"><b>⚠️ This will wipe your current threads and settings</b> and replace them with the snapshot. Are you sure?</p>
@@ -2116,7 +2121,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '2.03';
+const APP_VERSION = '2.04';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -5635,6 +5640,13 @@ async function b2Upload(data, key, contentType) {
   return await b2SignedUrl(key);
 }
 
+// Delete an object by key (used to prune cloud snapshots). 204 = success.
+async function b2Delete(key) {
+  const res = await _b2s3Fetch('DELETE', key);
+  if (!res.ok) throw new Error('B2 delete failed (' + res.status + ')');
+  return true;
+}
+
 // List objects under a prefix for ☁ Load. Returns [{ key, ts, size }].
 async function b2List(prefix) {
   const out = [];
@@ -6556,6 +6568,87 @@ async function saveSnapshotToFile() {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+// ── Cloud snapshots (v2.04): save/list/load/delete via B2 under snapshots/ ──
+const SNAP_PREFIX = 'snapshots/';
+
+async function saveSnapshotToCloud() {
+  if (!b2Ready()) throw new Error('Cloud storage not set up — add your B2 key under 🔑 Set API Keys.');
+  const json = JSON.stringify(buildFullSnapshot());
+  const stamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+  const key = `${SNAP_PREFIX}zaor-save_${stamp}.json`;
+  await b2Upload(new Blob([json], { type: 'application/json' }), key, 'application/json');
+  return key;
+}
+
+async function listCloudSnapshots() {
+  const items = await b2List(SNAP_PREFIX);
+  return items.sort((a, b) => b.ts - a.ts); // newest first
+}
+
+async function loadCloudSnapshot(key) {
+  const res = await fetch(await b2SignedUrl(key));
+  if (!res.ok) throw new Error('download failed (' + res.status + ')');
+  const snap = JSON.parse(await res.text());
+  if (!snap || snap.zaorSnapshot !== 2 || typeof snap.localStorage !== 'object' || !Array.isArray(snap.threads)) {
+    throw new Error('not a Zaor snapshot');
+  }
+  return snap;
+}
+
+function _fmtBytes(n) {
+  return !n ? '' : (n < 1048576 ? Math.round(n / 1024) + ' KB' : (n / 1048576).toFixed(1) + ' MB');
+}
+
+async function renderCloudSnapshotList() {
+  const box = document.getElementById('savegame-cloud-list');
+  box.style.display = 'block';
+  box.innerHTML = '<p style="color:var(--text-dim);font-size:13px;margin:0;">Loading…</p>';
+  let items;
+  try { items = await listCloudSnapshots(); }
+  catch (e) { box.innerHTML = ''; const p = document.createElement('p'); p.style.cssText = 'color:#c0392b;font-size:13px;margin:0;'; p.textContent = 'Couldn’t list cloud saves: ' + e.message; box.appendChild(p); return; }
+  box.innerHTML = '';
+  if (!items.length) {
+    const p = document.createElement('p'); p.style.cssText = 'color:var(--text-dim);font-size:13px;margin:0;'; p.textContent = 'No cloud snapshots yet.'; box.appendChild(p); return;
+  }
+  for (const it of items) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;';
+    const info = document.createElement('button');
+    info.className = 'btn-secondary';
+    info.style.cssText = 'flex:1;text-align:left;';
+    const when = it.ts ? new Date(it.ts).toLocaleString() : it.key.replace(SNAP_PREFIX, '');
+    info.textContent = _fmtBytes(it.size) ? `${when} · ${_fmtBytes(it.size)}` : when;
+    info.addEventListener('click', async () => {
+      const orig = info.textContent; info.textContent = 'Loading…'; info.disabled = true;
+      try {
+        pendingSnapshot = await loadCloudSnapshot(it.key);
+        const c = document.getElementById('savegame-confirm');
+        c.style.display = 'block';
+        c.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch (e) { appendError('Load failed: ' + e.message); info.textContent = orig; info.disabled = false; }
+    });
+    const del = document.createElement('button');
+    del.className = 'btn-secondary';
+    del.style.cssText = 'flex:0 0 auto;color:#c0392b;min-width:64px;';
+    del.textContent = '✕';
+    del.title = 'Delete this cloud snapshot';
+    del.addEventListener('click', async () => {
+      if (del.dataset.armed !== '1') {
+        del.dataset.armed = '1'; del.textContent = 'Delete?';
+        setTimeout(() => { if (del.dataset.armed === '1') { del.dataset.armed = '0'; del.textContent = '✕'; } }, 3000);
+        return;
+      }
+      del.textContent = '…'; del.disabled = true;
+      try {
+        await b2Delete(it.key); row.remove();
+        if (!box.querySelector('div')) { const p = document.createElement('p'); p.style.cssText = 'color:var(--text-dim);font-size:13px;margin:0;'; p.textContent = 'No cloud snapshots yet.'; box.appendChild(p); }
+      } catch (e) { appendError('Delete failed: ' + e.message); del.dataset.armed = '0'; del.textContent = '✕'; del.disabled = false; }
+    });
+    row.appendChild(info); row.appendChild(del);
+    box.appendChild(row);
+  }
+}
+
 let pendingSnapshot = null;
 
 function applySnapshot(snap) {
@@ -6617,6 +6710,28 @@ document.getElementById('savegame-confirm-yes')?.addEventListener('click', () =>
 document.getElementById('savegame-confirm-no')?.addEventListener('click', () => {
   pendingSnapshot = null;
   document.getElementById('savegame-confirm').style.display = 'none';
+});
+
+document.getElementById('savegame-cloud-save')?.addEventListener('click', async () => {
+  const b = document.getElementById('savegame-cloud-save');
+  const o = b.textContent; b.disabled = true; b.textContent = '☁ Saving…';
+  try {
+    await saveSnapshotToCloud();
+    b.textContent = '✓ Saved to cloud';
+    const box = document.getElementById('savegame-cloud-list');
+    if (box && box.style.display === 'block') renderCloudSnapshotList(); // reflect the new save if list is open
+  } catch (e) {
+    appendError('Cloud save failed: ' + e.message);
+  }
+  b.disabled = false;
+  setTimeout(() => { b.textContent = o; }, 2000);
+});
+
+document.getElementById('savegame-cloud-load')?.addEventListener('click', () => {
+  if (!b2Ready()) { appendError('Cloud storage not set up — add your B2 key under 🔑 Set API Keys.'); return; }
+  const box = document.getElementById('savegame-cloud-list');
+  if (box.style.display === 'block') { box.style.display = 'none'; return; } // tap again to collapse
+  renderCloudSnapshotList();
 });
 
 // Open / close the Save-Load modal (mirrors the lora/library modal wiring).
