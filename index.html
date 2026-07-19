@@ -2124,7 +2124,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '2.10';
+const APP_VERSION = '2.12';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -6237,11 +6237,12 @@ const DEFAULT_LORAS = [
   { id:90011, name:'InstaPic Ultrareal (Klein)', url:'https://civitai.com/api/download/models/2912461', trigger:'instapic, detailed skin, capture from phone', base:'Flux2-Klein', category:'style', scale:1.0, notes:'Raw smartphone/social-media style layer. Strength 0.8–1.2, start 1.0. Stacks well with realism LoRAs.', active:false, boxFile:'klein_instapic_ultrareal.safetensors' },
   { id:90012, name:'DR34ML4Y AIO NSFW (HIGH)', url:'https://huggingface.co/yeqiu168182/DR34ML4Y_I2V_14B_HIGH/resolve/main/DR34ML4Y_I2V_14B_HIGH.safetensors', trigger:'', base:'Wan', noise:'high', category:'realism', scale:1.0, notes:'Wan 2.2 all-in-one NSFW · high-noise half. Activate together with the LOW half.', active:false },
   { id:90013, name:'DR34ML4Y AIO NSFW (LOW)',  url:'https://huggingface.co/yeqiu168182/DR34ML4Y_I2V_14B_LOW/resolve/main/DR34ML4Y_I2V_14B_LOW.safetensors',  trigger:'', base:'Wan', noise:'low',  category:'realism', scale:1.0, notes:'Wan 2.2 all-in-one NSFW · low-noise half. Activate together with the HIGH half.', active:false },
-  { id:90014, name:'Pony Amateur', url:'https://civitai.red/api/download/models/717403?fileId=632089', trigger:'photo, amateur, grainy', base:'Pony', category:'realism', scale:0.85, notes:'Amateur-photo realism for Pony XL. Core triggers baked in; optional extras: lowres, 2000s nostalgia, webcam photo, flash. Trained clip-skip 2 (not settable on WaveSpeed — minor). Served via civitai.red mirror; if WaveSpeed fails to load it, swap URL to civitai.com equivalent.', active:false }
+  { id:90014, name:'Pony Amateur', url:'https://civitai.red/api/download/models/717403?fileId=632089', trigger:'photo, amateur, grainy', base:'Pony', category:'realism', scale:0.85, notes:'Amateur-photo realism for Pony XL. Core triggers baked in; optional extras: lowres, 2000s nostalgia, webcam photo, flash. Trained clip-skip 2 (not settable on WaveSpeed — minor). Served via civitai.red mirror; if WaveSpeed fails to load it, swap URL to civitai.com equivalent.', active:false },
+  { id:90015, name:'Stable Yogi Realism (Pony)', url:'https://civitai.red/api/download/models/2074888', trigger:'', base:'Pony', category:'realism', scale:1.0, notes:'Clean modern realism for Pony XL: skin detail, freckles, natural light, real depth of field. No trigger needed. Weight 0.4-1.5, sweet spot 1.0-1.3. Do NOT stack with Pony Amateur — opposite style pulls (polished vs degraded). civitai.red mirror; swap to civitai.com if WaveSpeed fails to load.', active:false }
 ];
 // Versioned seeding: bump LORA_SEED_VER whenever DEFAULT_LORAS changes so new
 // defaults merge into existing libraries (merge is by URL; user entries untouched).
-const LORA_SEED_VER = '3';
+const LORA_SEED_VER = 'v2.11-pony';
 try {
   // Migrate old SNOFS entry (glitchy civitai.red link) to the HF v1.4 mirror in place.
   zaorLoras.forEach(l => {
