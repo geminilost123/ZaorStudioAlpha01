@@ -2024,6 +2024,7 @@
           <option value="Flux2-Klein">For: Flux.2 Klein</option>
           <option value="Z-Image">For: Z-Image</option>
           <option value="Wan">For: Wan video</option>
+          <option value="Pony">For: Pony XL</option>
           <option value="Other">For: Other</option>
         </select>
         <input type="number" id="lora-scale" value="0.85" min="0" max="3" step="0.05" title="Strength. ~0.85 for most. Concept-slider LoRAs may want 2–3." style="width:74px;margin-bottom:6px;" />
@@ -2123,7 +2124,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '2.08';
+const APP_VERSION = '2.09';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2488,8 +2489,14 @@ const MODEL_REGISTRY = {
   // Prefect Pony XL — SDXL Pony-family checkpoint, uncensored-capable second hosted lane
   // alongside Chroma. Schema has no safety-checker or LoRA params — plain prompt/size/seed.
   // Responds best to booru-tag dialect (score_9, score_8_up, tags) rather than prose.
-  'prefect-pony-xl':{ cat:'t2img', label:'Prefect Pony XL · WaveSpeed', provider:'wavespeed', path:'wavespeed-ai/prefect-pony-xl', price:0.01, verified:true,
+  'prefect-pony-xl':{ cat:'t2img', label:'Prefect Pony XL · WaveSpeed', provider:'wavespeed', path:'wavespeed-ai/prefect-pony-xl', price:0.015, verified:true,
     buildBody:p=>({ prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, output_format:'png', enable_base64_output:false }) },
+  'prefect-pony-xl-lora':{ cat:'t2img', label:'Prefect Pony XL · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/prefect-pony-xl-lora', price:0.02, verified:true, lora:true, loraBase:'Pony',
+    buildBody:p=>{
+      const b = { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, output_format:'png', enable_base64_output:false };
+      if (p.loras && p.loras.length) b.loras = p.loras.slice(0,3).map(l=>({ path:l.path, scale:Number(l.scale)||1 }));
+      return b;
+    } },
   'klein9b-lora':   { cat:'t2img', label:'Flux.2 Klein 9B · WaveSpeed · LoRA', provider:'wavespeed', path:'wavespeed-ai/flux-2-klein-9b/text-to-image-lora', price:0.015, verified:true, lora:true, loraBase:'Flux2-Klein',
     buildBody:p=>{
       const b = { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, enable_safety_checker:false, enable_base64_output:false };
