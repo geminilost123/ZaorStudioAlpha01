@@ -1680,6 +1680,24 @@
             <b>Steps</b>: 28 default · 36–45 for tricky anatomy (slower). &nbsp;<b>Guidance</b>: 3–4 sweet spot · higher = more literal, can over-cook.
           </div>
         </div>
+        <div class="img-controls-row" id="krea-advanced-row" style="display:none;">
+          <div class="img-control-group">
+            <span class="mode-label" title="How loosely Krea interprets the prompt. Raw = renders only what you describe; High = adds aesthetic depth and style on its own.">Creativity</span>
+            <select id="krea-creativity" class="img-control-select">
+              <option value="raw">Raw (literal)</option>
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High (loose)</option>
+            </select>
+          </div>
+          <div class="img-control-group">
+            <span class="mode-label" title="Sends your 🎯 Edit Target (or the last generated image if no target is set) as a style reference. Adds a flat $0.0025 to the run.">Style ref</span>
+            <button type="button" id="krea-use-ref" style="background:transparent;border:1px solid rgba(255,255,255,0.1);color:var(--text-dim);font-family:'Inter',sans-serif;font-size:11px;padding:3px 10px;border-radius:10px;cursor:pointer;transition:all 0.2s;white-space:nowrap;">Off</button>
+          </div>
+          <div style="font-size:11px;color:var(--text-dim);flex-basis:100%;line-height:1.45;padding-top:2px;">
+            <b>Style ref</b>: uses 🎯 Edit Target (falls back to last image) · +$0.0025. &nbsp;<b>Seed &amp; Res</b>: not supported by this model.
+          </div>
+        </div>
       </div>
       <div id="edit-mode-row">
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:0 0 2px;">
@@ -2124,7 +2142,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '2.12';
+const APP_VERSION = '2.13';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -2502,6 +2520,16 @@ const MODEL_REGISTRY = {
       const b = { prompt:p.prompt, size:wsSize(p.aspectRatio,p.resolution), seed:-1, enable_safety_checker:false, enable_base64_output:false };
       if (p.guidance != null) b.guidance_scale = p.guidance;
       if (p.loras && p.loras.length) b.loras = p.loras.slice(0,3).map(l=>({ path:l.path, scale:Number(l.scale)||1 }));
+      return b;
+    } },
+  // Krea 2 Medium Turbo — hosted Krea API model (not the open-weight Turbo checkpoint).
+  // Schema: prompt + aspect_ratio + creativity (raw/low/medium/high) + optional reference
+  // image array for style guidance (+$0.0025 flat when any refs attached, regardless of count).
+  // No seed param, no size param — Res select doesn't apply; noSeed flag drives the seed-lock warning.
+  'krea2-medium-turbo': { cat:'t2img', label:'Krea 2 Medium Turbo · WaveSpeed', provider:'wavespeed', path:'wavespeed-ai/krea-v2-medium-turbo/text-to-image', price:0.015, verified:true, noSeed:true,
+    buildBody:p=>{
+      const b = { prompt:p.prompt, aspect_ratio:p.aspectRatio||'1:1', creativity:p.creativity||'medium' };
+      if (p.reference && p.reference.length) b.reference = p.reference;
       return b;
     } },
   'atlas-flux-dev': { cat:'t2img', label:'Flux Dev · Atlas', provider:'atlas', path:'black-forest-labs/flux-dev', price:0.01, verified:true,
@@ -3258,15 +3286,29 @@ try {
 // Generate model dropdowns from the registry (single source of truth)
 try { populateModelDropdown('img-model-select', 't2img'); } catch (e) { console.error('[Zaor INIT populateDropdown]', e && (e.stack || e.message)); }
 
-// Show the steps/guidance controls only when the Flux LoRA model is selected
+// Show model-specific control rows only when their model is selected
+// (Flux LoRA → steps/guidance row; Krea 2 Medium Turbo → creativity/style-ref row)
 function updateFluxAdvancedRow() {
-  const row = document.getElementById('flux-advanced-row');
-  if (!row) return;
   const modelId = document.getElementById('img-model-select')?.value;
-  row.style.display = (modelId === 'flux-lora') ? 'flex' : 'none';
+  const fluxRow = document.getElementById('flux-advanced-row');
+  if (fluxRow) fluxRow.style.display = (modelId === 'flux-lora') ? 'flex' : 'none';
+  const kreaRow = document.getElementById('krea-advanced-row');
+  if (kreaRow) kreaRow.style.display = (modelId === 'krea2-medium-turbo') ? 'flex' : 'none';
 }
 document.getElementById('img-model-select')?.addEventListener('change', updateFluxAdvancedRow);
 try { updateFluxAdvancedRow(); } catch(e) {}
+
+// Krea style-ref toggle: Off ↔ On. When on, generateImage sends the 🎯 Edit Target
+// (or last generated image as fallback) as a single style reference (+$0.0025).
+let kreaUseRef = false;
+document.getElementById('krea-use-ref')?.addEventListener('click', () => {
+  kreaUseRef = !kreaUseRef;
+  const btn = document.getElementById('krea-use-ref');
+  if (!btn) return;
+  btn.textContent = kreaUseRef ? '🎯 On (+$0.0025)' : 'Off';
+  btn.style.borderColor = kreaUseRef ? 'var(--lavender)' : 'rgba(255,255,255,0.1)';
+  btn.style.color = kreaUseRef ? 'var(--lavender)' : 'var(--text-dim)';
+});
 
 // ── Seed Lock controls (v1.17): render + wire both Image and Edit rows ──
 const SEED_EDIT_WS = ['qwen2','qwen','fluxkontext','wan27','wan27pro','klein9b-edit-lora','z-image-i2i','z-image-i2i-lora'];
@@ -3274,7 +3316,8 @@ function seedScopeSupported(scope){
   if (scope === 'edit'){
     return SEED_EDIT_WS.includes(document.getElementById('edit-model-select')?.value);
   }
-  return MODEL_REGISTRY[document.getElementById('img-model-select')?.value]?.provider === 'wavespeed';
+  const _m = MODEL_REGISTRY[document.getElementById('img-model-select')?.value];
+  return _m?.provider === 'wavespeed' && !_m?.noSeed;
 }
 function renderSeedControls(){
   document.querySelectorAll('.seed-row[data-seedscope]').forEach(row => {
@@ -4357,6 +4400,17 @@ async function generateImage(prompt) {
       const gd = parseFloat(document.getElementById('flux-guidance')?.value);
       if (!isNaN(st)) callParams.steps = st;
       if (!isNaN(gd)) callParams.guidance = gd;
+    }
+
+    // Krea 2 Medium Turbo exposes creativity + optional style reference (see the krea row)
+    if (modelId === 'krea2-medium-turbo') {
+      const cr = document.getElementById('krea-creativity')?.value;
+      if (cr) callParams.creativity = cr;
+      if (typeof kreaUseRef !== 'undefined' && kreaUseRef) {
+        const ref = activeEditTarget || lastImageUrl;
+        if (ref) callParams.reference = [ref];
+        else appendError('Style ref is On but no 🎯 target or previous image exists — generating without a reference.');
+      }
     }
 
     // LoRA support: apply only LoRAs whose base matches the selected model (any LoRA-capable model)
