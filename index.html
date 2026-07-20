@@ -2142,7 +2142,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // together on each deploy. The sidebar badge + tab title are stamped from
 // this at boot, so the version display can never silently go stale again.
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = '2.13';
+const APP_VERSION = '2.14';
 
 // ═══════════════════════════════════════════════════════
 // PIN LOCK
@@ -3282,6 +3282,44 @@ try {
   if (_vb) _vb.textContent = 'v' + APP_VERSION;
   document.title = 'Zaor Studio v' + APP_VERSION;
 } catch (e) { console.error('[Zaor INIT version stamp]', e && (e.stack || e.message)); }
+
+// ── Version self-check (v2.14) ──
+// GitHub Pages' CDN caches the directory path ("/ZaorStudioAlpha01/") and
+// "index.html" as SEPARATE objects, so a deploy can leave the PWA's entry path
+// stale while index.html itself is already fresh (the v2.13 incident). On boot
+// and whenever the PWA resumes, fetch a cache-busted copy of index.html, read
+// its APP_VERSION, and if it's newer than the running one, show a one-tap
+// update bar. The tap navigates to a cache-busted URL, so it works even while
+// the CDN's bare-path entry is still stale. Silent on any failure.
+let _verCheckLast = 0;
+async function checkForNewVersion(){
+  const now = Date.now();
+  if (now - _verCheckLast < 300000) return; // throttle: at most once per 5 min
+  _verCheckLast = now;
+  try {
+    const res = await fetch('index.html?vercheck=' + now, { cache:'no-store' });
+    if (!res.ok) return;
+    const txt = await res.text();
+    const m = txt.match(/APP_VERSION\s*=\s*'([\d.]+)'/);
+    if (!m) return;
+    // Only prompt for NEWER versions — if the CDN is serving something older
+    // than what's running, a reload would downgrade, so stay quiet.
+    if (parseFloat(m[1]) > parseFloat(APP_VERSION)) showUpdateBar(m[1]);
+  } catch(_){ /* offline / fetch blocked — never bother the user */ }
+}
+function showUpdateBar(ver){
+  if (document.getElementById('update-bar')) return;
+  const bar = document.createElement('div');
+  bar.id = 'update-bar';
+  bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#2e2e48;color:var(--lavender);border-bottom:1px solid var(--lavender);padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top));font-family:Inter,sans-serif;font-size:13px;text-align:center;cursor:pointer;';
+  bar.textContent = '\u2B06 v' + ver + ' is live \u2014 tap to update';
+  bar.addEventListener('click', () => { location.href = 'index.html?v=' + ver; });
+  document.body.appendChild(bar);
+}
+setTimeout(checkForNewVersion, 3000); // boot check, delayed so it never slows startup
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') checkForNewVersion(); // PWA resume check
+});
 
 // Generate model dropdowns from the registry (single source of truth)
 try { populateModelDropdown('img-model-select', 't2img'); } catch (e) { console.error('[Zaor INIT populateDropdown]', e && (e.stack || e.message)); }

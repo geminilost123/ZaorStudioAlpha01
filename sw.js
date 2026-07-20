@@ -1,7 +1,7 @@
 // ── Service worker: network-first for the app shell ──
 // Deploys are picked up immediately. Cache is only an offline fallback.
 // Bump CACHE_VERSION on each deploy to purge old caches.
-const CACHE_VERSION = 'zaor-studio-v2-13';
+const CACHE_VERSION = 'zaor-studio-v2-14';
 const CACHE = CACHE_VERSION;
 
 self.addEventListener('install', e => {
@@ -21,6 +21,11 @@ self.addEventListener('fetch', e => {
   if (!e.request.url.startsWith(self.location.origin)) return;
 
   const url = e.request.url;
+
+  // Version self-check fetches must reach the network untouched — never serve
+  // them from any cache, never store them. Not calling respondWith() hands the
+  // request straight to the browser's default network fetch.
+  if (url.includes('vercheck=')) return;
 
   // NEVER cache the service worker script or manifest — if sw.js itself gets
   // cache-first served, the browser checks for updates against a stale copy
