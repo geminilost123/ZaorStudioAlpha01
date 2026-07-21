@@ -6660,7 +6660,7 @@ function buildFullSnapshot() {
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     // Prompt library is a device-global; snapshots never carry it (v2.03).
-    if (k === 'zaor_user_prompts') continue;
+    
     ls[k] = localStorage.getItem(k);
   }
   // All threads with media stripped: image/video messages become text placeholders keeping their prompts.
